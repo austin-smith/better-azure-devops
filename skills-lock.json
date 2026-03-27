@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "azure-devops": {
+      "source": "rysweet/amplihack",
+      "sourceType": "github",
+      "computedHash": "df4fbab99068ff887d48af4312a645da2df8b923a96116298a8a8b237b734f25"
+    },
+    "azure-devops-cli": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "computedHash": "da5ebe107d2f8618f0ae41a5c48d5cfde11cb7b86789ba8fbfddc34a18dc17ab"
+    }
+  }
+}
