@@ -25,18 +25,13 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { AppHeader } from "@/components/app-header";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
-import {
-  getDefaultTaskViewHref,
-  getTaskViewHref,
-} from "@/lib/tasks/navigation";
-import type { TaskViewDefinition } from "@/lib/tasks/views";
+import { getDefaultTaskViewHref } from "@/lib/tasks/navigation";
 
 type TaskDetailProps = {
   detail: TaskDetailData | null;
   detailError: string | null;
   projectLabel: string;
   taskId: number;
-  view: TaskViewDefinition;
 };
 
 type AssigneeOption = {
@@ -384,7 +379,6 @@ export function TaskDetail({
   detailError,
   projectLabel,
   taskId,
-  view,
 }: TaskDetailProps) {
   const [currentDetail, setCurrentDetail] = useState(detail);
 
@@ -396,7 +390,6 @@ export function TaskDetail({
   const linkedPullRequests = currentDetail?.linkedPullRequests ?? [];
   const headerItems = [
     { href: getDefaultTaskViewHref(), label: projectLabel },
-    { href: getTaskViewHref(view.slug), label: view.label },
     { label: `Task #${taskId}` },
   ];
 

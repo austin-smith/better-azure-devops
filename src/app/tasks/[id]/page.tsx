@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { TaskDetail } from "@/components/tasks/task-detail";
 import { getAzureDevOpsConfig, hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
 import { loadTaskDetail } from "@/lib/tasks/load-task-detail";
-import { getTaskView } from "@/lib/tasks/views";
 
 function parseTaskId(value: string) {
   const taskId = Number(value);
@@ -11,20 +10,16 @@ function parseTaskId(value: string) {
 }
 
 type TaskDetailPageProps = {
-  params: Promise<{
-    id: string;
-    viewSlug: string;
-  }>;
+  params: Promise<{ id: string }>;
 };
 
 export async function generateMetadata({
   params,
 }: TaskDetailPageProps): Promise<Metadata> {
-  const { id, viewSlug } = await params;
+  const { id } = await params;
   const taskId = parseTaskId(id);
-  const view = getTaskView(viewSlug);
 
-  if (!taskId || !view) {
+  if (!taskId) {
     notFound();
   }
 
@@ -38,11 +33,10 @@ export async function generateMetadata({
 export default async function TaskDetailPage({
   params,
 }: TaskDetailPageProps) {
-  const { id, viewSlug } = await params;
+  const { id } = await params;
   const taskId = parseTaskId(id);
-  const view = getTaskView(viewSlug);
 
-  if (!taskId || !view) {
+  if (!taskId) {
     notFound();
   }
 
@@ -55,7 +49,6 @@ export default async function TaskDetailPage({
       detailError={error}
       projectLabel={config?.project ?? "Tasks"}
       taskId={taskId}
-      view={view}
     />
   );
 }

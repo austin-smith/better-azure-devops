@@ -5,11 +5,11 @@ function encodeRouteSegment(value: string) {
 }
 
 export function getTaskViewHref(viewSlug: string) {
-  return `/views/${encodeRouteSegment(viewSlug)}`;
+  return `/${encodeRouteSegment(viewSlug)}`;
 }
 
-export function getTaskDetailHref(taskId: number, viewSlug: string) {
-  return `${getTaskViewHref(viewSlug)}/tasks/${taskId}`;
+export function getTaskDetailHref(taskId: number) {
+  return `/tasks/${taskId}`;
 }
 
 export function getDefaultTaskViewHref() {
@@ -19,9 +19,9 @@ export function getDefaultTaskViewHref() {
 export function getTaskViewSlugFromPathname(pathname: string) {
   const segments = pathname.split("/").filter(Boolean);
 
-  if (segments[0] !== "views" || !segments[1]) {
+  if (segments.length !== 1) {
     return null;
   }
 
-  return decodeURIComponent(segments[1]);
+  return decodeURIComponent(segments[0]);
 }

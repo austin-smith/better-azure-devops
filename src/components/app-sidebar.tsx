@@ -50,10 +50,11 @@ export function AppSidebar({
   views,
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const defaultView = views[0];
   const selectedViewSlug = getTaskViewSlugFromPathname(pathname);
-  const selectedView = views.find((view) => view.slug === selectedViewSlug) ?? views[0];
+  const selectedView = views.find((view) => view.slug === selectedViewSlug) ?? null;
 
-  if (!selectedView) {
+  if (!defaultView) {
     return null;
   }
 
@@ -91,7 +92,7 @@ export function AppSidebar({
                   <SidebarMenuItem key={view.slug}>
                     <SidebarMenuButton
                       render={<Link href={getTaskViewHref(view.slug)} />}
-                      isActive={view.slug === selectedView.slug}
+                      isActive={view.slug === selectedViewSlug}
                       tooltip={view.label}
                     >
                       <Icon />
@@ -110,7 +111,7 @@ export function AppSidebar({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  render={<Link href={getTaskViewHref(selectedView.slug)} />}
+                  render={<Link href={getTaskViewHref((selectedView ?? defaultView).slug)} />}
                   tooltip={projectLabel}
                 >
                   <FolderGit2Icon />

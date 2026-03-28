@@ -130,7 +130,7 @@ export function TaskTable({
   projectLabel,
   view,
 }: TaskTableProps) {
-  const taskDetailHref = (taskId: number) => getTaskDetailHref(taskId, view.slug);
+  const taskDetailHref = (taskId: number) => getTaskDetailHref(taskId);
   const columns = getColumns(taskDetailHref);
 
   // TanStack Table manages imperative table state internally and is not React Compiler-compatible.
