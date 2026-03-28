@@ -4,13 +4,13 @@ import { getAzureDevOpsConfig, hasAzureDevOpsConfig } from "@/lib/azure-devops/c
 import { loadTaskList } from "@/lib/tasks/load-task-list";
 
 export const metadata: Metadata = {
-  title: "Tasks",
+  title: "My Tasks",
 };
 
-export default async function Home() {
+export default async function MinePage() {
   const config = hasAzureDevOpsConfig() ? getAzureDevOpsConfig() : null;
   const { error, items } = config
-    ? await loadTaskList("all")
+    ? await loadTaskList("mine")
     : {
         error:
           "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL and AZURE_DEVOPS_PROJECT.",
