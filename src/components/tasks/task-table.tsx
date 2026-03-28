@@ -9,12 +9,12 @@ import {
 } from "@tanstack/react-table";
 import { ChevronDownIcon, FilterIcon, PlusIcon } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
+import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Table,
   TableBody,
@@ -28,14 +28,21 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { AppHeader } from "@/components/app-header";
 import type {
   AzureDevOpsTask as Task,
+  TaskView,
 } from "@/lib/azure-devops/tasks";
+import {
+  getTaskDetailHref,
+  getTaskViewLabel,
+} from "@/lib/tasks/navigation";
 
 type TaskTableProps = {
   error: string | null;
   items: Task[];
   projectLabel: string;
+  view: TaskView;
 };
 
 function statusVariant(state: string) {
@@ -51,86 +58,83 @@ function statusVariant(state: string) {
   }
 }
 
-function priorityVariant(priority: string) {
-  switch (priority.toLowerCase()) {
-    case "1":
-    case "high":
-      return "destructive";
-    case "2":
-    case "medium":
-      return "outline";
-    default:
-      return "secondary";
-  }
-}
-
 const columnHelper = createColumnHelper<Task>();
 
-const columns = [
-  columnHelper.accessor("id", {
-    header: "ID",
-    cell: ({ getValue }) => (
-      <span className="whitespace-nowrap font-mono text-xs text-muted-foreground">
-        #{getValue()}
-      </span>
-    ),
-  }),
-  columnHelper.accessor("title", {
-    header: "Title",
-    cell: ({ getValue }) => (
-      <div className="font-medium whitespace-normal">{getValue()}</div>
-    ),
-  }),
-  columnHelper.accessor("state", {
-    header: "State",
-    cell: ({ getValue }) => (
-      <div className="whitespace-nowrap">
-        <Badge variant={statusVariant(getValue())}>{getValue()}</Badge>
-      </div>
-    ),
-  }),
-  columnHelper.accessor("priority", {
-    header: "Priority",
-    cell: ({ getValue }) => (
-      <div className="whitespace-nowrap">
-        <Badge variant={priorityVariant(getValue())}>{getValue()}</Badge>
-      </div>
-    ),
-  }),
-  columnHelper.accessor("assignee", {
-    header: "Assignee",
-    cell: ({ getValue, row }) => (
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Link
-              href={`/tasks/${row.original.id}`}
-              className="relative z-20 inline-flex"
-            >
-              <UserAvatar
-                avatarUrl={row.original.assigneeAvatarUrl}
-                name={getValue()}
-                size="sm"
-              />
-            </Link>
-          }
+function getColumns(taskDetailHref: (taskId: number) => string) {
+  return [
+    columnHelper.accessor("id", {
+      header: "ID",
+      cell: ({ getValue }) => (
+        <span className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+          #{getValue()}
+        </span>
+      ),
+    }),
+    columnHelper.accessor("title", {
+      header: "Title",
+      cell: ({ getValue }) => (
+        <div className="font-medium whitespace-normal">{getValue()}</div>
+      ),
+    }),
+    columnHelper.accessor("state", {
+      header: "State",
+      cell: ({ getValue }) => (
+        <div className="whitespace-nowrap">
+          <Badge variant={statusVariant(getValue())}>{getValue()}</Badge>
+        </div>
+      ),
+    }),
+    columnHelper.accessor("priority", {
+      header: "Priority",
+      cell: ({ getValue }) => (
+        <div className="whitespace-nowrap">
+          <PriorityBadge priority={getValue()} />
+        </div>
+      ),
+    }),
+    columnHelper.accessor("assignee", {
+      header: "Assignee",
+      cell: ({ getValue, row }) => (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Link
+                href={taskDetailHref(row.original.id)}
+                className="relative z-20 inline-flex"
+              >
+                <UserAvatar
+                  avatarUrl={row.original.assigneeAvatarUrl}
+                  name={getValue()}
+                  size="sm"
+                />
+              </Link>
+            }
+          />
+          <TooltipContent>{getValue()}</TooltipContent>
+        </Tooltip>
+      ),
+    }),
+    columnHelper.accessor("updatedAt", {
+      header: "Updated",
+      cell: ({ getValue }) => (
+        <DateLabel
+          className="whitespace-nowrap text-muted-foreground"
+          value={getValue()}
         />
-        <TooltipContent>{getValue()}</TooltipContent>
-      </Tooltip>
-    ),
-  }),
-  columnHelper.accessor("updatedAt", {
-    header: "Updated",
-    cell: ({ getValue }) => (
-      <DateLabel
-        className="whitespace-nowrap text-muted-foreground"
-        value={getValue()}
-      />
-    ),
-  }),
-];
+      ),
+    }),
+  ];
+}
 
-export function TaskTable({ error, items, projectLabel }: TaskTableProps) {
+export function TaskTable({
+  error,
+  items,
+  projectLabel,
+  view,
+}: TaskTableProps) {
+  const taskDetailHref = (taskId: number) => getTaskDetailHref(taskId, view);
+  const columns = getColumns(taskDetailHref);
+
   // TanStack Table manages imperative table state internally and is not React Compiler-compatible.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -142,21 +146,25 @@ export function TaskTable({ error, items, projectLabel }: TaskTableProps) {
 
   return (
     <>
-      <div className="flex h-14 items-center gap-2 border-b px-3">
-        <SidebarTrigger />
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium">{projectLabel}</div>
-        </div>
-        <ThemeToggle />
-        <Button variant="outline" size="sm">
-          <FilterIcon data-icon="inline-start" />
-          <span>Filter</span>
-        </Button>
-        <Button size="sm">
-          <PlusIcon data-icon="inline-start" />
-          <span>New Task</span>
-        </Button>
-      </div>
+      <AppHeader
+        actions={(
+          <>
+            <ThemeToggle />
+            <Button variant="outline" size="sm">
+              <FilterIcon data-icon="inline-start" />
+              <span>Filter</span>
+            </Button>
+            <Button size="sm">
+              <PlusIcon data-icon="inline-start" />
+              <span>New Task</span>
+            </Button>
+          </>
+        )}
+        items={[
+          { href: "/", label: projectLabel },
+          { label: getTaskViewLabel(view) },
+        ]}
+      />
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -219,7 +227,7 @@ export function TaskTable({ error, items, projectLabel }: TaskTableProps) {
                         <TableCell key={cell.id} className="relative">
                           <Link
                             aria-hidden={cell.column.id !== "id"}
-                            href={`/tasks/${row.original.id}`}
+                            href={taskDetailHref(row.original.id)}
                             tabIndex={cell.column.id === "id" ? 0 : -1}
                             className="absolute inset-0 z-0"
                           >

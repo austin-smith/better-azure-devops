@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
-import { listTasks, type TaskView } from "@/lib/azure-devops/tasks";
-
-function parseTaskView(value: string | null): TaskView {
-  return value === "mine" ? "mine" : "all";
-}
+import { listTasks } from "@/lib/azure-devops/tasks";
+import { parseTaskView } from "@/lib/tasks/navigation";
 
 export async function GET(request: NextRequest) {
   if (!hasAzureDevOpsConfig()) {

@@ -4,10 +4,11 @@ import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowUpRightIcon, GitBranchIcon, Loader2Icon } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
+import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -22,14 +23,22 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
+import { AppHeader } from "@/components/app-header";
+import type {
+  AzureDevOpsTaskDetail as TaskDetailData,
+  TaskView,
+} from "@/lib/azure-devops/tasks";
+import {
+  getTaskViewHref,
+  getTaskViewLabel,
+} from "@/lib/tasks/navigation";
 
 type TaskDetailProps = {
   detail: TaskDetailData | null;
   detailError: string | null;
   projectLabel: string;
   taskId: number;
+  view: TaskView | null;
 };
 
 type AssigneeOption = {
@@ -37,6 +46,11 @@ type AssigneeOption = {
   key: string;
   name: string;
   secondaryText: string;
+  value: string;
+};
+
+type CommentPart = {
+  type: "mention" | "text";
   value: string;
 };
 
@@ -50,19 +64,6 @@ function statusVariant(state: string) {
       return "destructive";
     default:
       return "outline";
-  }
-}
-
-function priorityVariant(priority: string) {
-  switch (priority.toLowerCase()) {
-    case "1":
-    case "high":
-      return "destructive";
-    case "2":
-    case "medium":
-      return "outline";
-    default:
-      return "secondary";
   }
 }
 
@@ -101,6 +102,43 @@ function SidebarField({
         {label}
       </div>
       <div className="mt-1 text-sm text-foreground">{children}</div>
+    </div>
+  );
+}
+
+function getCommentParts(comment: TaskDetailData["comments"][number]): CommentPart[] {
+  if (Array.isArray(comment.parts) && comment.parts.length > 0) {
+    return comment.parts;
+  }
+
+  return comment.text ? [{ type: "text", value: comment.text }] : [];
+}
+
+function CommentBody({
+  comment,
+}: {
+  comment: TaskDetailData["comments"][number];
+}) {
+  const parts = getCommentParts(comment);
+
+  if (parts.length === 0) {
+    return <div className="mt-2 text-sm leading-relaxed text-foreground">No comment text.</div>;
+  }
+
+  return (
+    <div className="mt-2 text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
+      {parts.map((part, index) =>
+        part.type === "mention" ? (
+          <span
+            key={`${comment.id}-mention-${index}`}
+            className="rounded-md bg-sky-500/12 px-1.5 py-0.5 font-medium text-sky-700 ring-1 ring-inset ring-sky-500/25 dark:bg-sky-400/15 dark:text-sky-200 dark:ring-sky-400/30"
+          >
+            {part.value}
+          </span>
+        ) : (
+          <span key={`${comment.id}-text-${index}`}>{part.value}</span>
+        ),
+      )}
     </div>
   );
 }
@@ -348,8 +386,8 @@ export function TaskDetail({
   detailError,
   projectLabel,
   taskId,
+  view,
 }: TaskDetailProps) {
-  const router = useRouter();
   const [currentDetail, setCurrentDetail] = useState(detail);
 
   useEffect(() => {
@@ -358,47 +396,25 @@ export function TaskDetail({
 
   const comments = currentDetail?.comments ?? [];
   const linkedPullRequests = currentDetail?.linkedPullRequests ?? [];
+  const headerItems = view
+    ? [
+        { href: "/", label: projectLabel },
+        { href: getTaskViewHref(view), label: getTaskViewLabel(view) },
+        { label: `Task #${taskId}` },
+      ]
+    : [
+        { href: "/", label: projectLabel },
+        { label: `Task #${taskId}` },
+      ];
 
   return (
     <>
-      <div className="flex h-14 items-center gap-2 border-b px-3">
-        <SidebarTrigger />
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium">
-            {currentDetail?.title || `Task #${taskId}`}
-          </div>
-        </div>
-        <ThemeToggle />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            startTransition(() => {
-              router.push("/");
-            });
-          }}
-        >
-          <span>Back To List</span>
-        </Button>
-      </div>
+      <AppHeader
+        actions={<ThemeToggle />}
+        items={headerItems}
+      />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3 text-xs text-muted-foreground md:px-6 md:pt-4">
-          <button
-            type="button"
-            className="rounded-md px-2 py-1 transition-colors hover:bg-accent hover:text-foreground"
-            onClick={() => {
-              startTransition(() => {
-                router.push("/");
-              });
-            }}
-          >
-            {projectLabel}
-          </button>
-          <span>/</span>
-          <span>#{taskId}</span>
-        </div>
-
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-start gap-4 border-b px-4 py-3 md:px-6">
             <div className="min-w-0 flex-1">
@@ -411,9 +427,7 @@ export function TaskDetail({
                     <Badge variant={statusVariant(currentDetail.state)}>
                       {currentDetail.state}
                     </Badge>
-                    <Badge variant={priorityVariant(currentDetail.priority)}>
-                      P{currentDetail.priority || "?"}
-                    </Badge>
+                    <PriorityBadge priority={currentDetail.priority} />
                   </>
                 ) : null}
               </div>
@@ -522,9 +536,7 @@ export function TaskDetail({
                             value={comment.createdAt}
                           />
                         </div>
-                        <div className="mt-2 text-sm leading-relaxed text-foreground">
-                          {comment.text || "No comment text."}
-                        </div>
+                        <CommentBody comment={comment} />
                       </div>
                     ))
                   ) : (

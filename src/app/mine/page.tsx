@@ -22,6 +22,7 @@ export default async function MinePage() {
       error={error}
       items={items}
       projectLabel={config?.project ?? "Tasks"}
+      view="mine"
     />
   );
 }

@@ -22,6 +22,7 @@ export default async function Home() {
       error={error}
       items={items}
       projectLabel={config?.project ?? "Tasks"}
+      view="all"
     />
   );
 }

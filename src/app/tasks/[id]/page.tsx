@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { TaskDetail } from "@/components/tasks/task-detail";
 import { getAzureDevOpsConfig, hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
 import { loadTaskDetail } from "@/lib/tasks/load-task-detail";
+import { parseOptionalTaskView } from "@/lib/tasks/navigation";
 
 function parseTaskId(value: string) {
   const taskId = Number(value);
@@ -30,10 +31,13 @@ export async function generateMetadata({
 
 export default async function TaskDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ view?: string | string[] }>;
 }) {
   const { id } = await params;
+  const { view } = await searchParams;
   const taskId = parseTaskId(id);
 
   if (!taskId) {
@@ -49,6 +53,7 @@ export default async function TaskDetailPage({
       detailError={error}
       projectLabel={config?.project ?? "Tasks"}
       taskId={taskId}
+      view={parseOptionalTaskView(view)}
     />
   );
 }

@@ -12,11 +12,17 @@ export type AzureDevOpsTask = {
   updatedAt: string;
 };
 
+export type AzureDevOpsTaskCommentPart = {
+  type: "mention" | "text";
+  value: string;
+};
+
 export type AzureDevOpsTaskComment = {
   authorAvatarUrl: string | null;
   authorName: string;
   createdAt: string;
   id: number;
+  parts: AzureDevOpsTaskCommentPart[];
   text: string;
 };
 
@@ -144,6 +150,20 @@ const TASK_FIELDS = [
   "System.Title",
   "Microsoft.VSTS.Common.Priority",
 ] as const;
+const COMMENT_MENTION_END = "__ADO_COMMENT_MENTION_END__";
+const COMMENT_MENTION_START = "__ADO_COMMENT_MENTION_START__";
+const COMMENT_MENTION_TOKEN_PATTERN = new RegExp(
+  `(${COMMENT_MENTION_START}[\\s\\S]*?${COMMENT_MENTION_END})`,
+  "g",
+);
+const HTML_ENTITY_MAP: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  nbsp: " ",
+  quot: "\"",
+};
 
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -187,25 +207,99 @@ function escapeODataString(value: string) {
   return value.replace(/'/g, "''");
 }
 
+function decodeHtmlEntities(value: string) {
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (entity, token) => {
+    const normalizedToken = token.toLowerCase();
+
+    if (normalizedToken.startsWith("#x")) {
+      const codePoint = Number.parseInt(normalizedToken.slice(2), 16);
+
+      return Number.isNaN(codePoint) ? entity : String.fromCodePoint(codePoint);
+    }
+
+    if (normalizedToken.startsWith("#")) {
+      const codePoint = Number.parseInt(normalizedToken.slice(1), 10);
+
+      return Number.isNaN(codePoint) ? entity : String.fromCodePoint(codePoint);
+    }
+
+    return HTML_ENTITY_MAP[normalizedToken] ?? entity;
+  });
+}
+
+function normalizeRichText(value: string) {
+  return decodeHtmlEntities(value)
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[^\S\n]{2,}/g, " ")
+    .trim();
+}
+
+function stripHtml(value: string) {
+  return value.replace(/<[^>]+>/g, " ");
+}
+
+function flattenRichText(value: string) {
+  return value
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(?:div|p)>/gi, "\n")
+    .replace(/<li\b[^>]*>/gi, "• ")
+    .replace(/<\/li>/gi, "\n");
+}
+
 function parseRichText(value: unknown) {
   if (typeof value !== "string" || !value.trim()) {
     return "";
   }
 
-  return value
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<li>/gi, "• ")
-    .replace(/<\/li>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+  return normalizeRichText(stripHtml(flattenRichText(value)));
+}
+
+function parseCommentParts(value: unknown): AzureDevOpsTaskCommentPart[] {
+  if (typeof value !== "string" || !value.trim()) {
+    return [];
+  }
+
+  const commentText = normalizeRichText(
+    stripHtml(
+      flattenRichText(
+        value.replace(
+          /<([a-z]+)\b[^>]*\bdata-vss-mention\s*=\s*(['"])[\s\S]*?\2[^>]*>([\s\S]*?)<\/\1>/gi,
+          (_match, _tag, _quote, innerText) => {
+            const mentionText = normalizeRichText(stripHtml(String(innerText)));
+
+            if (!mentionText) {
+              return "";
+            }
+
+            return `${COMMENT_MENTION_START}${mentionText}${COMMENT_MENTION_END}`;
+          },
+        ),
+      ),
+    ),
+  );
+
+  if (!commentText) {
+    return [];
+  }
+
+  return commentText
+    .split(COMMENT_MENTION_TOKEN_PATTERN)
+    .filter(Boolean)
+    .map((part) => {
+      const isMention =
+        part.startsWith(COMMENT_MENTION_START) && part.endsWith(COMMENT_MENTION_END);
+
+      return {
+        type: isMention ? "mention" : "text",
+        value: isMention
+          ? part.slice(COMMENT_MENTION_START.length, -COMMENT_MENTION_END.length)
+          : part,
+      } satisfies AzureDevOpsTaskCommentPart;
+    })
+    .filter((part) => part.value);
 }
 
 function parseStringList(value: unknown) {
@@ -314,13 +408,15 @@ function toComment(comment: Comment): AzureDevOpsTaskComment | null {
   }
 
   const author = parseIdentity(comment.createdBy);
+  const parts = parseCommentParts(comment.renderedText ?? comment.text);
 
   return {
     authorAvatarUrl: author.avatarUrl,
     authorName: author.name,
     createdAt: String(comment.createdDate ?? ""),
     id,
-    text: parseRichText(comment.renderedText ?? comment.text),
+    parts,
+    text: parts.map((part) => part.value).join(""),
   };
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   CircleDotIcon,
   FolderGit2Icon,
@@ -22,13 +22,12 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-
-const views = [
-  { id: "all", label: "All", icon: CircleDotIcon },
-  { id: "mine", label: "Mine", icon: CircleDotIcon },
-] as const;
-
-export type TaskView = (typeof views)[number]["id"];
+import type { TaskView } from "@/lib/azure-devops/tasks";
+import {
+  getTaskViewHref,
+  parseOptionalTaskView,
+  TASK_VIEW_OPTIONS,
+} from "@/lib/tasks/navigation";
 
 type AppSidebarProps = {
   orgLabel: string;
@@ -50,11 +49,13 @@ export function AppSidebar({
   projectLabel,
 }: AppSidebarProps) {
   const pathname = usePathname();
-  const selectedView: TaskView = pathname === "/mine" ? "mine" : "all";
-
-  function getViewHref(view: TaskView) {
-    return view === "mine" ? "/mine" : "/";
-  }
+  const searchParams = useSearchParams();
+  const detailView = parseOptionalTaskView(searchParams.get("view"));
+  const selectedView: TaskView = pathname === "/mine"
+    ? "mine"
+    : pathname.startsWith("/tasks/")
+      ? detailView ?? "all"
+      : "all";
 
   return (
     <Sidebar collapsible="icon">
@@ -83,13 +84,13 @@ export function AppSidebar({
           <SidebarGroupLabel>Views</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {views.map((view) => {
-                const Icon = view.icon;
+              {TASK_VIEW_OPTIONS.map((view) => {
+                const Icon = CircleDotIcon;
 
                 return (
                   <SidebarMenuItem key={view.id}>
                     <SidebarMenuButton
-                      render={<Link href={getViewHref(view.id)} />}
+                      render={<Link href={getTaskViewHref(view.id)} />}
                       isActive={view.id === selectedView}
                       tooltip={view.label}
                     >
@@ -109,7 +110,7 @@ export function AppSidebar({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  render={<Link href={getViewHref(selectedView)} />}
+                  render={<Link href={getTaskViewHref(selectedView)} />}
                   tooltip={projectLabel}
                 >
                   <FolderGit2Icon />
