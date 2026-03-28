@@ -2,13 +2,25 @@
 
 import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpRightIcon, GitBranchIcon } from "lucide-react";
+import { ArrowUpRightIcon, GitBranchIcon, Loader2Icon } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
@@ -103,33 +115,38 @@ function AssigneeField({
   taskId: number;
 }) {
   const router = useRouter();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<AssigneeOption[]>([]);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const showResults = results.length > 0;
+  const showEmpty = !isLoading && query.trim().length >= 2 && results.length === 0;
+  const showList =
+    isLoading || Boolean(lookupError) || Boolean(saveError) || showResults || showEmpty;
 
   useEffect(() => {
-    if (!isEditing) {
+    if (!isOpen) {
       setQuery("");
       setResults([]);
+      setIsLoading(false);
       setLookupError(null);
       setSaveError(null);
     }
-  }, [isEditing]);
+  }, [isOpen]);
 
   useEffect(() => {
-    if (!isEditing) {
+    if (!isOpen) {
       return;
     }
 
     const trimmedQuery = query.trim();
 
     if (trimmedQuery.length < 2) {
-      setIsLoading(false);
       setResults([]);
+      setIsLoading(false);
       setLookupError(null);
       return;
     }
@@ -178,7 +195,7 @@ function AssigneeField({
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [isEditing, query]);
+  }, [isOpen, query]);
 
   async function updateAssignee(assignee: string | null) {
     if (!detail) {
@@ -211,7 +228,10 @@ function AssigneeField({
       }
 
       onUpdated(payload.item);
-      setIsEditing(false);
+      setIsOpen(false);
+      setQuery("");
+      setResults([]);
+      setLookupError(null);
       startTransition(() => {
         router.refresh();
       });
@@ -227,126 +247,95 @@ function AssigneeField({
   return (
     <SidebarField label="Assignee">
       {detail ? (
-        <div className="space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <UserAvatar
-                avatarUrl={detail.assigneeAvatarUrl}
-                name={detail.assignee}
-                size="sm"
-              />
-              <span className="truncate">{detail.assignee}</span>
-            </div>
-            {!isEditing ? (
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => {
-                  setIsEditing(true);
-                }}
-              >
-                Change
-              </Button>
-            ) : null}
-          </div>
+        <Popover
+          modal={false}
+          open={isOpen}
+          onOpenChange={(open) => {
+            setIsOpen(open);
+            if (open) {
+              setQuery("");
+            }
+          }}
+        >
+          <PopoverTrigger
+            className="flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
+            disabled={isSaving}
+          >
+            <UserAvatar
+              avatarUrl={detail.assigneeAvatarUrl}
+              name={detail.assignee}
+              size="sm"
+            />
+            <span className="min-w-0 flex-1 truncate">{detail.assignee}</span>
+          </PopoverTrigger>
 
-          {isEditing ? (
-            <div className="space-y-2">
-              <Input
+          <PopoverContent
+            align="start"
+            className="w-(--anchor-width) min-w-0 overflow-hidden p-0"
+            sideOffset={6}
+          >
+            <Command className="bg-transparent p-0" shouldFilter={false}>
+              <CommandInput
                 autoFocus
                 disabled={isSaving}
-                onChange={(event) => {
-                  setQuery(event.target.value);
+                onValueChange={(value) => {
+                  setQuery(value);
                 }}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    setIsEditing(false);
-                  }
-                }}
-                placeholder="Search name or email"
+                placeholder="Search assignee"
                 value={query}
               />
 
-              {query.trim().length > 0 && query.trim().length < 2 ? (
-                <p className="text-xs text-muted-foreground">
-                  Type at least 2 characters.
-                </p>
-              ) : null}
+              {showList ? (
+                <CommandList className="max-h-52">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-3 text-muted-foreground">
+                      <Loader2Icon className="size-4 animate-spin" />
+                    </div>
+                  ) : null}
 
-              {isLoading ? (
-                <p className="text-xs text-muted-foreground">Searching…</p>
-              ) : null}
+                  {lookupError ? (
+                    <div className="px-3 py-2 text-xs text-destructive">{lookupError}</div>
+                  ) : null}
 
-              {lookupError ? (
-                <p className="text-xs text-destructive">{lookupError}</p>
-              ) : null}
+                  {saveError ? (
+                    <div className="px-3 py-2 text-xs text-destructive">{saveError}</div>
+                  ) : null}
 
-              {saveError ? (
-                <p className="text-xs text-destructive">{saveError}</p>
-              ) : null}
+                  {showEmpty ? <CommandEmpty>No assignees found.</CommandEmpty> : null}
 
-              {!isLoading && !lookupError && results.length > 0 ? (
-                <div className="max-h-52 overflow-y-auto rounded-md border">
-                  {results.map((result) => (
-                    <button
-                      key={result.key}
-                      type="button"
-                      className="flex w-full items-center gap-2 border-b px-2 py-2 text-left text-sm transition-colors last:border-b-0 hover:bg-muted/50"
-                      disabled={isSaving}
-                      onClick={() => {
-                        void updateAssignee(result.value);
-                      }}
-                    >
-                      <UserAvatar
-                        avatarUrl={result.avatarUrl}
-                        name={result.name}
-                        size="sm"
-                      />
-                      <div className="min-w-0">
-                        <div className="truncate text-foreground">{result.name}</div>
-                        {result.secondaryText ? (
-                          <div className="truncate text-xs text-muted-foreground">
-                            {result.secondaryText}
+                  {!isLoading && showResults ? (
+                    <CommandGroup>
+                      {results.map((result) => (
+                        <CommandItem
+                          key={result.key}
+                          disabled={isSaving}
+                          onSelect={() => {
+                            void updateAssignee(result.value);
+                          }}
+                          value={result.key}
+                        >
+                          <UserAvatar
+                            avatarUrl={result.avatarUrl}
+                            name={result.name}
+                            size="sm"
+                          />
+                          <div className="min-w-0">
+                            <div className="truncate text-foreground">{result.name}</div>
+                            {result.secondaryText ? (
+                              <div className="truncate text-xs text-muted-foreground">
+                                {result.secondaryText}
+                              </div>
+                            ) : null}
                           </div>
-                        ) : null}
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  ) : null}
+                </CommandList>
               ) : null}
-
-              {!isLoading &&
-              !lookupError &&
-              query.trim().length >= 2 &&
-              results.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No matching users.</p>
-              ) : null}
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="xs"
-                  variant="outline"
-                  disabled={isSaving}
-                  onClick={() => {
-                    void updateAssignee(null);
-                  }}
-                >
-                  Unassign
-                </Button>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  disabled={isSaving}
-                  onClick={() => {
-                    setIsEditing(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </div>
+            </Command>
+          </PopoverContent>
+        </Popover>
       ) : (
         <span className="text-muted-foreground">—</span>
       )}
@@ -573,22 +562,6 @@ export function TaskDetail({
 
                 <SidebarField label="Reason">
                   {currentDetail?.reason || "—"}
-                </SidebarField>
-
-                <Separator />
-
-                <SidebarField label="Tags">
-                  {currentDetail?.tags?.length ? (
-                    <div className="flex flex-wrap gap-1">
-                      {currentDetail.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-[11px]">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
                 </SidebarField>
               </div>
             </aside>
