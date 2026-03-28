@@ -1,0 +1,56 @@
+import { ArrowUpRightIcon } from "lucide-react";
+import { PriorityBadge } from "@/components/tasks/priority-badge";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
+
+type TaskDetailHeaderProps = {
+  detail: TaskDetailData | null;
+  taskId: number;
+};
+
+function statusVariant(state: string) {
+  switch (state.toLowerCase()) {
+    case "done":
+    case "closed":
+    case "completed":
+      return "secondary";
+    case "blocked":
+      return "destructive";
+    default:
+      return "outline";
+  }
+}
+
+export function TaskDetailHeader({
+  detail,
+  taskId,
+}: TaskDetailHeaderProps) {
+  return (
+    <div className="flex items-start gap-4 border-b px-4 py-3 md:px-6">
+      <div className="min-w-0 flex-1">
+        <h2 className="text-[15px] font-semibold leading-normal text-foreground">
+          {detail?.title || `Task #${taskId}`}
+        </h2>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {detail ? (
+            <>
+              <Badge variant={statusVariant(detail.state)}>{detail.state}</Badge>
+              <PriorityBadge priority={detail.priority} />
+            </>
+          ) : null}
+        </div>
+      </div>
+      {detail?.url ? (
+        <a
+          className={buttonVariants({ size: "icon-xs", variant: "ghost" })}
+          href={detail.url}
+          rel="noreferrer"
+          target="_blank"
+        >
+          <ArrowUpRightIcon />
+        </a>
+      ) : null}
+    </div>
+  );
+}

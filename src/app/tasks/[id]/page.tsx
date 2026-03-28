@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { TaskDetail } from "@/components/tasks/task-detail";
+import { TaskDetail } from "./_components/task-detail-client";
 import { getAzureDevOpsConfig, hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
 import { loadTaskDetail } from "@/lib/tasks/load-task-detail";
 
