@@ -22,6 +22,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { AppHeader } from "@/components/app-header";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
@@ -115,11 +116,11 @@ function CommentBody({
   const parts = getCommentParts(comment);
 
   if (parts.length === 0) {
-    return <div className="mt-2 text-sm leading-relaxed text-foreground">No comment text.</div>;
+    return <div className="mt-1 text-sm leading-relaxed text-foreground">No comment text.</div>;
   }
 
   return (
-    <div className="mt-2 text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
+    <div className="mt-1 text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
       {parts.map((part, index) =>
         part.type === "mention" ? (
           <span
@@ -499,31 +500,28 @@ export function TaskDetail({
                   title="Discussion"
                   count={comments.length}
                 />
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {comments.length > 0 ? (
                     comments.map((comment) => (
-                      <div
-                        key={comment.id}
-                        className="border-l-2 border-border py-2 pl-4"
-                      >
+                      <Card key={comment.id} size="sm" className="p-3 gap-0 shadow-sm">
                         <div className="flex items-center gap-2">
                           <UserAvatar
                             avatarUrl={comment.authorAvatarUrl}
                             name={comment.authorName}
                             size="sm"
                           />
-                          <div className="min-w-0 flex-1">
-                            <span className="truncate text-sm font-medium text-foreground">
+                          <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                            <span className="truncate text-sm font-semibold text-foreground">
                               {comment.authorName}
                             </span>
+                            <DateLabel
+                              className="shrink-0 text-xs text-muted-foreground"
+                              value={comment.createdAt}
+                            />
                           </div>
-                          <DateLabel
-                            className="shrink-0 text-xs text-muted-foreground"
-                            value={comment.createdAt}
-                          />
                         </div>
                         <CommentBody comment={comment} />
-                      </div>
+                      </Card>
                     ))
                   ) : (
                     <p className="py-2 text-sm text-muted-foreground">No comments yet.</p>
