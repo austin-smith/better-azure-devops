@@ -25,6 +25,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { AppHeader } from "@/components/app-header";
+import { TaskMarkup } from "@/components/tasks/task-markup";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
 import { getDefaultTaskViewHref } from "@/lib/tasks/navigation";
 
@@ -40,11 +41,6 @@ type AssigneeOption = {
   key: string;
   name: string;
   secondaryText: string;
-  value: string;
-};
-
-type CommentPart = {
-  type: "mention" | "text";
   value: string;
 };
 
@@ -100,40 +96,19 @@ function SidebarField({
   );
 }
 
-function getCommentParts(comment: TaskDetailData["comments"][number]): CommentPart[] {
-  if (Array.isArray(comment.parts) && comment.parts.length > 0) {
-    return comment.parts;
-  }
-
-  return comment.text ? [{ type: "text", value: comment.text }] : [];
-}
-
 function CommentBody({
   comment,
 }: {
   comment: TaskDetailData["comments"][number];
 }) {
-  const parts = getCommentParts(comment);
-
-  if (parts.length === 0) {
-    return <div className="mt-1 text-sm leading-relaxed text-foreground">No comment text.</div>;
-  }
-
   return (
-    <div className="mt-1 text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground">
-      {parts.map((part, index) =>
-        part.type === "mention" ? (
-          <span
-            key={`${comment.id}-mention-${index}`}
-            className="rounded-md bg-sky-500/12 px-1.5 py-0.5 font-medium text-sky-700 ring-1 ring-inset ring-sky-500/25 dark:bg-sky-400/15 dark:text-sky-200 dark:ring-sky-400/30"
-          >
-            {part.value}
-          </span>
-        ) : (
-          <span key={`${comment.id}-text-${index}`}>{part.value}</span>
-        ),
-      )}
-    </div>
+    <TaskMarkup
+      className="mt-1"
+      emptyMessage="No comment text."
+      html={comment.html}
+      markdown={comment.format === "markdown" ? comment.text : undefined}
+      text={comment.text}
+    />
   );
 }
 
@@ -439,9 +414,10 @@ export function TaskDetail({
                 </div>
               ) : null}
 
-              <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                {currentDetail?.description || "No description."}
-              </div>
+              <TaskMarkup
+                emptyMessage="No description."
+                html={currentDetail?.descriptionHtml}
+              />
 
               <div className="mt-8">
                 <SectionLabel

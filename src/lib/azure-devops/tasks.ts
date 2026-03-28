@@ -1,10 +1,15 @@
 import { azureDevOpsRequest } from "@/lib/azure-devops/client";
+import {
+  buildAzureDevOpsAssetProxyPath,
+  isAzureDevOpsAssetUrl,
+} from "@/lib/azure-devops/assets";
 import { getAzureDevOpsOrganizationName } from "@/lib/azure-devops/config";
+import sanitizeHtml from "sanitize-html";
 
 export type AzureDevOpsTask = {
   assignee: string;
   assigneeAvatarUrl: string | null;
-  description: string;
+  descriptionHtml: string;
   id: number;
   priority: string;
   state: string;
@@ -12,17 +17,13 @@ export type AzureDevOpsTask = {
   updatedAt: string;
 };
 
-export type AzureDevOpsTaskCommentPart = {
-  type: "mention" | "text";
-  value: string;
-};
-
 export type AzureDevOpsTaskComment = {
   authorAvatarUrl: string | null;
   authorName: string;
   createdAt: string;
+  format: "html" | "markdown" | "unknown";
+  html: string;
   id: number;
-  parts: AzureDevOpsTaskCommentPart[];
   text: string;
 };
 
@@ -92,6 +93,7 @@ type Comment = {
   commentId?: number;
   createdBy?: unknown;
   createdDate?: string;
+  format?: string;
   id?: number;
   isDeleted?: boolean;
   renderedText?: string;
@@ -152,19 +154,19 @@ const TASK_FIELDS = [
   "System.Title",
   "Microsoft.VSTS.Common.Priority",
 ] as const;
-const COMMENT_MENTION_END = "__ADO_COMMENT_MENTION_END__";
-const COMMENT_MENTION_START = "__ADO_COMMENT_MENTION_START__";
-const COMMENT_MENTION_TOKEN_PATTERN = new RegExp(
-  `(${COMMENT_MENTION_START}[\\s\\S]*?${COMMENT_MENTION_END})`,
-  "g",
-);
-const HTML_ENTITY_MAP: Record<string, string> = {
-  amp: "&",
-  apos: "'",
-  gt: ">",
-  lt: "<",
-  nbsp: " ",
-  quot: "\"",
+const SANITIZE_ALLOWED_TAGS = [
+  ...(sanitizeHtml.defaults.allowedTags ?? []),
+  "img",
+];
+const SANITIZE_ALLOWED_ATTRIBUTES = {
+  ...sanitizeHtml.defaults.allowedAttributes,
+  a: [
+    ...(sanitizeHtml.defaults.allowedAttributes.a ?? []),
+    "data-vss-mention",
+    "rel",
+    "target",
+  ],
+  img: ["alt", "src", "title"],
 };
 
 function readString(value: unknown) {
@@ -209,99 +211,75 @@ function escapeODataString(value: string) {
   return value.replace(/'/g, "''");
 }
 
-function decodeHtmlEntities(value: string) {
-  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (entity, token) => {
-    const normalizedToken = token.toLowerCase();
-
-    if (normalizedToken.startsWith("#x")) {
-      const codePoint = Number.parseInt(normalizedToken.slice(2), 16);
-
-      return Number.isNaN(codePoint) ? entity : String.fromCodePoint(codePoint);
-    }
-
-    if (normalizedToken.startsWith("#")) {
-      const codePoint = Number.parseInt(normalizedToken.slice(1), 10);
-
-      return Number.isNaN(codePoint) ? entity : String.fromCodePoint(codePoint);
-    }
-
-    return HTML_ENTITY_MAP[normalizedToken] ?? entity;
-  });
+function normalizePlainText(value: string) {
+  return value.replace(/\r\n?/g, "\n").trim();
 }
 
-function normalizeRichText(value: string) {
-  return decodeHtmlEntities(value)
-    .replace(/\r\n?/g, "\n")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n[ \t]+/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[^\S\n]{2,}/g, " ")
-    .trim();
-}
-
-function stripHtml(value: string) {
-  return value.replace(/<[^>]+>/g, " ");
-}
-
-function flattenRichText(value: string) {
-  return value
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/(?:div|p)>/gi, "\n")
-    .replace(/<li\b[^>]*>/gi, "• ")
-    .replace(/<\/li>/gi, "\n");
-}
-
-function parseRichText(value: unknown) {
+function sanitizeAzureDevOpsHtml(value: unknown) {
   if (typeof value !== "string" || !value.trim()) {
     return "";
   }
 
-  return normalizeRichText(stripHtml(flattenRichText(value)));
+  return sanitizeHtml(value, {
+    allowedAttributes: SANITIZE_ALLOWED_ATTRIBUTES,
+    allowedSchemes: ["http", "https", "mailto"],
+    allowedTags: SANITIZE_ALLOWED_TAGS,
+    transformTags: {
+      a: (tagName, attribs) => {
+        const href = typeof attribs.href === "string" ? attribs.href : "";
+        const nextAttribs = { ...attribs };
+
+        if (typeof nextAttribs["data-vss-mention"] === "string") {
+          delete nextAttribs.href;
+          delete nextAttribs.rel;
+          delete nextAttribs.target;
+
+          return {
+            attribs: nextAttribs,
+            tagName,
+          };
+        }
+
+        if (href.startsWith("http://") || href.startsWith("https://")) {
+          nextAttribs.rel = "noreferrer noopener";
+          nextAttribs.target = "_blank";
+        }
+
+        return {
+          attribs: nextAttribs,
+          tagName,
+        };
+      },
+      img: (tagName, attribs) => {
+        const source = typeof attribs.src === "string" ? attribs.src : "";
+        const nextAttribs = { ...attribs };
+
+        if (isAzureDevOpsAssetUrl(source)) {
+          nextAttribs.src = buildAzureDevOpsAssetProxyPath(source);
+        }
+
+        return {
+          attribs: nextAttribs,
+          tagName,
+        };
+      },
+    },
+  });
 }
 
-function parseCommentParts(value: unknown): AzureDevOpsTaskCommentPart[] {
-  if (typeof value !== "string" || !value.trim()) {
-    return [];
+function parseCommentFormat(value: unknown): AzureDevOpsTaskComment["format"] {
+  if (typeof value !== "string") {
+    return "unknown";
   }
 
-  const commentText = normalizeRichText(
-    stripHtml(
-      flattenRichText(
-        value.replace(
-          /<([a-z]+)\b[^>]*\bdata-vss-mention\s*=\s*(['"])[\s\S]*?\2[^>]*>([\s\S]*?)<\/\1>/gi,
-          (_match, _tag, _quote, innerText) => {
-            const mentionText = normalizeRichText(stripHtml(String(innerText)));
-
-            if (!mentionText) {
-              return "";
-            }
-
-            return `${COMMENT_MENTION_START}${mentionText}${COMMENT_MENTION_END}`;
-          },
-        ),
-      ),
-    ),
-  );
-
-  if (!commentText) {
-    return [];
+  switch (value.toLowerCase()) {
+    case "html":
+      return "html";
+    case "markdown":
+      return "markdown";
+    default:
+      return "unknown";
   }
-
-  return commentText
-    .split(COMMENT_MENTION_TOKEN_PATTERN)
-    .filter(Boolean)
-    .map((part) => {
-      const isMention =
-        part.startsWith(COMMENT_MENTION_START) && part.endsWith(COMMENT_MENTION_END);
-
-      return {
-        type: isMention ? "mention" : "text",
-        value: isMention
-          ? part.slice(COMMENT_MENTION_START.length, -COMMENT_MENTION_END.length)
-          : part,
-      } satisfies AzureDevOpsTaskCommentPart;
-    })
-    .filter((part) => part.value);
 }
 
 function parseStringList(value: unknown) {
@@ -360,7 +338,7 @@ function toTask(workItem: WorkItem): AzureDevOpsTask {
   return {
     assignee: assignee.name,
     assigneeAvatarUrl: assignee.avatarUrl,
-    description: parseRichText(workItem.fields["System.Description"]),
+    descriptionHtml: sanitizeAzureDevOpsHtml(workItem.fields["System.Description"]),
     id: workItem.id,
     priority: String(workItem.fields["Microsoft.VSTS.Common.Priority"] ?? ""),
     state: String(workItem.fields["System.State"] ?? ""),
@@ -410,15 +388,17 @@ function toComment(comment: Comment): AzureDevOpsTaskComment | null {
   }
 
   const author = parseIdentity(comment.createdBy);
-  const parts = parseCommentParts(comment.renderedText ?? comment.text);
+  const format = parseCommentFormat(comment.format);
+  const html = format === "html" ? sanitizeAzureDevOpsHtml(comment.text) : "";
 
   return {
     authorAvatarUrl: author.avatarUrl,
     authorName: author.name,
     createdAt: String(comment.createdDate ?? ""),
+    format,
+    html,
     id,
-    parts,
-    text: parts.map((part) => part.value).join(""),
+    text: typeof comment.text === "string" ? normalizePlainText(comment.text) : "",
   };
 }
 

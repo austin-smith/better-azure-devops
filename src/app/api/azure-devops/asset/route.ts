@@ -17,13 +17,13 @@ export async function GET(request: NextRequest) {
   const source = request.nextUrl.searchParams.get("src");
 
   if (!source) {
-    return NextResponse.json({ error: "Missing avatar source." }, { status: 400 });
+    return NextResponse.json({ error: "Missing asset source." }, { status: 400 });
   }
 
   try {
-    const avatarUrl = resolveAzureDevOpsAssetUrl(source);
+    const assetUrl = resolveAzureDevOpsAssetUrl(source);
     const accessToken = await getAzureDevOpsAccessToken();
-    const response = await fetch(avatarUrl, {
+    const response = await fetch(assetUrl, {
       headers: {
         Accept: "image/*",
         Authorization: `Bearer ${accessToken}`,
@@ -33,22 +33,31 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { error: "Failed to load avatar from Azure DevOps." },
+        { error: "Failed to load asset from Azure DevOps." },
         { status: response.status },
+      );
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+
+    if (!contentType.startsWith("image/")) {
+      return NextResponse.json(
+        { error: "Azure DevOps asset is not an image." },
+        { status: 415 },
       );
     }
 
     return new Response(await response.arrayBuffer(), {
       headers: {
         "Cache-Control": "private, max-age=300",
-        "Content-Type": response.headers.get("content-type") ?? "image/png",
+        "Content-Type": contentType,
       },
       status: response.status,
       statusText: response.statusText,
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to load avatar from Azure DevOps.";
+      error instanceof Error ? error.message : "Failed to load asset from Azure DevOps.";
 
     return NextResponse.json({ error: message }, { status: 500 });
   }
