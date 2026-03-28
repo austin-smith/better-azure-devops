@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   CircleDotIcon,
   FolderGit2Icon,
@@ -22,16 +22,16 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
-import type { TaskView } from "@/lib/azure-devops/tasks";
 import {
   getTaskViewHref,
-  parseOptionalTaskView,
-  TASK_VIEW_OPTIONS,
+  getTaskViewSlugFromPathname,
 } from "@/lib/tasks/navigation";
+import type { TaskViewDefinition } from "@/lib/tasks/views";
 
 type AppSidebarProps = {
   orgLabel: string;
   projectLabel: string;
+  views: ReadonlyArray<TaskViewDefinition>;
 };
 
 function avatarFallback(label: string) {
@@ -47,15 +47,15 @@ function avatarFallback(label: string) {
 export function AppSidebar({
   orgLabel,
   projectLabel,
+  views,
 }: AppSidebarProps) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const detailView = parseOptionalTaskView(searchParams.get("view"));
-  const selectedView: TaskView = pathname === "/mine"
-    ? "mine"
-    : pathname.startsWith("/tasks/")
-      ? detailView ?? "all"
-      : "all";
+  const selectedViewSlug = getTaskViewSlugFromPathname(pathname);
+  const selectedView = views.find((view) => view.slug === selectedViewSlug) ?? views[0];
+
+  if (!selectedView) {
+    return null;
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -84,18 +84,18 @@ export function AppSidebar({
           <SidebarGroupLabel>Views</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {TASK_VIEW_OPTIONS.map((view) => {
+              {views.map((view) => {
                 const Icon = CircleDotIcon;
 
                 return (
-                  <SidebarMenuItem key={view.id}>
+                  <SidebarMenuItem key={view.slug}>
                     <SidebarMenuButton
-                      render={<Link href={getTaskViewHref(view.id)} />}
-                      isActive={view.id === selectedView}
+                      render={<Link href={getTaskViewHref(view.slug)} />}
+                      isActive={view.slug === selectedView.slug}
                       tooltip={view.label}
                     >
                       <Icon />
-                      <span>{view.label}</span>
+                      <span>{view.shortLabel}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -110,7 +110,7 @@ export function AppSidebar({
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  render={<Link href={getTaskViewHref(selectedView)} />}
+                  render={<Link href={getTaskViewHref(selectedView.slug)} />}
                   tooltip={projectLabel}
                 >
                   <FolderGit2Icon />

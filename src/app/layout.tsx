@@ -9,6 +9,7 @@ import {
   getAzureDevOpsConfig,
   hasAzureDevOpsConfig,
 } from "@/lib/azure-devops/config";
+import { listTaskViews } from "@/lib/tasks/views";
 
 export const metadata: Metadata = {
   description: "Task workspace",
@@ -40,6 +41,7 @@ export default function RootLayout({
               <AppSidebar
                 orgLabel={orgLabel}
                 projectLabel={projectLabel}
+                views={listTaskViews()}
               />
               <SidebarInset>{children}</SidebarInset>
             </SidebarProvider>

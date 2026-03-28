@@ -24,21 +24,19 @@ import {
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { AppHeader } from "@/components/app-header";
-import type {
-  AzureDevOpsTaskDetail as TaskDetailData,
-  TaskView,
-} from "@/lib/azure-devops/tasks";
+import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
 import {
+  getDefaultTaskViewHref,
   getTaskViewHref,
-  getTaskViewLabel,
 } from "@/lib/tasks/navigation";
+import type { TaskViewDefinition } from "@/lib/tasks/views";
 
 type TaskDetailProps = {
   detail: TaskDetailData | null;
   detailError: string | null;
   projectLabel: string;
   taskId: number;
-  view: TaskView | null;
+  view: TaskViewDefinition;
 };
 
 type AssigneeOption = {
@@ -396,16 +394,11 @@ export function TaskDetail({
 
   const comments = currentDetail?.comments ?? [];
   const linkedPullRequests = currentDetail?.linkedPullRequests ?? [];
-  const headerItems = view
-    ? [
-        { href: "/", label: projectLabel },
-        { href: getTaskViewHref(view), label: getTaskViewLabel(view) },
-        { label: `Task #${taskId}` },
-      ]
-    : [
-        { href: "/", label: projectLabel },
-        { label: `Task #${taskId}` },
-      ];
+  const headerItems = [
+    { href: getDefaultTaskViewHref(), label: projectLabel },
+    { href: getTaskViewHref(view.slug), label: view.label },
+    { label: `Task #${taskId}` },
+  ];
 
   return (
     <>

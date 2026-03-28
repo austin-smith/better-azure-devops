@@ -1,10 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
 import { listTasks } from "@/lib/azure-devops/tasks";
-import { parseTaskView } from "@/lib/tasks/navigation";
+import { getTaskView } from "@/lib/tasks/views";
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ viewSlug: string }> },
+) {
+  const { viewSlug } = await params;
+  const view = getTaskView(viewSlug);
+
+  if (!view) {
+    return NextResponse.json({ error: "Task view not found." }, { status: 404 });
+  }
+
   if (!hasAzureDevOpsConfig()) {
     return NextResponse.json(
       {
@@ -17,8 +27,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const accessToken = await getAzureDevOpsAccessToken();
-    const view = parseTaskView(request.nextUrl.searchParams.get("view"));
-    const tasks = await listTasks(accessToken, view);
+    const tasks = await listTasks(accessToken, view.filters);
 
     return NextResponse.json({ items: tasks });
   } catch (error) {

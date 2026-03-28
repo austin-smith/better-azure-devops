@@ -2,7 +2,7 @@ import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import {
   listTasks,
   type AzureDevOpsTask,
-  type TaskView,
+  type TaskListFilters,
 } from "@/lib/azure-devops/tasks";
 
 type LoadTaskListResult = {
@@ -10,10 +10,12 @@ type LoadTaskListResult = {
   items: AzureDevOpsTask[];
 };
 
-export async function loadTaskList(view: TaskView): Promise<LoadTaskListResult> {
+export async function loadTaskList(
+  filters: TaskListFilters,
+): Promise<LoadTaskListResult> {
   try {
     const accessToken = await getAzureDevOpsAccessToken();
-    const items = await listTasks(accessToken, view);
+    const items = await listTasks(accessToken, filters);
 
     return {
       error: null,

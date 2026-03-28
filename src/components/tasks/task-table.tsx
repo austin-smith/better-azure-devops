@@ -29,20 +29,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AppHeader } from "@/components/app-header";
-import type {
-  AzureDevOpsTask as Task,
-  TaskView,
-} from "@/lib/azure-devops/tasks";
+import type { AzureDevOpsTask as Task } from "@/lib/azure-devops/tasks";
 import {
+  getDefaultTaskViewHref,
   getTaskDetailHref,
-  getTaskViewLabel,
 } from "@/lib/tasks/navigation";
+import type { TaskViewDefinition } from "@/lib/tasks/views";
 
 type TaskTableProps = {
   error: string | null;
   items: Task[];
   projectLabel: string;
-  view: TaskView;
+  view: TaskViewDefinition;
 };
 
 function statusVariant(state: string) {
@@ -132,7 +130,7 @@ export function TaskTable({
   projectLabel,
   view,
 }: TaskTableProps) {
-  const taskDetailHref = (taskId: number) => getTaskDetailHref(taskId, view);
+  const taskDetailHref = (taskId: number) => getTaskDetailHref(taskId, view.slug);
   const columns = getColumns(taskDetailHref);
 
   // TanStack Table manages imperative table state internally and is not React Compiler-compatible.
@@ -161,8 +159,8 @@ export function TaskTable({
           </>
         )}
         items={[
-          { href: "/", label: projectLabel },
-          { label: getTaskViewLabel(view) },
+          { href: getDefaultTaskViewHref(), label: projectLabel },
+          { label: view.label },
         ]}
       />
 

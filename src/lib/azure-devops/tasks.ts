@@ -140,7 +140,9 @@ type ParsedIdentity = {
   name: string;
 };
 
-export type TaskView = "all" | "mine";
+export type TaskListFilters = Readonly<{
+  assignee?: "me";
+}>;
 
 const TASK_FIELDS = [
   "System.AssignedTo",
@@ -492,9 +494,12 @@ async function listLinkedPullRequests(
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export async function listTasks(accessToken: string, view: TaskView = "all") {
+export async function listTasks(
+  accessToken: string,
+  filters: TaskListFilters = {},
+) {
   const assigneeFilter =
-    view === "mine" ? "\n  AND [System.AssignedTo] = @Me" : "";
+    filters.assignee === "me" ? "\n  AND [System.AssignedTo] = @Me" : "";
   const wiql = `SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [System.ChangedDate]
 FROM WorkItems
 WHERE [System.TeamProject] = @Project
