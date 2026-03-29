@@ -7,6 +7,7 @@ This repo expects direct, modern, maintainable code. Match the stack and convent
 ## Non-Negotiables
 
 - Follow current best practices for Next.js 16 App Router, React 19, TypeScript, Tailwind 4, and the libraries already installed in this repo.
+- Use `pnpm` for dependency management and scripts.
 - Read the relevant docs in `node_modules/next/dist/docs/` before changing Next.js behavior, APIs, or file conventions.
 - Prefer official library APIs, generators, and CLI workflows over custom abstractions.
 - Do not add compatibility layers, fallback branches, or temporary hacks unless they are explicitly required.
