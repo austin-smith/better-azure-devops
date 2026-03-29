@@ -4,13 +4,19 @@ import {
   isAzureDevOpsAssetUrl,
 } from "@/lib/azure-devops/assets";
 import { getAzureDevOpsOrganizationName } from "@/lib/azure-devops/config";
+import {
+  getDefaultTaskListFilters,
+  type TaskListFilters,
+} from "@/lib/tasks/filters";
 import sanitizeHtml from "sanitize-html";
 
 export type AzureDevOpsTask = {
+  areaPath: string;
   assignee: string;
   assigneeAvatarUrl: string | null;
   descriptionHtml: string;
   id: number;
+  iterationPath: string;
   priority: string;
   state: string;
   title: string;
@@ -55,6 +61,13 @@ export type AzureDevOpsTaskDetail = AzureDevOpsTask & {
 
 export type AzureDevOpsAssigneeOption = {
   avatarUrl: string | null;
+  key: string;
+  name: string;
+  secondaryText: string;
+  value: string;
+};
+
+export type AzureDevOpsClassificationPathOption = {
   key: string;
   name: string;
   secondaryText: string;
@@ -142,14 +155,29 @@ type ParsedIdentity = {
   name: string;
 };
 
-export type TaskListFilters = Readonly<{
-  assignee?: "me";
-}>;
+type ClassificationNodeKind = "areas" | "iterations";
+
+type ClassificationNode = {
+  children?: ClassificationNode[];
+  hasChildren?: boolean;
+  id?: number;
+  identifier?: string;
+  name?: string;
+  path?: string;
+};
+
+type WorkItemBatchRequest = {
+  errorPolicy: "omit";
+  fields: readonly string[];
+  ids: number[];
+};
 
 const TASK_FIELDS = [
+  "System.AreaPath",
   "System.AssignedTo",
   "System.ChangedDate",
   "System.Description",
+  "System.IterationPath",
   "System.State",
   "System.Title",
   "Microsoft.VSTS.Common.Priority",
@@ -167,6 +195,15 @@ const SANITIZE_ALLOWED_ATTRIBUTES = {
     "target",
   ],
   img: ["alt", "src", "title"],
+};
+const WORK_ITEMS_BATCH_LIMIT = 200;
+const HTML_ENTITY_MAP: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  nbsp: " ",
+  quot: '"',
 };
 
 function readString(value: unknown) {
@@ -211,8 +248,123 @@ function escapeODataString(value: string) {
   return value.replace(/'/g, "''");
 }
 
+function escapeWiqlString(value: string) {
+  return value.replace(/'/g, "''");
+}
+
 function normalizePlainText(value: string) {
   return value.replace(/\r\n?/g, "\n").trim();
+}
+
+function decodeHtmlEntities(value: string) {
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (entity, code) => {
+    const normalizedCode = code.toLowerCase();
+
+    if (normalizedCode.startsWith("#x")) {
+      const parsed = Number.parseInt(normalizedCode.slice(2), 16);
+      return Number.isNaN(parsed) ? entity : String.fromCodePoint(parsed);
+    }
+
+    if (normalizedCode.startsWith("#")) {
+      const parsed = Number.parseInt(normalizedCode.slice(1), 10);
+      return Number.isNaN(parsed) ? entity : String.fromCodePoint(parsed);
+    }
+
+    return HTML_ENTITY_MAP[normalizedCode] ?? entity;
+  });
+}
+
+function extractRenderedMentionLabels(renderedText: string) {
+  const mentions = new Map<string, string>();
+
+  for (const match of renderedText.matchAll(
+    /<a\b[^>]*\bdata-vss-mention="[^"]*?,([^"]+)"[^>]*>(.*?)<\/a>/gi,
+  )) {
+    const mentionId = match[1]?.trim().toLowerCase();
+    const mentionLabel = decodeHtmlEntities(
+      sanitizeHtml(match[2] ?? "", {
+        allowedAttributes: {},
+        allowedTags: [],
+      }).trim(),
+    );
+
+    if (mentionId && mentionLabel) {
+      mentions.set(mentionId, mentionLabel);
+    }
+  }
+
+  return mentions;
+}
+
+function escapeMarkdownLinkText(value: string) {
+  return value.replace(/([\\[\]])/g, "\\$1");
+}
+
+function normalizeAzureDevOpsMarkdown(text: string, renderedText?: string) {
+  const normalizedText = normalizePlainText(decodeHtmlEntities(text));
+
+  if (!renderedText?.trim()) {
+    return normalizedText;
+  }
+
+  const mentionLabels = extractRenderedMentionLabels(renderedText);
+
+  return normalizedText.replace(/@<([^>]+)>/g, (token, mentionId) => {
+    const normalizedMentionId = String(mentionId).trim().toLowerCase();
+    const mentionLabel = mentionLabels.get(normalizedMentionId);
+
+    if (!mentionLabel) {
+      return token;
+    }
+
+    return `[${escapeMarkdownLinkText(mentionLabel)}](./ado-mention/${normalizedMentionId})`;
+  });
+}
+
+function normalizeTaskPath(value: unknown) {
+  const normalizedValue = readString(value);
+
+  if (!normalizedValue) {
+    return "";
+  }
+
+  return normalizedValue
+    .split("\\")
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .join("\\");
+}
+
+function normalizeClassificationFilterPath(
+  kind: ClassificationNodeKind,
+  path: string,
+) {
+  const segments = normalizeTaskPath(path).split("\\").filter(Boolean);
+
+  if (segments.length < 2) {
+    return segments.join("\\");
+  }
+
+  const classificationLabels =
+    kind === "areas"
+      ? new Set(["area", "areas"])
+      : new Set(["iteration", "iterations"]);
+
+  if (!classificationLabels.has(segments[1]?.toLowerCase() ?? "")) {
+    return segments.join("\\");
+  }
+
+  return [segments[0], ...segments.slice(2)].join("\\");
+}
+
+function chunkIds(ids: number[], size: number) {
+  const chunks: number[][] = [];
+
+  for (let index = 0; index < ids.length; index += size) {
+    chunks.push(ids.slice(index, index + size));
+  }
+
+  return chunks;
 }
 
 function sanitizeAzureDevOpsHtml(value: unknown) {
@@ -336,15 +488,102 @@ function toTask(workItem: WorkItem): AzureDevOpsTask {
   const assignee = parseIdentity(workItem.fields["System.AssignedTo"], "Unassigned");
 
   return {
+    areaPath: normalizeTaskPath(workItem.fields["System.AreaPath"]),
     assignee: assignee.name,
     assigneeAvatarUrl: assignee.avatarUrl,
     descriptionHtml: sanitizeAzureDevOpsHtml(workItem.fields["System.Description"]),
     id: workItem.id,
+    iterationPath: normalizeTaskPath(workItem.fields["System.IterationPath"]),
     priority: String(workItem.fields["Microsoft.VSTS.Common.Priority"] ?? ""),
     state: String(workItem.fields["System.State"] ?? ""),
     title: String(workItem.fields["System.Title"] ?? `Work item ${workItem.id}`),
     updatedAt: String(workItem.fields["System.ChangedDate"] ?? ""),
   };
+}
+
+function compareClassificationPathOptions(
+  left: AzureDevOpsClassificationPathOption,
+  right: AzureDevOpsClassificationPathOption,
+) {
+  return left.value.localeCompare(right.value, undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
+function flattenClassificationNodes(
+  kind: ClassificationNodeKind,
+  node: ClassificationNode,
+  options: AzureDevOpsClassificationPathOption[],
+  depth = 0,
+  parentPath = "",
+  parentNormalizedPath = "",
+) {
+  const name = readString(node.name) ?? "";
+  const path = normalizeTaskPath(node.path ?? [parentPath, name].filter(Boolean).join("\\"));
+  const normalizedPath = normalizeClassificationFilterPath(kind, path);
+  const identifier = readString(node.identifier);
+  const secondaryText =
+    normalizedPath && normalizedPath !== name ? normalizedPath : "";
+
+  if (depth > 0 && normalizedPath && normalizedPath !== parentNormalizedPath) {
+    options.push({
+      key: identifier ?? String(node.id ?? normalizedPath),
+      name: name || path,
+      secondaryText,
+      value: normalizedPath,
+    });
+  }
+
+  for (const child of node.children ?? []) {
+    flattenClassificationNodes(
+      kind,
+      child,
+      options,
+      depth + 1,
+      path,
+      normalizedPath,
+    );
+  }
+}
+
+async function listClassificationPathOptions(
+  accessToken: string,
+  kind: ClassificationNodeKind,
+  query = "",
+) {
+  const response = await azureDevOpsRequest<ClassificationNode>(
+    `/_apis/wit/classificationnodes/${kind}?$depth=100`,
+    { accessToken },
+  );
+  const options: AzureDevOpsClassificationPathOption[] = [];
+  const seen = new Set<string>();
+  const normalizedQuery = query.trim().toLowerCase();
+
+  flattenClassificationNodes(kind, response, options);
+
+  return options
+    .filter((option) => {
+      const key = option.value.toLowerCase();
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    })
+    .filter((option) => {
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      return (
+        option.name.toLowerCase().includes(normalizedQuery) ||
+        option.value.toLowerCase().includes(normalizedQuery)
+      );
+    })
+    .sort(compareClassificationPathOptions);
 }
 
 function toAssigneeOption(entitlement: UserEntitlement): AzureDevOpsAssigneeOption | null {
@@ -389,16 +628,20 @@ function toComment(comment: Comment): AzureDevOpsTaskComment | null {
 
   const author = parseIdentity(comment.createdBy);
   const format = parseCommentFormat(comment.format);
-  const html = format === "html" ? sanitizeAzureDevOpsHtml(comment.text) : "";
 
   return {
     authorAvatarUrl: author.avatarUrl,
     authorName: author.name,
     createdAt: String(comment.createdDate ?? ""),
     format,
-    html,
+    html: format === "html" ? sanitizeAzureDevOpsHtml(comment.text) : "",
     id,
-    text: typeof comment.text === "string" ? normalizePlainText(comment.text) : "",
+    text:
+      typeof comment.text === "string"
+        ? format === "markdown"
+          ? normalizeAzureDevOpsMarkdown(comment.text, comment.renderedText)
+          : normalizePlainText(comment.text)
+        : "",
   };
 }
 
@@ -476,20 +719,49 @@ async function listLinkedPullRequests(
 
 export async function listTasks(
   accessToken: string,
-  filters: TaskListFilters = {},
+  filters: TaskListFilters = getDefaultTaskListFilters(),
 ) {
+  const normalizedAreaPath = filters.areaPath
+    ? normalizeClassificationFilterPath("areas", filters.areaPath)
+    : "";
+  const normalizedIterationPath = filters.iterationPath
+    ? normalizeClassificationFilterPath("iterations", filters.iterationPath)
+    : "";
+  const areaPathFilter = normalizedAreaPath
+    ? `\n  AND [System.AreaPath] UNDER '${escapeWiqlString(normalizedAreaPath)}'`
+    : "";
   const assigneeFilter =
     filters.assignee === "me" ? "\n  AND [System.AssignedTo] = @Me" : "";
+  const iterationPathFilter = normalizedIterationPath
+    ? `\n  AND [System.IterationPath] UNDER '${escapeWiqlString(normalizedIterationPath)}'`
+    : "";
+  const stateFilter =
+    filters.states.length > 0
+      ? `\n  AND [System.State] IN (${filters.states
+          .map((state) => `'${escapeWiqlString(state)}'`)
+          .join(", ")})`
+      : "";
+  const priorityFilter =
+    filters.priorities.length > 0
+      ? `\n  AND [Microsoft.VSTS.Common.Priority] IN (${filters.priorities
+          .map((priority) => `'${escapeWiqlString(priority)}'`)
+          .join(", ")})`
+      : "";
   const wiql = `SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [System.ChangedDate]
 FROM WorkItems
 WHERE [System.TeamProject] = @Project
   AND [System.WorkItemType] = 'Task'
+${areaPathFilter}
 ${assigneeFilter}
+${iterationPathFilter}
+${stateFilter}
+${priorityFilter}
   AND [System.State] <> 'Closed'
+  AND [System.State] <> 'Removed'
 ORDER BY [System.ChangedDate] DESC`;
 
   const result = await azureDevOpsRequest<WiqlResponse>(
-    "/_apis/wit/wiql?$top=50",
+    "/_apis/wit/wiql",
     {
       accessToken,
       method: "POST",
@@ -502,21 +774,26 @@ ORDER BY [System.ChangedDate] DESC`;
   }
 
   const ids = result.workItems.map((item) => item.id);
-  const workItems = await azureDevOpsRequest<WorkItemsResponse>(
-    "/_apis/wit/workitemsbatch",
-    {
-      accessToken,
-      method: "POST",
-      body: JSON.stringify({
-        errorPolicy: "omit",
-        fields: TASK_FIELDS,
-        ids,
-      }),
-    },
+  const workItemsResponses = await Promise.all(
+    chunkIds(ids, WORK_ITEMS_BATCH_LIMIT).map((batchIds) =>
+      azureDevOpsRequest<WorkItemsResponse>(
+        "/_apis/wit/workitemsbatch",
+        {
+          accessToken,
+          method: "POST",
+          body: JSON.stringify({
+            errorPolicy: "omit",
+            fields: TASK_FIELDS,
+            ids: batchIds,
+          } satisfies WorkItemBatchRequest),
+        },
+      ),
+    ),
   );
+  const workItems = workItemsResponses.flatMap((response) => response.value);
 
   const workItemsById = new Map(
-    workItems.value.map((workItem) => [workItem.id, workItem]),
+    workItems.map((workItem) => [workItem.id, workItem]),
   );
 
   return ids
@@ -538,9 +815,9 @@ export async function getTaskDetails(accessToken: string, workItemId: number) {
 
   return {
     ...toTask(workItem),
-    areaPath: String(workItem.fields["System.AreaPath"] ?? ""),
+    areaPath: normalizeTaskPath(workItem.fields["System.AreaPath"]),
     comments,
-    iterationPath: String(workItem.fields["System.IterationPath"] ?? ""),
+    iterationPath: normalizeTaskPath(workItem.fields["System.IterationPath"]),
     linkedPullRequests,
     revision: Number(workItem.rev ?? 0),
     reason: String(workItem.fields["System.Reason"] ?? ""),
@@ -585,6 +862,14 @@ export async function listAssignableUsers(accessToken: string, query: string) {
       seen.add(key);
       return true;
     });
+}
+
+export async function listAreaPathOptions(accessToken: string, query = "") {
+  return listClassificationPathOptions(accessToken, "areas", query);
+}
+
+export async function listIterationPathOptions(accessToken: string, query = "") {
+  return listClassificationPathOptions(accessToken, "iterations", query);
 }
 
 export async function updateTaskAssignee(

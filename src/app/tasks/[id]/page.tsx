@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TaskDetail } from "./_components/task-detail-client";
-import { getAzureDevOpsConfig, hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
+import {
+  getTaskListTitle,
+  parseTaskListFilters,
+  type TaskListSearchParams,
+} from "@/lib/tasks/filters";
 import { loadTaskDetail } from "@/lib/tasks/load-task-detail";
+import { getTaskListHref } from "@/lib/tasks/navigation";
 
 function parseTaskId(value: string) {
   const taskId = Number(value);
@@ -11,6 +16,7 @@ function parseTaskId(value: string) {
 
 type TaskDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<TaskListSearchParams>;
 };
 
 export async function generateMetadata({
@@ -32,23 +38,27 @@ export async function generateMetadata({
 
 export default async function TaskDetailPage({
   params,
+  searchParams,
 }: TaskDetailPageProps) {
-  const { id } = await params;
+  const [{ id }, filters] = await Promise.all([
+    params,
+    searchParams.then(parseTaskListFilters),
+  ]);
   const taskId = parseTaskId(id);
 
   if (!taskId) {
     notFound();
   }
 
-  const config = hasAzureDevOpsConfig() ? getAzureDevOpsConfig() : null;
   const { detail, error } = await loadTaskDetail(taskId);
 
   return (
     <TaskDetail
       detail={detail}
       detailError={error}
-      projectLabel={config?.project ?? "Tasks"}
       taskId={taskId}
+      taskListHref={getTaskListHref(filters)}
+      taskListLabel={getTaskListTitle(filters)}
     />
   );
 }

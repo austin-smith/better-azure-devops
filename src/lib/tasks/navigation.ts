@@ -1,27 +1,32 @@
-import { getDefaultTaskView } from "@/lib/tasks/views";
+import {
+  createTaskListSearchParams,
+  type TaskListFilterInput,
+} from "@/lib/tasks/filters";
 
-function encodeRouteSegment(value: string) {
-  return encodeURIComponent(value);
-}
+const TASK_LIST_PATH = "/tasks";
 
-export function getTaskViewHref(viewSlug: string) {
-  return `/${encodeRouteSegment(viewSlug)}`;
-}
+function appendSearchParams(pathname: string, filters: TaskListFilterInput = {}) {
+  const searchParams = createTaskListSearchParams(filters);
+  const query = searchParams.toString();
 
-export function getTaskDetailHref(taskId: number) {
-  return `/tasks/${taskId}`;
-}
-
-export function getDefaultTaskViewHref() {
-  return getTaskViewHref(getDefaultTaskView().slug);
-}
-
-export function getTaskViewSlugFromPathname(pathname: string) {
-  const segments = pathname.split("/").filter(Boolean);
-
-  if (segments.length !== 1) {
-    return null;
+  if (!query) {
+    return pathname;
   }
 
-  return decodeURIComponent(segments[0]);
+  return `${pathname}?${query}`;
+}
+
+export function getTaskDetailHref(
+  taskId: number,
+  filters: TaskListFilterInput = {},
+) {
+  return appendSearchParams(`/tasks/${taskId}`, filters);
+}
+
+export function getTaskListHref(filters: TaskListFilterInput = {}) {
+  return appendSearchParams(TASK_LIST_PATH, filters);
+}
+
+export function getDefaultTaskListHref() {
+  return getTaskListHref();
 }

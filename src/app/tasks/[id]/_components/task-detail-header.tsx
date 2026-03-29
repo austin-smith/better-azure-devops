@@ -3,24 +3,12 @@ import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
+import { getTaskStateBadgeVariant } from "@/lib/tasks/state";
 
 type TaskDetailHeaderProps = {
   detail: TaskDetailData | null;
   taskId: number;
 };
-
-function statusVariant(state: string) {
-  switch (state.toLowerCase()) {
-    case "done":
-    case "closed":
-    case "completed":
-      return "secondary";
-    case "blocked":
-      return "destructive";
-    default:
-      return "outline";
-  }
-}
 
 export function TaskDetailHeader({
   detail,
@@ -35,7 +23,7 @@ export function TaskDetailHeader({
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {detail ? (
             <>
-              <Badge variant={statusVariant(detail.state)}>{detail.state}</Badge>
+              <Badge variant={getTaskStateBadgeVariant(detail.state)}>{detail.state}</Badge>
               <PriorityBadge priority={detail.priority} />
             </>
           ) : null}

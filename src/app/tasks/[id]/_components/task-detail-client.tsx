@@ -7,20 +7,21 @@ import { TaskDetailSidebar } from "./task-detail-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AppHeader } from "@/components/app-header";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
-import { getDefaultTaskViewHref } from "@/lib/tasks/navigation";
 
 type TaskDetailProps = {
   detail: TaskDetailData | null;
   detailError: string | null;
-  projectLabel: string;
   taskId: number;
+  taskListHref: string;
+  taskListLabel: string;
 };
 
 export function TaskDetail({
   detail,
   detailError,
-  projectLabel,
   taskId,
+  taskListHref,
+  taskListLabel,
 }: TaskDetailProps) {
   const [currentDetail, setCurrentDetail] = useState(detail);
 
@@ -29,7 +30,8 @@ export function TaskDetail({
   }, [detail]);
 
   const headerItems = [
-    { href: getDefaultTaskViewHref(), label: projectLabel },
+    { href: "/", label: "Home" },
+    { href: taskListHref, label: taskListLabel },
     { label: `Task #${taskId}` },
   ];
 

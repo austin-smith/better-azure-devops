@@ -9,18 +9,25 @@ import {
   getAzureDevOpsConfig,
   hasAzureDevOpsConfig,
 } from "@/lib/azure-devops/config";
-import { listTaskViews } from "@/lib/tasks/views";
+import { loadCurrentAzureDevOpsUser } from "@/lib/azure-devops/current-user";
+import { loadDashboardOverview } from "@/lib/tasks/load-dashboard-overview";
 
 export const metadata: Metadata = {
   description: "Task workspace",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const config = hasAzureDevOpsConfig() ? getAzureDevOpsConfig() : null;
+  const [overview, currentUser] = config
+    ? await Promise.all([
+        loadDashboardOverview(),
+        loadCurrentAzureDevOpsUser(),
+      ])
+    : [null, null];
   const orgLabel = config
     ? new URL(config.orgUrl).pathname.replace(/^\/|\/$/g, "")
     : "Azure DevOps";
@@ -39,9 +46,11 @@ export default function RootLayout({
           <TooltipProvider>
             <SidebarProvider>
               <AppSidebar
+                currentUser={currentUser}
                 orgLabel={orgLabel}
                 projectLabel={projectLabel}
-                views={listTaskViews()}
+                queueCount={overview?.error ? null : (overview?.queueCount ?? null)}
+                taskCount={overview?.error ? null : (overview?.openTaskCount ?? null)}
               />
               <SidebarInset>{children}</SidebarInset>
             </SidebarProvider>
