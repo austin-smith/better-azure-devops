@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { Source_Code_Pro } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { AppSidebar } from "@/components/app-sidebar";
-import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeShortcut } from "@/components/theme-shortcut";
+import { ThemeProvider } from "@/components/themes/theme-provider";
+import { ThemeShortcut } from "@/components/themes/theme-shortcut";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
@@ -10,7 +13,20 @@ import {
   hasAzureDevOpsConfig,
 } from "@/lib/azure-devops/config";
 import { loadCurrentAzureDevOpsUser } from "@/lib/azure-devops/current-user";
+import {
+  PREFERRED_THEME_FAMILY_KEY,
+  THEME_MODE_COOKIE_NAME,
+  getThemeModeScript,
+  isKnownThemeFamily,
+  normalizeThemeMode,
+} from "@/lib/theme/constants";
 import { loadDashboardOverview } from "@/lib/tasks/load-dashboard-overview";
+
+const sourceCodePro = Source_Code_Pro({
+  subsets: ["latin"],
+  variable: "--font-perpetuity-dark",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   description: "Task workspace",
@@ -21,6 +37,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
   const config = hasAzureDevOpsConfig() ? getAzureDevOpsConfig() : null;
   const [overview, currentUser] = config
     ? await Promise.all([
@@ -32,15 +49,35 @@ export default async function RootLayout({
     ? new URL(config.orgUrl).pathname.replace(/^\/|\/$/g, "")
     : "Azure DevOps";
   const projectLabel = config?.project ?? "Tasks";
+  const familyCookieRaw =
+    cookieStore.get(PREFERRED_THEME_FAMILY_KEY)?.value ?? "";
+  const themeModeCookieRaw = cookieStore.get(THEME_MODE_COOKIE_NAME)?.value ?? "";
+  const serverThemeMode = normalizeThemeMode(themeModeCookieRaw);
+  const serverThemeFamilyClass =
+    familyCookieRaw !== "default" && isKnownThemeFamily(familyCookieRaw)
+      ? familyCookieRaw
+      : "";
+  const htmlClassName = [
+    "h-full",
+    sourceCodePro.variable,
+    serverThemeMode === "dark" ? "dark" : "",
+    serverThemeFamilyClass,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <html lang="en" className="h-full" suppressHydrationWarning>
+    <html lang="en" className={htmlClassName} suppressHydrationWarning>
       <body className="flex min-h-full flex-col antialiased">
+        <Script
+          id="theme-mode-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: getThemeModeScript() }}
+        />
         <ThemeProvider
-          attribute="class"
           defaultTheme="system"
-          enableSystem
           disableTransitionOnChange
+          initialTheme={serverThemeMode}
         >
           <ThemeShortcut />
           <TooltipProvider>

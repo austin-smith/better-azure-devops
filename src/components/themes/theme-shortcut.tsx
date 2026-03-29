@@ -1,16 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useTheme } from "next-themes";
-import { getNextTheme } from "@/lib/theme-config";
-import { ThemeSwitcherModal } from "@/components/theme-switcher-modal";
+import { ThemeSwitcherModal } from "@/components/themes/theme-switcher-modal";
+import { useTheme } from "@/components/themes/theme-provider";
+import {
+  getNextThemeMode,
+  normalizeThemeMode,
+} from "@/lib/theme/constants";
 
 export function ThemeShortcut() {
   const { theme, setTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
 
   const cycleTheme = useCallback(() => {
-    setTheme(getNextTheme(theme));
+    setTheme(getNextThemeMode(normalizeThemeMode(theme)));
   }, [theme, setTheme]);
 
   useEffect(() => {
@@ -35,8 +38,6 @@ export function ThemeShortcut() {
     <ThemeSwitcherModal
       isOpen={isOpen}
       onClose={() => setIsOpen(false)}
-      selectedTheme={theme}
-      onSelectTheme={setTheme}
     />
   );
 }

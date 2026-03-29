@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { TaskDetailContent } from "./task-detail-content";
 import { TaskDetailHeader } from "./task-detail-header";
 import { TaskDetailSidebar } from "./task-detail-sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeToggle } from "@/components/themes/theme-toggle";
 import { AppHeader } from "@/components/app-header";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
 

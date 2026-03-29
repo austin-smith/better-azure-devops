@@ -10,7 +10,7 @@ import {
 import { AppHeader } from "@/components/app-header";
 import { DateLabel } from "@/components/date-label";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeToggle } from "@/components/themes/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

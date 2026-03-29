@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { ThemeToggle } from "@/components/themes/theme-toggle";
 import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -70,7 +70,6 @@ import {
 } from "@/lib/tasks/navigation";
 import {
   getCompactTaskPathBreadcrumb,
-  getTaskPathLeaf,
   getDefaultTaskListFilters,
   isTaskListFiltered,
   type TaskFilterOptions,
@@ -160,40 +159,12 @@ function toggleSelection(values: readonly string[], value: string) {
     : [...values, value];
 }
 
-function getAssigneeLabel(assignee: string | null) {
-  if (!assignee) {
-    return "Assignee";
-  }
-
-  if (assignee === "me") {
-    return "Assigned to me";
-  }
-
-  return assignee;
-}
-
-function getSelectionLabel(
-  fallbackLabel: string,
-  values: readonly string[],
-  pluralLabel: string,
-) {
-  if (values.length === 0) {
-    return fallbackLabel;
-  }
-
-  if (values.length === 1) {
-    return values[0] ?? fallbackLabel;
-  }
-
-  return `${pluralLabel} (${values.length})`;
-}
-
-function getPathFilterLabel(label: string, path: string | null) {
-  if (!path) {
-    return label;
-  }
-
-  return `${label}: ${getTaskPathLeaf(path)}`;
+function getFilterTriggerClassName(isActive: boolean) {
+  return cn(
+    buttonVariants({ size: "sm", variant: "outline" }),
+    isActive &&
+      "border-foreground/40 ring-1 ring-inset ring-foreground/15 hover:border-foreground/50 aria-expanded:border-foreground/50",
+  );
 }
 
 type AssigneeFilterProps = {
@@ -302,10 +273,10 @@ function AssigneeFilter({
       }}
     >
       <PopoverTrigger
-        className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
+        className={getFilterTriggerClassName(currentAssignee !== null)}
         disabled={disabled}
       >
-        {getAssigneeLabel(currentAssignee)}
+        Assignee
         <ChevronDownIcon data-icon="inline-end" />
       </PopoverTrigger>
       <PopoverContent
@@ -481,10 +452,10 @@ function ClassificationPathFilter({
       onOpenChange={setIsOpen}
     >
       <PopoverTrigger
-        className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
+        className={getFilterTriggerClassName(currentPath !== null)}
         disabled={disabled}
       >
-        {getPathFilterLabel(label, currentPath)}
+        {label}
         <ChevronDownIcon data-icon="inline-end" />
       </PopoverTrigger>
       <PopoverContent
@@ -666,17 +637,6 @@ export function TaskTable({
               type="search"
               value={searchQuery}
             />
-            {filters.query ? (
-              <Button
-                disabled={isPending}
-                onClick={clearSearch}
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                Clear
-              </Button>
-            ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <ClassificationPathFilter
@@ -695,9 +655,9 @@ export function TaskTable({
             />
             <DropdownMenu>
               <DropdownMenuTrigger
-                className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
+                className={getFilterTriggerClassName(filters.states.length > 0)}
               >
-                {getSelectionLabel("State", filters.states, "States")}
+                State
                 <ChevronDownIcon data-icon="inline-end" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-44">
@@ -750,9 +710,9 @@ export function TaskTable({
             />
             <DropdownMenu>
               <DropdownMenuTrigger
-                className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
+                className={getFilterTriggerClassName(filters.priorities.length > 0)}
               >
-                {getSelectionLabel("Priority", filters.priorities, "Priorities")}
+                Priority
                 <ChevronDownIcon data-icon="inline-end" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-44">
@@ -779,16 +739,6 @@ export function TaskTable({
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
-            {hasActiveFilters ? (
-              <Button
-                disabled={isPending}
-                onClick={clearAllFilters}
-                size="sm"
-                variant="ghost"
-              >
-                Reset
-              </Button>
-            ) : null}
           </div>
         </div>
 
