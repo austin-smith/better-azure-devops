@@ -1,4 +1,8 @@
 import type { AzureDevOpsTask } from "@/lib/azure-devops/tasks";
+import {
+  getDefaultWorkItemTypes,
+  normalizeWorkItemTypes,
+} from "@/lib/tasks/work-item-type";
 
 type SearchParamValue = string | string[] | undefined;
 
@@ -11,6 +15,7 @@ export type TaskListFilterInput = Readonly<{
   priorities?: readonly string[];
   query?: string;
   states?: readonly string[];
+  types?: readonly string[];
 }>;
 
 export type TaskListFilters = Readonly<{
@@ -20,12 +25,14 @@ export type TaskListFilters = Readonly<{
   priorities: readonly string[];
   query: string;
   states: readonly string[];
+  types: readonly string[];
 }>;
 
 export type TaskFilterOptions = Readonly<{
   assignees: readonly string[];
   priorities: readonly string[];
   states: readonly string[];
+  types: readonly string[];
 }>;
 
 export type TaskFilterPreset = Readonly<{
@@ -45,12 +52,14 @@ type TaskFilterableTask = Pick<
   | "priority"
   | "state"
   | "title"
+  | "type"
 >;
 
 const EMPTY_FILTER_OPTIONS: TaskFilterOptions = {
   assignees: [],
   priorities: [],
   states: [],
+  types: [],
 };
 
 function compareAlphabetical(left: string, right: string) {
@@ -132,6 +141,12 @@ function normalizeArrayValues(
   return dedupeStrings(values ?? []).sort(compare);
 }
 
+function normalizeTypeFilterValues(values: readonly string[] | undefined) {
+  const normalizedValues = normalizeWorkItemTypes(values);
+
+  return normalizedValues.length > 0 ? normalizedValues : getDefaultWorkItemTypes();
+}
+
 function readFirstValue(value: SearchParamValue) {
   if (Array.isArray(value)) {
     return normalizeSingleValue(value[0]);
@@ -166,6 +181,7 @@ export function getDefaultTaskListFilters(): TaskListFilters {
     priorities: [],
     query: "",
     states: [],
+    types: getDefaultWorkItemTypes(),
   };
 }
 
@@ -183,6 +199,7 @@ export function normalizeTaskListFilters(
     priorities: normalizeArrayValues(filters.priorities, comparePriority),
     query: normalizeSingleValue(filters.query) ?? "",
     states: normalizeArrayValues(filters.states, compareAlphabetical),
+    types: normalizeTypeFilterValues(filters.types),
   };
 }
 
@@ -196,6 +213,7 @@ export function parseTaskListFilters(
     priorities: readManyValues(searchParams.priority),
     query: readFirstValue(searchParams.q) ?? "",
     states: readManyValues(searchParams.state),
+    types: readManyValues(searchParams.type),
   });
 }
 
@@ -229,6 +247,17 @@ export function createTaskListSearchParams(
     searchParams.append("priority", priority);
   }
 
+  const defaultTypes = getDefaultTaskListFilters().types;
+  const hasNonDefaultTypes =
+    normalizedFilters.types.length !== defaultTypes.length ||
+    normalizedFilters.types.some((type, index) => type !== defaultTypes[index]);
+
+  if (hasNonDefaultTypes) {
+    for (const type of normalizedFilters.types) {
+      searchParams.append("type", type);
+    }
+  }
+
   return searchParams;
 }
 
@@ -246,7 +275,9 @@ export function areTaskListFiltersEqual(
     normalizedLeft.query === normalizedRight.query &&
     normalizedLeft.states.length === normalizedRight.states.length &&
     normalizedLeft.priorities.length === normalizedRight.priorities.length &&
+    normalizedLeft.types.length === normalizedRight.types.length &&
     normalizedLeft.states.every((value, index) => value === normalizedRight.states[index]) &&
+    normalizedLeft.types.every((value, index) => value === normalizedRight.types[index]) &&
     normalizedLeft.priorities.every(
       (value, index) => value === normalizedRight.priorities[index],
     )
@@ -260,8 +291,8 @@ export function isTaskListFiltered(filters: TaskListFilterInput) {
 const TASK_FILTER_PRESETS = [
   {
     key: "all",
-    label: "Tasks",
-    title: "Tasks",
+    label: "Work Items",
+    title: "Work Items",
     filters: getDefaultTaskListFilters(),
   },
   {
@@ -293,7 +324,7 @@ export function getTaskListTitle(filters: TaskListFilterInput) {
     return preset.title;
   }
 
-  return isTaskListFiltered(filters) ? "Filtered Tasks" : "Tasks";
+  return isTaskListFiltered(filters) ? "Filtered Work Items" : "Work Items";
 }
 
 export function getTaskFilterOptions<T extends TaskFilterableTask>(
@@ -316,6 +347,10 @@ export function getTaskFilterOptions<T extends TaskFilterableTask>(
     [...tasks.map((task) => task.priority), ...normalizedFilters.priorities],
     comparePriority,
   );
+  const types = normalizeWorkItemTypes([
+    ...tasks.map((task) => task.type),
+    ...normalizedFilters.types,
+  ]);
 
   if (
     normalizedFilters.assignee &&
@@ -334,6 +369,7 @@ export function getTaskFilterOptions<T extends TaskFilterableTask>(
     assignees,
     priorities,
     states,
+    types,
   };
 }
 
@@ -437,6 +473,18 @@ export function applyTaskListFilters<T extends TaskFilterableTask>(
       return false;
     }
 
+    if (normalizedFilters.types.length > 0) {
+      const normalizedType = normalizeMatchValue(task.type);
+
+      if (
+        !normalizedFilters.types.some(
+          (type) => normalizeMatchValue(type) === normalizedType,
+        )
+      ) {
+        return false;
+      }
+    }
+
     if (normalizedFilters.priorities.length > 0) {
       const normalizedPriority = normalizeMatchValue(task.priority);
 
@@ -461,6 +509,7 @@ export function applyTaskListFilters<T extends TaskFilterableTask>(
       task.assignee,
       task.areaPath,
       task.iterationPath,
+      task.type,
       stripHtml(task.descriptionHtml),
     ]
       .join(" ")

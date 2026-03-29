@@ -32,7 +32,9 @@ export async function generateMetadata({
   const { detail } = await loadTaskDetail(taskId);
 
   return {
-    title: detail?.title ? `Task #${taskId}: ${detail.title}` : `Task #${taskId}`,
+    title: detail?.title
+      ? `Work Item #${taskId}: ${detail.title}`
+      : `Work Item #${taskId}`,
   };
 }
 

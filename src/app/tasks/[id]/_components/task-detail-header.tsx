@@ -1,5 +1,6 @@
 import { ArrowUpRightIcon } from "lucide-react";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
+import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
@@ -18,11 +19,14 @@ export function TaskDetailHeader({
     <div className="flex items-start gap-4 border-b px-4 py-3 md:px-6">
       <div className="min-w-0 flex-1">
         <h2 className="text-[15px] font-semibold leading-normal text-foreground">
-          {detail?.title || `Task #${taskId}`}
+          {detail?.title || `Work Item #${taskId}`}
         </h2>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {detail ? (
             <>
+              <Badge variant="outline">
+                <WorkItemTypeLabel type={detail.type} />
+              </Badge>
               <Badge variant={getTaskStateBadgeVariant(detail.state)}>{detail.state}</Badge>
               <PriorityBadge priority={detail.priority} />
             </>

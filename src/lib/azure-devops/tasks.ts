@@ -8,6 +8,7 @@ import {
   getDefaultTaskListFilters,
   type TaskListFilters,
 } from "@/lib/tasks/filters";
+import { getDefaultWorkItemTypes } from "@/lib/tasks/work-item-type";
 import sanitizeHtml from "sanitize-html";
 
 export type AzureDevOpsTask = {
@@ -20,6 +21,7 @@ export type AzureDevOpsTask = {
   priority: string;
   state: string;
   title: string;
+  type: string;
   updatedAt: string;
 };
 
@@ -180,6 +182,7 @@ const TASK_FIELDS = [
   "System.IterationPath",
   "System.State",
   "System.Title",
+  "System.WorkItemType",
   "Microsoft.VSTS.Common.Priority",
 ] as const;
 const SANITIZE_ALLOWED_TAGS = [
@@ -497,6 +500,7 @@ function toTask(workItem: WorkItem): AzureDevOpsTask {
     priority: String(workItem.fields["Microsoft.VSTS.Common.Priority"] ?? ""),
     state: String(workItem.fields["System.State"] ?? ""),
     title: String(workItem.fields["System.Title"] ?? `Work item ${workItem.id}`),
+    type: String(workItem.fields["System.WorkItemType"] ?? "Task"),
     updatedAt: String(workItem.fields["System.ChangedDate"] ?? ""),
   };
 }
@@ -721,6 +725,8 @@ export async function listTasks(
   accessToken: string,
   filters: TaskListFilters = getDefaultTaskListFilters(),
 ) {
+  const workItemTypes =
+    filters.types.length > 0 ? filters.types : getDefaultWorkItemTypes();
   const normalizedAreaPath = filters.areaPath
     ? normalizeClassificationFilterPath("areas", filters.areaPath)
     : "";
@@ -747,10 +753,13 @@ export async function listTasks(
           .map((priority) => `'${escapeWiqlString(priority)}'`)
           .join(", ")})`
       : "";
+  const workItemTypeFilter = `\n  AND [System.WorkItemType] IN (${workItemTypes
+    .map((type) => `'${escapeWiqlString(type)}'`)
+    .join(", ")})`;
   const wiql = `SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [System.ChangedDate]
 FROM WorkItems
 WHERE [System.TeamProject] = @Project
-  AND [System.WorkItemType] = 'Task'
+${workItemTypeFilter}
 ${areaPathFilter}
 ${assigneeFilter}
 ${iterationPathFilter}

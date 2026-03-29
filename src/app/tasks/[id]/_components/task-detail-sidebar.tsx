@@ -9,6 +9,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
+import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
 import { UserAvatar } from "@/components/user-avatar";
 import {
   Command,
@@ -308,6 +309,14 @@ export function TaskDetailSidebar({
         </SidebarField>
 
         <Separator />
+
+        <SidebarField label="Type">
+          {detail ? (
+            <WorkItemTypeLabel type={detail.type} />
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </SidebarField>
 
         <SidebarField label="Area">{detail?.areaPath || "—"}</SidebarField>
 

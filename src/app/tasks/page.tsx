@@ -4,6 +4,7 @@ import {
   getAzureDevOpsConfig,
   hasAzureDevOpsConfig,
 } from "@/lib/azure-devops/config";
+import { getDefaultWorkItemTypes } from "@/lib/tasks/work-item-type";
 import {
   getTaskListTitle,
   parseTaskListFilters,
@@ -42,6 +43,7 @@ export default async function TaskListPage({
           assignees: [],
           priorities: [],
           states: [],
+          types: getDefaultWorkItemTypes(),
         },
         items: [],
       };

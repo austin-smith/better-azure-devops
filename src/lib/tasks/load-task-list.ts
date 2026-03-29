@@ -31,6 +31,7 @@ function getServerScopedFilters(filters: TaskListFilters): TaskListFilters {
     priorities: filters.priorities,
     query: "",
     states: filters.states,
+    types: filters.types,
   };
 }
 
@@ -77,7 +78,7 @@ export async function loadTaskList(
     };
   } catch (error) {
     return {
-      error: error instanceof Error ? error.message : "Failed to load tasks.",
+      error: error instanceof Error ? error.message : "Failed to load work items.",
       filterOptions: getEmptyTaskFilterOptions(),
       items: [],
     };

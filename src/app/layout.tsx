@@ -29,7 +29,7 @@ const sourceCodePro = Source_Code_Pro({
 });
 
 export const metadata: Metadata = {
-  description: "Task workspace",
+  description: "Manage Azure DevOps work items.",
 };
 
 export default async function RootLayout({
@@ -48,7 +48,7 @@ export default async function RootLayout({
   const orgLabel = config
     ? new URL(config.orgUrl).pathname.replace(/^\/|\/$/g, "")
     : "Azure DevOps";
-  const projectLabel = config?.project ?? "Tasks";
+  const projectLabel = config?.project ?? "Work Items";
   const familyCookieRaw =
     cookieStore.get(PREFERRED_THEME_FAMILY_KEY)?.value ?? "";
   const themeModeCookieRaw = cookieStore.get(THEME_MODE_COOKIE_NAME)?.value ?? "";

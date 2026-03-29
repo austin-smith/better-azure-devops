@@ -76,10 +76,10 @@ function SidebarNavigation({
         <SidebarMenuButton
           render={<Link href={getDefaultTaskListHref()} />}
           isActive={isTasks}
-          tooltip="Tasks"
+          tooltip="Work Items"
         >
           <LayoutListIcon />
-          <span>Tasks</span>
+          <span>Work Items</span>
         </SidebarMenuButton>
         {taskCount !== null ? (
           <SidebarMenuBadge>{taskCount}</SidebarMenuBadge>
@@ -120,10 +120,10 @@ function SidebarNavigationFallback({
       <SidebarMenuItem>
         <SidebarMenuButton
           render={<Link href={getDefaultTaskListHref()} />}
-          tooltip="Tasks"
+          tooltip="Work Items"
         >
           <LayoutListIcon />
-          <span>Tasks</span>
+          <span>Work Items</span>
         </SidebarMenuButton>
         {taskCount !== null ? (
           <SidebarMenuBadge>{taskCount}</SidebarMenuBadge>

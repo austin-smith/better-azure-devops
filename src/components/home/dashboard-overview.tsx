@@ -84,7 +84,7 @@ export function DashboardOverview({ overview }: DashboardOverviewProps) {
               size="sm"
               render={<Link href={tasksHref} />}
             >
-              Tasks
+              Work Items
             </Button>
             <Button
               nativeButton={false}
@@ -114,7 +114,7 @@ export function DashboardOverview({ overview }: DashboardOverviewProps) {
             <KpiCard
               href={tasksHref}
               icon={LayoutListIcon}
-              label="Open Tasks"
+              label="Open Work Items"
               value={overview.openTaskCount}
             />
             <KpiCard
@@ -218,7 +218,7 @@ export function DashboardOverview({ overview }: DashboardOverviewProps) {
               <CardHeader>
                 <CardTitle>Project Health</CardTitle>
                 <CardDescription>
-                  {overview.openTaskCount} open across{" "}
+                  {overview.openTaskCount} open work items across{" "}
                   {overview.stateDistribution.length} states
                 </CardDescription>
                 <CardAction>
@@ -266,7 +266,7 @@ export function DashboardOverview({ overview }: DashboardOverviewProps) {
                   </>
                 ) : (
                   <div className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                    No open tasks.
+                    No open work items.
                   </div>
                 )}
               </CardContent>
@@ -313,7 +313,7 @@ export function DashboardOverview({ overview }: DashboardOverviewProps) {
                   ))
                 ) : (
                   <div className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                    No assigned tasks.
+                    No assigned work items.
                   </div>
                 )}
               </CardContent>

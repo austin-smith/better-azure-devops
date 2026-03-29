@@ -4,7 +4,7 @@ import { loadDashboardOverview } from "@/lib/tasks/load-dashboard-overview";
 
 export const metadata: Metadata = {
   title: "Home",
-  description: "Task overview",
+  description: "Work item overview",
 };
 
 export default async function HomePage() {
@@ -12,4 +12,3 @@ export default async function HomePage() {
 
   return <DashboardOverview overview={overview} />;
 }
-

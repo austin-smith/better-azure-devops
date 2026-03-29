@@ -32,7 +32,7 @@ export function TaskDetail({
   const headerItems = [
     { href: "/", label: "Home" },
     { href: taskListHref, label: taskListLabel },
-    { label: `Task #${taskId}` },
+    { label: `Work Item #${taskId}` },
   ];
 
   return (

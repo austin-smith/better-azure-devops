@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
+import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
 import { ThemeToggle } from "@/components/themes/theme-toggle";
 import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
@@ -76,6 +77,7 @@ import {
   type TaskListFilters,
 } from "@/lib/tasks/filters";
 import { getTaskStateBadgeVariant } from "@/lib/tasks/state";
+import { getDefaultWorkItemTypes } from "@/lib/tasks/work-item-type";
 
 type TaskTableProps = {
   error: string | null;
@@ -101,6 +103,16 @@ function getColumns(taskDetailHref: (taskId: number) => string) {
       header: "Title",
       cell: ({ getValue }) => (
         <div className="font-medium whitespace-normal">{getValue()}</div>
+      ),
+    }),
+    columnHelper.accessor("type", {
+      header: "Type",
+      cell: ({ getValue }) => (
+        <div className="whitespace-nowrap">
+          <Badge variant="outline">
+            <WorkItemTypeLabel type={getValue()} />
+          </Badge>
+        </div>
       ),
     }),
     columnHelper.accessor("state", {
@@ -164,6 +176,15 @@ function getFilterTriggerClassName(isActive: boolean) {
     buttonVariants({ size: "sm", variant: "outline" }),
     isActive &&
       "border-foreground/40 ring-1 ring-inset ring-foreground/15 hover:border-foreground/50 aria-expanded:border-foreground/50",
+  );
+}
+
+function isDefaultTypeSelection(types: readonly string[]) {
+  const defaultTypes = getDefaultWorkItemTypes();
+
+  return (
+    types.length === defaultTypes.length &&
+    types.every((type, index) => type === defaultTypes[index])
   );
 }
 
@@ -547,6 +568,7 @@ export function TaskTable({
   const taskDetailHref = (taskId: number) => getTaskDetailHref(taskId, filters);
   const columns = getColumns(taskDetailHref);
   const hasActiveFilters = isTaskListFiltered(filters);
+  const hasTypeFilter = !isDefaultTypeSelection(filters.types);
 
   useEffect(() => {
     setSearchQuery(filters.query);
@@ -617,7 +639,7 @@ export function TaskTable({
             <ThemeToggle />
             <Button size="sm">
               <PlusIcon data-icon="inline-start" />
-              <span>New Task</span>
+              <span>New Work Item</span>
             </Button>
           </>
         )}
@@ -629,11 +651,11 @@ export function TaskTable({
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex min-w-72 flex-1 flex-wrap items-center gap-2">
+          <div className="flex max-w-full flex-none flex-wrap items-center gap-2">
             <Input
-              className="min-w-56 flex-1"
+              className="w-72 max-w-full"
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search tasks"
+              placeholder="Search work items"
               type="search"
               value={searchQuery}
             />
@@ -653,6 +675,37 @@ export function TaskTable({
               }
               searchPlaceholder="Search area paths"
             />
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className={getFilterTriggerClassName(hasTypeFilter)}
+              >
+                Type
+                <ChevronDownIcon data-icon="inline-end" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-52">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Filter by type</DropdownMenuLabel>
+                  {filterOptions.types.length > 0 ? (
+                    filterOptions.types.map((type) => (
+                      <DropdownMenuCheckboxItem
+                        key={type}
+                        checked={filters.types.includes(type)}
+                        onClick={() =>
+                          navigate({
+                            ...filters,
+                            types: toggleSelection(filters.types, type),
+                          })
+                        }
+                      >
+                        <WorkItemTypeLabel type={type} />
+                      </DropdownMenuCheckboxItem>
+                    ))
+                  ) : (
+                    <DropdownMenuItem disabled>No types available</DropdownMenuItem>
+                  )}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger
                 className={getFilterTriggerClassName(filters.states.length > 0)}
@@ -744,7 +797,7 @@ export function TaskTable({
 
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>
-            {items.length} task{items.length === 1 ? "" : "s"}
+            {items.length} work item{items.length === 1 ? "" : "s"}
           </span>
           {filters.query ? (
             <Button
@@ -758,6 +811,26 @@ export function TaskTable({
               <XIcon data-icon="inline-end" />
             </Button>
           ) : null}
+          {hasTypeFilter
+            ? filters.types.map((type) => (
+                <Button
+                  key={type}
+                  disabled={isPending}
+                  onClick={() =>
+                    navigate({
+                      ...filters,
+                      types: filters.types.filter((value) => value !== type),
+                    })
+                  }
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <WorkItemTypeLabel type={type} />
+                  <XIcon data-icon="inline-end" />
+                </Button>
+              ))
+            : null}
           {filters.assignee ? (
             <Button
               disabled={isPending}
@@ -875,7 +948,7 @@ export function TaskTable({
                       className="px-4 py-8 text-muted-foreground"
                       colSpan={columns.length}
                     >
-                      No tasks found.
+                      No work items found.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -890,7 +963,7 @@ export function TaskTable({
                             className="absolute inset-0 z-0"
                           >
                             <span className="sr-only">
-                              Open task #{row.original.id}
+                              Open work item #{row.original.id}
                             </span>
                           </Link>
                           <div
