@@ -52,7 +52,10 @@ export default async function RootLayout({
   const familyCookieRaw =
     cookieStore.get(PREFERRED_THEME_FAMILY_KEY)?.value ?? "";
   const themeModeCookieRaw = cookieStore.get(THEME_MODE_COOKIE_NAME)?.value ?? "";
+  const sidebarOpenCookieRaw = cookieStore.get("sidebar_state")?.value;
   const serverThemeMode = normalizeThemeMode(themeModeCookieRaw);
+  const defaultSidebarOpen =
+    sidebarOpenCookieRaw === "false" ? false : true;
   const serverThemeFamilyClass =
     familyCookieRaw !== "default" && isKnownThemeFamily(familyCookieRaw)
       ? familyCookieRaw
@@ -81,7 +84,7 @@ export default async function RootLayout({
         >
           <ThemeShortcut />
           <TooltipProvider>
-            <SidebarProvider>
+            <SidebarProvider defaultOpen={defaultSidebarOpen}>
               <AppSidebar
                 currentUser={currentUser}
                 orgLabel={orgLabel}
