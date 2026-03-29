@@ -19,6 +19,7 @@ import {
   ChevronDownIcon,
   Loader2Icon,
   PlusIcon,
+  SearchIcon,
   XIcon,
 } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
@@ -65,6 +66,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import type {
   AzureDevOpsClassificationPathOption,
   AzureDevOpsAssigneeOption,
@@ -569,6 +578,7 @@ export function TaskTable({
   const columns = getColumns(taskDetailHref);
   const hasActiveFilters = isTaskListFiltered(filters);
   const hasTypeFilter = filters.types.length > 0;
+  const showEmptyState = !error && items.length === 0;
 
   useEffect(() => {
     setSearchQuery(filters.query);
@@ -945,13 +955,39 @@ export function TaskTable({
                 ))}
               </TableHeader>
               <TableBody>
-                {items.length === 0 ? (
+                {showEmptyState ? (
                   <TableRow>
-                    <TableCell
-                      className="px-4 py-8 text-muted-foreground"
-                      colSpan={columns.length}
-                    >
-                      No work items found.
+                    <TableCell className="p-6" colSpan={columns.length}>
+                      <Empty className="mx-auto max-w-md py-16">
+                        <EmptyHeader>
+                          <EmptyMedia variant="icon">
+                            <SearchIcon />
+                          </EmptyMedia>
+                          <EmptyTitle className="text-base">
+                            {hasActiveFilters
+                              ? "No matching work items"
+                              : "No work items"}
+                          </EmptyTitle>
+                          <EmptyDescription>
+                            {hasActiveFilters
+                              ? "Try adjusting your filters or search query to find what you're looking for."
+                              : "Work items that match your project will show up here."}
+                          </EmptyDescription>
+                        </EmptyHeader>
+                        {hasActiveFilters ? (
+                          <EmptyContent>
+                            <Button
+                              disabled={isPending}
+                              onClick={clearAllFilters}
+                              size="sm"
+                              type="button"
+                              variant="outline"
+                            >
+                              Clear all filters
+                            </Button>
+                          </EmptyContent>
+                        ) : null}
+                      </Empty>
                     </TableCell>
                   </TableRow>
                 ) : (
