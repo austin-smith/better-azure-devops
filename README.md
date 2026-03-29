@@ -3,9 +3,6 @@
   <img src="./public/logo.png" alt="Better Azure DevOps logo" width="128">
   <br>Better Azure DevOps
 </h1>
-<p align="center">
-  Minimal Azure DevOps task workspace.
-</p>
 
 <p align="center">
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js%2016-black?logo=nextdotjs">
