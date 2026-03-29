@@ -77,7 +77,6 @@ import {
   type TaskListFilters,
 } from "@/lib/tasks/filters";
 import { getTaskStateBadgeVariant } from "@/lib/tasks/state";
-import { getDefaultWorkItemTypes } from "@/lib/tasks/work-item-type";
 
 type TaskTableProps = {
   error: string | null;
@@ -176,15 +175,6 @@ function getFilterTriggerClassName(isActive: boolean) {
     buttonVariants({ size: "sm", variant: "outline" }),
     isActive &&
       "border-foreground/40 ring-1 ring-inset ring-foreground/15 hover:border-foreground/50 aria-expanded:border-foreground/50",
-  );
-}
-
-function isDefaultTypeSelection(types: readonly string[]) {
-  const defaultTypes = getDefaultWorkItemTypes();
-
-  return (
-    types.length === defaultTypes.length &&
-    types.every((type, index) => type === defaultTypes[index])
   );
 }
 
@@ -568,7 +558,7 @@ export function TaskTable({
   const taskDetailHref = (taskId: number) => getTaskDetailHref(taskId, filters);
   const columns = getColumns(taskDetailHref);
   const hasActiveFilters = isTaskListFiltered(filters);
-  const hasTypeFilter = !isDefaultTypeSelection(filters.types);
+  const hasTypeFilter = filters.types.length > 0;
 
   useEffect(() => {
     setSearchQuery(filters.query);

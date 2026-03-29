@@ -1,6 +1,5 @@
 import type { AzureDevOpsTask } from "@/lib/azure-devops/tasks";
 import {
-  getDefaultWorkItemTypes,
   normalizeWorkItemTypes,
 } from "@/lib/tasks/work-item-type";
 
@@ -142,9 +141,7 @@ function normalizeArrayValues(
 }
 
 function normalizeTypeFilterValues(values: readonly string[] | undefined) {
-  const normalizedValues = normalizeWorkItemTypes(values);
-
-  return normalizedValues.length > 0 ? normalizedValues : getDefaultWorkItemTypes();
+  return normalizeWorkItemTypes(values);
 }
 
 function readFirstValue(value: SearchParamValue) {
@@ -181,7 +178,7 @@ export function getDefaultTaskListFilters(): TaskListFilters {
     priorities: [],
     query: "",
     states: [],
-    types: getDefaultWorkItemTypes(),
+    types: [],
   };
 }
 
@@ -247,15 +244,8 @@ export function createTaskListSearchParams(
     searchParams.append("priority", priority);
   }
 
-  const defaultTypes = getDefaultTaskListFilters().types;
-  const hasNonDefaultTypes =
-    normalizedFilters.types.length !== defaultTypes.length ||
-    normalizedFilters.types.some((type, index) => type !== defaultTypes[index]);
-
-  if (hasNonDefaultTypes) {
-    for (const type of normalizedFilters.types) {
-      searchParams.append("type", type);
-    }
+  for (const type of normalizedFilters.types) {
+    searchParams.append("type", type);
   }
 
   return searchParams;
