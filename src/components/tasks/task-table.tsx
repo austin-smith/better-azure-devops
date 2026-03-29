@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useDeferredValue, useEffect, useState, useTransition } from "react";
+import {
+  type ComponentProps,
+  useDeferredValue,
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   createColumnHelper,
@@ -21,9 +27,8 @@ import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
 import { ThemeToggle } from "@/components/themes/theme-toggle";
 import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
-import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -170,11 +175,14 @@ function toggleSelection(values: readonly string[], value: string) {
     : [...values, value];
 }
 
-function getFilterTriggerClassName(isActive: boolean) {
-  return cn(
-    buttonVariants({ size: "sm", variant: "outline" }),
-    isActive &&
-      "border-foreground/40 ring-1 ring-inset ring-foreground/15 hover:border-foreground/50 aria-expanded:border-foreground/50",
+function FilterTriggerButton(props: ComponentProps<typeof Button>) {
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="data-[active=true]:ring-1 data-[active=true]:ring-ring"
+      {...props}
+    />
   );
 }
 
@@ -284,8 +292,9 @@ function AssigneeFilter({
       }}
     >
       <PopoverTrigger
-        className={getFilterTriggerClassName(currentAssignee !== null)}
+        data-active={currentAssignee !== null ? "true" : undefined}
         disabled={disabled}
+        render={<FilterTriggerButton />}
       >
         Assignee
         <ChevronDownIcon data-icon="inline-end" />
@@ -463,8 +472,9 @@ function ClassificationPathFilter({
       onOpenChange={setIsOpen}
     >
       <PopoverTrigger
-        className={getFilterTriggerClassName(currentPath !== null)}
+        data-active={currentPath !== null ? "true" : undefined}
         disabled={disabled}
+        render={<FilterTriggerButton />}
       >
         {label}
         <ChevronDownIcon data-icon="inline-end" />
@@ -667,7 +677,8 @@ export function TaskTable({
             />
             <DropdownMenu>
               <DropdownMenuTrigger
-                className={getFilterTriggerClassName(hasTypeFilter)}
+                data-active={hasTypeFilter ? "true" : undefined}
+                render={<FilterTriggerButton />}
               >
                 Type
                 <ChevronDownIcon data-icon="inline-end" />
@@ -698,7 +709,8 @@ export function TaskTable({
             </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger
-                className={getFilterTriggerClassName(filters.states.length > 0)}
+                data-active={filters.states.length > 0 ? "true" : undefined}
+                render={<FilterTriggerButton />}
               >
                 State
                 <ChevronDownIcon data-icon="inline-end" />
@@ -753,7 +765,8 @@ export function TaskTable({
             />
             <DropdownMenu>
               <DropdownMenuTrigger
-                className={getFilterTriggerClassName(filters.priorities.length > 0)}
+                data-active={filters.priorities.length > 0 ? "true" : undefined}
+                render={<FilterTriggerButton />}
               >
                 Priority
                 <ChevronDownIcon data-icon="inline-end" />
