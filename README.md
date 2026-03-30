@@ -18,15 +18,44 @@ Better Azure DevOps is a small web client for viewing and interacting with Azure
 
 ## Setup
 
-1. Install dependencies with `pnpm install`.
-2. Copy `.env.example` to `.env.local` and set:
+### 1. Install dependencies
+
+```bash
+pnpm install
+```
+
+### 2. Install Azure CLI
+
+#### macOS
+
+```bash
+brew update && brew install azure-cli
+```
+
+#### Windows
+
+```powershell
+winget install --exact --id Microsoft.AzureCLI
+```
+
+#### Ubuntu/Debian
+
+```bash
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+```
+
+For other platforms, see [Install Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest).
+
+### 3. Configure the app
+
+Copy `.env.example` to `.env.local` and set:
 
 ```bash
 AZURE_DEVOPS_ORG_URL=https://dev.azure.com/your-org
 AZURE_DEVOPS_PROJECT=your-project
 ```
 
-3. Sign in with Azure CLI:
+### 4. Sign in
 
 ```bash
 AZURE_CONFIG_DIR=.azure az login
