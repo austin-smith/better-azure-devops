@@ -1,16 +1,27 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
-import { promisify } from "node:util";
 
-const execFileAsync = promisify(execFile);
 const AZURE_DEVOPS_RESOURCE = "499b84ac-1321-427f-aa17-267ca6975798";
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
 const AZURE_CONFIG_DIR = path.join(process.cwd(), ".azure");
+const AZURE_CLI_ACCESS_TOKEN_ARGS = [
+  "account",
+  "get-access-token",
+  "--resource",
+  AZURE_DEVOPS_RESOURCE,
+  "-o",
+  "json",
+] as const;
 
 type AzureCliAccessTokenResponse = {
   accessToken?: string;
   expiresOn?: string;
   expires_on?: number | string;
+};
+
+type ExecFileAsyncOptions = {
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
 };
 
 let cachedToken:
@@ -47,15 +58,58 @@ function parseExpiresAt(payload: AzureCliAccessTokenResponse) {
 function formatAzureCliError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
 
-  if (message.includes("ENOENT")) {
-    return "Azure CLI is not installed. Install it and run `AZURE_CONFIG_DIR=.azure az login`.";
+  if (
+    message.includes("ENOENT") ||
+    message.includes("is not recognized as an internal or external command")
+  ) {
+    return "Azure CLI is not installed. Install it, then run `az login` with `AZURE_CONFIG_DIR` set to `.azure`.";
   }
 
   if (message.includes("az login")) {
-    return "Azure CLI is not signed in. Run `AZURE_CONFIG_DIR=.azure az login` and reload.";
+    return "Azure CLI is not signed in. Run `az login` with `AZURE_CONFIG_DIR` set to `.azure`, then reload.";
   }
 
   return `Failed to get an Azure DevOps access token from Azure CLI: ${message}`;
+}
+
+function execFileAsync(
+  file: string,
+  args: readonly string[],
+  options: ExecFileAsyncOptions,
+) {
+  return new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    execFile(file, [...args], options, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve({ stderr, stdout });
+    });
+  });
+}
+
+async function runAzureCli() {
+  const env = {
+    ...process.env,
+    AZURE_CONFIG_DIR,
+  };
+
+  if (process.platform === "win32") {
+    const comSpec = process.env.ComSpec;
+
+    // Run from cmd.exe's own directory so a repo-local az.cmd cannot shadow Azure CLI.
+    return execFileAsync(
+      comSpec ?? "cmd.exe",
+      ["/d", "/s", "/c", `az ${AZURE_CLI_ACCESS_TOKEN_ARGS.join(" ")}`],
+      {
+        cwd: comSpec ? path.dirname(comSpec) : undefined,
+        env,
+      },
+    );
+  }
+
+  return execFileAsync("az", [...AZURE_CLI_ACCESS_TOKEN_ARGS], { env });
 }
 
 export async function getAzureDevOpsAccessToken() {
@@ -67,19 +121,7 @@ export async function getAzureDevOpsAccessToken() {
   }
 
   try {
-    const { stdout } = await execFileAsync("az", [
-      "account",
-      "get-access-token",
-      "--resource",
-      AZURE_DEVOPS_RESOURCE,
-      "-o",
-      "json",
-    ], {
-      env: {
-        ...process.env,
-        AZURE_CONFIG_DIR,
-      },
-    });
+    const { stdout } = await runAzureCli();
 
     const payload = JSON.parse(stdout) as AzureCliAccessTokenResponse;
 
