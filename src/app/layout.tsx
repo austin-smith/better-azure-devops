@@ -13,6 +13,7 @@ import {
   hasAzureDevOpsConfig,
 } from "@/lib/azure-devops/config";
 import { loadCurrentAzureDevOpsUser } from "@/lib/azure-devops/current-user";
+import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import {
   PREFERRED_THEME_FAMILY_KEY,
   THEME_MODE_COOKIE_NAME,
@@ -21,6 +22,7 @@ import {
   normalizeThemeMode,
 } from "@/lib/theme/constants";
 import { loadDashboardOverview } from "@/lib/tasks/load-dashboard-overview";
+import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 
 const sourceCodePro = Source_Code_Pro({
   subsets: ["latin"],
@@ -39,16 +41,27 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const config = hasAzureDevOpsConfig() ? getAzureDevOpsConfig() : null;
-  const [overview, currentUser] = config
+  const [overview, currentUser, projectSelection] = config
     ? await Promise.all([
         loadDashboardOverview(),
         loadCurrentAzureDevOpsUser(),
+        (async () => {
+          try {
+            const accessToken = await getAzureDevOpsAccessToken();
+            return await loadAzureDevOpsProjectSelection(accessToken);
+          } catch {
+            return null;
+          }
+        })(),
       ])
-    : [null, null];
+    : [null, null, null];
   const orgLabel = config
     ? new URL(config.orgUrl).pathname.replace(/^\/|\/$/g, "")
     : "Azure DevOps";
-  const projectLabel = config?.project ?? "Work Items";
+  const projectLabel =
+    projectSelection?.selectedProjectIds.length && projectSelection.selectedProjectIds.length > 0
+      ? `${projectSelection.selectedProjectIds.length} project${projectSelection.selectedProjectIds.length === 1 ? "" : "s"}`
+      : "Projects";
   const familyCookieRaw =
     cookieStore.get(PREFERRED_THEME_FAMILY_KEY)?.value ?? "";
   const themeModeCookieRaw = cookieStore.get(THEME_MODE_COOKIE_NAME)?.value ?? "";
@@ -86,10 +99,12 @@ export default async function RootLayout({
           <TooltipProvider>
             <SidebarProvider defaultOpen={defaultSidebarOpen}>
               <AppSidebar
+                availableProjects={projectSelection?.availableProjects ?? []}
                 currentUser={currentUser}
                 orgLabel={orgLabel}
                 projectLabel={projectLabel}
                 queueCount={overview?.error ? null : (overview?.queueCount ?? null)}
+                selectedProjectIds={projectSelection?.selectedProjectIds ?? []}
                 taskCount={overview?.error ? null : (overview?.openTaskCount ?? null)}
               />
               <SidebarInset>{children}</SidebarInset>

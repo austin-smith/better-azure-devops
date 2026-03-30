@@ -14,6 +14,7 @@ type TaskDetailProps = {
   taskId: number;
   taskListHref: string;
   taskListLabel: string;
+  taskProjectId: string | null;
 };
 
 export function TaskDetail({
@@ -22,6 +23,7 @@ export function TaskDetail({
   taskId,
   taskListHref,
   taskListLabel,
+  taskProjectId,
 }: TaskDetailProps) {
   const [currentDetail, setCurrentDetail] = useState(detail);
 
@@ -52,6 +54,7 @@ export function TaskDetail({
               detail={currentDetail}
               onUpdated={setCurrentDetail}
               taskId={taskId}
+              taskProjectId={taskProjectId}
             />
           </div>
         </div>

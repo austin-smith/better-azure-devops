@@ -52,7 +52,6 @@ Copy `.env.example` to `.env.local` and set:
 
 ```bash
 AZURE_DEVOPS_ORG_URL=https://dev.azure.com/your-org
-AZURE_DEVOPS_PROJECT=your-project
 ```
 
 ### 4. Sign in

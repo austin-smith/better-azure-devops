@@ -9,6 +9,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
+import { ProjectImage } from "@/components/project-image";
 import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
 import { UserAvatar } from "@/components/user-avatar";
 import {
@@ -31,6 +32,7 @@ type TaskDetailSidebarProps = {
   detail: TaskDetailData | null;
   onUpdated: (detail: TaskDetailData) => void;
   taskId: number;
+  taskProjectId: string | null;
 };
 
 type AssigneeOption = {
@@ -62,10 +64,12 @@ function AssigneeField({
   detail,
   onUpdated,
   taskId,
+  taskProjectId,
 }: {
   detail: TaskDetailData | null;
   onUpdated: (detail: TaskDetailData) => void;
   taskId: number;
+  taskProjectId: string | null;
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -159,7 +163,15 @@ function AssigneeField({
     setSaveError(null);
 
     try {
-      const response = await fetch(`/api/tasks/${taskId}`, {
+      const params = new URLSearchParams();
+
+      if (detail.projectId ?? taskProjectId) {
+        params.set("project", detail.projectId ?? taskProjectId ?? "");
+      }
+
+      const response = await fetch(
+        `/api/tasks/${taskId}${params.size > 0 ? `?${params.toString()}` : ""}`,
+        {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -168,7 +180,8 @@ function AssigneeField({
           assignee,
           revision: detail.revision,
         }),
-      });
+      },
+      );
       const payload = (await response.json()) as
         | {
             error?: string;
@@ -298,11 +311,17 @@ export function TaskDetailSidebar({
   detail,
   onUpdated,
   taskId,
+  taskProjectId,
 }: TaskDetailSidebarProps) {
   return (
     <aside className="w-52 shrink-0 overflow-y-auto border-l p-4 md:w-60">
       <div className="space-y-4">
-        <AssigneeField detail={detail} onUpdated={onUpdated} taskId={taskId} />
+        <AssigneeField
+          detail={detail}
+          onUpdated={onUpdated}
+          taskId={taskId}
+          taskProjectId={taskProjectId}
+        />
 
         <SidebarField label="Updated">
           {detail ? <DateLabel value={detail.updatedAt} /> : <span className="text-muted-foreground">—</span>}
@@ -315,6 +334,23 @@ export function TaskDetailSidebar({
             <WorkItemTypeLabel type={detail.type} />
           ) : (
             <span className="text-muted-foreground">—</span>
+          )}
+        </SidebarField>
+
+        <SidebarField label="Project">
+          {detail ? (
+            <div className="flex items-center gap-2">
+              <ProjectImage
+                className="size-4 rounded-sm ring-0"
+                imageClassName="rounded-sm"
+                imageUrl={detail.projectImageUrl}
+                name={detail.projectName}
+                size="sm"
+              />
+              <span className="truncate">{detail.projectName}</span>
+            </div>
+          ) : (
+            "—"
           )}
         </SidebarField>
 

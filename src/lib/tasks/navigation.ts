@@ -19,8 +19,20 @@ function appendSearchParams(pathname: string, filters: TaskListFilterInput = {})
 export function getTaskDetailHref(
   taskId: number,
   filters: TaskListFilterInput = {},
+  options: {
+    taskProjectId?: string | null;
+  } = {},
 ) {
-  return appendSearchParams(`/tasks/${taskId}`, filters);
+  const href = appendSearchParams(`/tasks/${taskId}`, filters);
+
+  if (!options.taskProjectId) {
+    return href;
+  }
+
+  const url = new URL(href, "http://localhost");
+  url.searchParams.set("taskProject", options.taskProjectId);
+
+  return `${url.pathname}${url.search}`;
 }
 
 export function getTaskListHref(filters: TaskListFilterInput = {}) {

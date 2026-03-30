@@ -20,7 +20,7 @@ describe("azureDevOpsRequest", () => {
     vi.unstubAllGlobals();
   });
 
-  it("builds the default project-scoped api url and attaches headers", async () => {
+  it("builds the default org-scoped api url and attaches headers", async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ value: "ok" }), {
         headers: { "content-type": "application/json" },
@@ -34,7 +34,7 @@ describe("azureDevOpsRequest", () => {
 
     expect(result).toEqual({ value: "ok" });
     expect(fetchMock).toHaveBeenCalledWith(
-      new URL("https://dev.azure.com/example/Platform/_apis/test?api-version=7.1"),
+      new URL("https://dev.azure.com/example/_apis/test?api-version=7.1"),
       expect.objectContaining({
         body: undefined,
         cache: "no-store",
@@ -63,7 +63,7 @@ describe("azureDevOpsRequest", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      new URL("https://dev.azure.com/example/Platform/_apis/test?api-version=8.0"),
+      new URL("https://dev.azure.com/example/_apis/test?api-version=8.0"),
       expect.objectContaining({
         headers: {
           Accept: "application/json",

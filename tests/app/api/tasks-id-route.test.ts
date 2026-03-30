@@ -54,7 +54,7 @@ describe("task detail route", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ item: { id: 42, title: "Hello" } });
-    expect(getTaskDetailsMock).toHaveBeenCalledWith("token", 42);
+    expect(getTaskDetailsMock).toHaveBeenCalledWith("token", 42, {});
   });
 
   it("rejects invalid patch bodies", async () => {
@@ -108,6 +108,12 @@ describe("task detail route", () => {
     await expect(response.json()).resolves.toEqual({
       item: { id: 42, assignee: "ada@example.com" },
     });
-    expect(updateTaskAssigneeMock).toHaveBeenCalledWith("token", 42, "ada@example.com", 7);
+    expect(updateTaskAssigneeMock).toHaveBeenCalledWith(
+      "token",
+      42,
+      "ada@example.com",
+      7,
+      {},
+    );
   });
 });

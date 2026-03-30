@@ -24,7 +24,6 @@ describe("azure-devops config", () => {
     expect(getAzureDevOpsConfig()).toEqual({
       apiVersion: "7.1",
       orgUrl: "https://dev.azure.com/example",
-      project: "Platform",
     });
     expect(getAzureDevOpsOrganizationName()).toBe("example");
   });
@@ -45,7 +44,7 @@ describe("azure-devops config", () => {
     const { getAzureDevOpsConfig } = await import("@/lib/azure-devops/config");
 
     expect(() => getAzureDevOpsConfig()).toThrow(
-      "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL and AZURE_DEVOPS_PROJECT.",
+      "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.",
     );
   });
 });

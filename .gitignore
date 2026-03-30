@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 .azure/
+.data/
 *.pem
 
 # debug

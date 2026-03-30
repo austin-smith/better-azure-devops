@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
+import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
 import { getTaskDetails, updateTaskAssignee } from "@/lib/azure-devops/tasks";
 
@@ -22,6 +23,21 @@ function parseAssignee(value: unknown) {
   return typeof value === "string" ? value.trim() || null : undefined;
 }
 
+async function resolveTaskContext(accessToken: string, projectId: string | null) {
+  if (!projectId) {
+    return {};
+  }
+
+  const selection = await loadAzureDevOpsProjectSelection(accessToken, [projectId]);
+  const project = selection.selectedProjects[0] ?? null;
+
+  return {
+    projectId: project?.id ?? projectId,
+    projectImageUrl: project?.defaultTeamImageUrl ?? null,
+    projectName: project?.name ?? null,
+  };
+}
+
 function errorStatus(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   const match = message.match(/Azure DevOps request failed \((\d{3})/);
@@ -37,7 +53,7 @@ export async function GET(
     return NextResponse.json(
       {
         error:
-          "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL and AZURE_DEVOPS_PROJECT.",
+          "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.",
       },
       { status: 503 },
     );
@@ -52,7 +68,11 @@ export async function GET(
 
   try {
     const accessToken = await getAzureDevOpsAccessToken();
-    const task = await getTaskDetails(accessToken, taskId);
+    const context = await resolveTaskContext(
+      accessToken,
+      _request.nextUrl.searchParams.get("project"),
+    );
+    const task = await getTaskDetails(accessToken, taskId, context);
 
     return NextResponse.json({ item: task });
   } catch (error) {
@@ -71,7 +91,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         error:
-          "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL and AZURE_DEVOPS_PROJECT.",
+          "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.",
       },
       { status: 503 },
     );
@@ -109,7 +129,17 @@ export async function PATCH(
 
   try {
     const accessToken = await getAzureDevOpsAccessToken();
-    const task = await updateTaskAssignee(accessToken, taskId, assignee, revision);
+    const context = await resolveTaskContext(
+      accessToken,
+      request.nextUrl.searchParams.get("project"),
+    );
+    const task = await updateTaskAssignee(
+      accessToken,
+      taskId,
+      assignee,
+      revision,
+      context,
+    );
 
     return NextResponse.json({ item: task });
   } catch (error) {

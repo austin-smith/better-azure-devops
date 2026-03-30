@@ -141,21 +141,29 @@ export function DashboardOverview({ overview }: DashboardOverviewProps) {
               <CardHeader>
                 <CardTitle>Recent Changes</CardTitle>
                 <CardDescription>
-                  {overview.recentChangeCount} updated in the last{" "}
-                  {overview.recentChangeWindowHours}h
+                  {overview.recentChangeCount} updated across{" "}
+                  {overview.projectCount} project{overview.projectCount === 1 ? "" : "s"} in
+                  the last {overview.recentChangeWindowHours}h
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {overview.recentLatestItem ? (
                   <Link
                     className="flex flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-muted/40"
-                    href={getTaskDetailHref(overview.recentLatestItem.id)}
+                    href={getTaskDetailHref(
+                      overview.recentLatestItem.id,
+                      {},
+                      { taskProjectId: overview.recentLatestItem.projectId },
+                    )}
                   >
                     <div className="font-medium">
                       #{overview.recentLatestItem.id}{" "}
                       {overview.recentLatestItem.title}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <Badge variant="outline">
+                        {overview.recentLatestItem.projectName}
+                      </Badge>
                       <Badge
                         variant={getTaskStateBadgeVariant(
                           overview.recentLatestItem.state,
@@ -219,6 +227,7 @@ export function DashboardOverview({ overview }: DashboardOverviewProps) {
                 <CardTitle>Project Health</CardTitle>
                 <CardDescription>
                   {overview.openTaskCount} open work items across{" "}
+                  {overview.projectCount} project{overview.projectCount === 1 ? "" : "s"} and{" "}
                   {overview.stateDistribution.length} states
                 </CardDescription>
                 <CardAction>
@@ -297,12 +306,17 @@ export function DashboardOverview({ overview }: DashboardOverviewProps) {
                     <Link
                       key={task.id}
                       className="rounded-lg border p-3 transition-colors hover:bg-muted/40"
-                      href={getTaskDetailHref(task.id, { assignee: "me" })}
+                      href={getTaskDetailHref(
+                        task.id,
+                        { assignee: "me" },
+                        { taskProjectId: task.projectId },
+                      )}
                     >
                       <div className="line-clamp-2 font-medium">
                         #{task.id} {task.title}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline">{task.projectName}</Badge>
                         <Badge variant={getTaskStateBadgeVariant(task.state)}>
                           {task.state}
                         </Badge>

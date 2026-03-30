@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL and AZURE_DEVOPS_PROJECT.",
+          "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.",
       },
       { status: 503 },
     );

@@ -1,5 +1,6 @@
 import {
   getTaskDetails,
+  listAreaPathOptions,
   listAssignableUsers,
   listTasks,
   updateTaskAssignee,
@@ -107,6 +108,7 @@ describe("azure-devops task helpers", () => {
                 '<p>Safe html</p><script>alert(1)</script><img src="https://dev.azure.com/example/avatar?id=1" />',
               "System.IterationPath": "Project\\Iterations\\Sprint 1",
               "System.State": "Active",
+              "System.TeamProject": "Project",
               "System.Title": "Second",
               "System.WorkItemType": "Feature",
             },
@@ -121,6 +123,7 @@ describe("azure-devops task helpers", () => {
               "System.Description": "<p>First</p>",
               "System.IterationPath": "Project\\Iterations\\Sprint 1",
               "System.State": "Blocked",
+              "System.TeamProject": "Project",
               "System.Title": "First",
               "System.WorkItemType": "Bug",
             },
@@ -129,10 +132,14 @@ describe("azure-devops task helpers", () => {
         ],
       });
 
-    const result = await listTasks("token", {
-      areaPath: "Project\\Areas\\Platform",
+    const result = await listTasks("token", [{
+      defaultTeamImageUrl: "https://dev.azure.com/example/_apis/projects/project-id/image",
+      id: "project-id",
+      name: "Project",
+    }], {
+      areaPath: "Project\\Platform",
       assignee: "me",
-      iterationPath: "Project\\Iterations\\Sprint 1",
+      iterationPath: "Project\\Sprint 1",
       priorities: ["1"],
       query: "",
       states: ["Active", "Blocked"],
@@ -146,6 +153,7 @@ describe("azure-devops task helpers", () => {
       descriptionHtml: '<p>Safe html</p><img src="/proxy?src=https://dev.azure.com/example/avatar?id=1" />',
       iterationPath: "Project\\Iterations\\Sprint 1",
       priority: "2",
+      projectImageUrl: "https://dev.azure.com/example/_apis/projects/project-id/image",
       type: "Feature",
     });
 
@@ -174,6 +182,124 @@ describe("azure-devops task helpers", () => {
     expect(String(azureDevOpsRequestMock.mock.calls[1]?.[1]?.body)).toContain(
       '"ids":[11,10]',
     );
+  });
+
+  it("does not send a bare project root as an area path filter", async () => {
+    azureDevOpsRequestMock
+      .mockResolvedValueOnce({
+        workItems: [{ id: 10 }],
+      })
+      .mockResolvedValueOnce({
+        value: [
+          {
+            fields: {
+              "Microsoft.VSTS.Common.Priority": 2,
+              "System.AreaPath": "Project\\Areas\\Platform",
+              "System.AssignedTo": { displayName: "Ada Lovelace" },
+              "System.ChangedDate": "2025-01-05T12:00:00.000Z",
+              "System.Description": "<p>Safe html</p>",
+              "System.IterationPath": "Project\\Iterations\\Sprint 1",
+              "System.State": "Active",
+              "System.TeamProject": "Project",
+              "System.Title": "Second",
+              "System.WorkItemType": "Feature",
+            },
+            id: 10,
+          },
+        ],
+      });
+
+    await listTasks("token", [{
+      defaultTeamImageUrl: null,
+      id: "project-id",
+      name: "Project",
+    }], {
+      areaPath: "Project",
+      assignee: null,
+      iterationPath: null,
+      priorities: [],
+      query: "",
+      states: [],
+      types: [],
+    });
+
+    expect(
+      JSON.parse(String(azureDevOpsRequestMock.mock.calls[0]?.[1]?.body)).query,
+    ).not.toContain("[System.AreaPath] UNDER");
+  });
+
+  it("does not send malformed single-segment area path filters", async () => {
+    azureDevOpsRequestMock
+      .mockResolvedValueOnce({
+        workItems: [{ id: 10 }],
+      })
+      .mockResolvedValueOnce({
+        value: [
+          {
+            fields: {
+              "Microsoft.VSTS.Common.Priority": 2,
+              "System.AreaPath": "Project\\Areas\\Platform",
+              "System.AssignedTo": { displayName: "Ada Lovelace" },
+              "System.ChangedDate": "2025-01-05T12:00:00.000Z",
+              "System.Description": "<p>Safe html</p>",
+              "System.IterationPath": "Project\\Iterations\\Sprint 1",
+              "System.State": "Active",
+              "System.TeamProject": "Project",
+              "System.Title": "Second",
+              "System.WorkItemType": "Feature",
+            },
+            id: 10,
+          },
+        ],
+      });
+
+    await listTasks("token", [{
+      defaultTeamImageUrl: null,
+      id: "project-id",
+      name: "Project",
+    }], {
+      areaPath: "Platform",
+      assignee: null,
+      iterationPath: null,
+      priorities: [],
+      query: "",
+      states: [],
+      types: [],
+    });
+
+    expect(
+      JSON.parse(String(azureDevOpsRequestMock.mock.calls[0]?.[1]?.body)).query,
+    ).not.toContain("[System.AreaPath] UNDER");
+  });
+
+  it("omits classification root options that normalize to the bare project path", async () => {
+    azureDevOpsRequestMock.mockResolvedValue({
+      children: [
+        {
+          name: "Areas",
+          path: "Project\\Areas",
+          children: [
+            {
+              name: "Platform",
+              path: "Project\\Areas\\Platform",
+            },
+          ],
+        },
+      ],
+      name: "Project",
+      path: "Project",
+    });
+
+    await expect(listAreaPathOptions("token", [{
+      defaultTeamImageUrl: null,
+      id: "project-id",
+      name: "Project",
+    }])).resolves.toEqual([
+      expect.objectContaining({
+        name: "Platform",
+        value: "Project\\Platform",
+      }),
+    ]);
   });
 
   it("loads task details, comments, and linked pull requests", async () => {
@@ -261,9 +387,43 @@ describe("azure-devops task helpers", () => {
           targetBranch: "main",
         }),
       ],
+      projectImageUrl: null,
       revision: 7,
       tags: ["backend", "urgent"],
       url: "https://dev.azure.com/example/workitems/42",
+    });
+
+    expect(azureDevOpsRequestMock).toHaveBeenNthCalledWith(
+      3,
+      "/_apis/git/pullrequests/501",
+      { accessToken: "token" },
+    );
+  });
+
+  it("uses the task context project image when loading task details", async () => {
+    azureDevOpsRequestMock.mockResolvedValue({
+      fields: {
+        "System.AreaPath": "Project\\Areas\\Platform",
+        "System.ChangedDate": "2025-01-05T12:00:00.000Z",
+        "System.IterationPath": "Project\\Iterations\\Sprint 1",
+        "System.State": "Active",
+        "System.Title": "Investigate issue",
+        "System.WorkItemType": "Task",
+      },
+      id: 42,
+      rev: 7,
+    });
+
+    await expect(
+      getTaskDetails("token", 42, {
+        projectId: "project-id",
+        projectImageUrl: "https://dev.azure.com/example/_apis/projects/project-id/image",
+        projectName: "Project",
+      }),
+    ).resolves.toMatchObject({
+      projectId: "project-id",
+      projectImageUrl: "https://dev.azure.com/example/_apis/projects/project-id/image",
+      projectName: "Project",
     });
   });
 

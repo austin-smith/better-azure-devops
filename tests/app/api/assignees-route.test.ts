@@ -37,8 +37,7 @@ describe("GET /api/assignees", () => {
 
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
-      error:
-        "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL and AZURE_DEVOPS_PROJECT.",
+      error: "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.",
     });
   });
 

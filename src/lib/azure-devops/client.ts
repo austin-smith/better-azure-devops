@@ -6,6 +6,7 @@ type AzureDevOpsRequestOptions = {
   body?: BodyInit;
   contentType?: string;
   method?: "GET" | "PATCH" | "POST";
+  projectName?: string | null;
 };
 
 export async function azureDevOpsRequest<T>(
@@ -14,7 +15,9 @@ export async function azureDevOpsRequest<T>(
 ) {
   const config = getAzureDevOpsConfig();
   const requestPath = path.startsWith("/") ? path : `/${path}`;
-  const baseUrl = options.baseUrl ?? `${config.orgUrl}/${config.project}`;
+  const baseUrl =
+    options.baseUrl ??
+    (options.projectName ? `${config.orgUrl}/${options.projectName}` : config.orgUrl);
   const url = new URL(`${baseUrl}${requestPath}`);
 
   if (!url.searchParams.has("api-version")) {

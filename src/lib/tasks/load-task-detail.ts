@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
+import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import {
   getTaskDetails,
   type AzureDevOpsTaskDetail,
@@ -11,10 +12,18 @@ type LoadTaskDetailResult = {
 };
 
 export const loadTaskDetail = cache(
-  async (taskId: number): Promise<LoadTaskDetailResult> => {
+  async (taskId: number, taskProjectId: string | null = null): Promise<LoadTaskDetailResult> => {
     try {
       const accessToken = await getAzureDevOpsAccessToken();
-      const detail = await getTaskDetails(accessToken, taskId);
+      const selection = taskProjectId
+        ? await loadAzureDevOpsProjectSelection(accessToken, [taskProjectId])
+        : null;
+      const taskProject = selection?.selectedProjects[0] ?? null;
+      const detail = await getTaskDetails(accessToken, taskId, {
+        projectId: taskProject?.id ?? taskProjectId,
+        projectImageUrl: taskProject?.defaultTeamImageUrl ?? null,
+        projectName: taskProject?.name ?? null,
+      });
 
       return {
         detail,

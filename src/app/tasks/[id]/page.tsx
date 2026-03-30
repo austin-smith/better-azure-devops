@@ -19,8 +19,19 @@ type TaskDetailPageProps = {
   searchParams: Promise<TaskListSearchParams>;
 };
 
+function readTaskProjectId(searchParams: TaskListSearchParams) {
+  const value = searchParams.taskProject;
+
+  if (Array.isArray(value)) {
+    return value[0]?.trim() || null;
+  }
+
+  return typeof value === "string" ? value.trim() || null : null;
+}
+
 export async function generateMetadata({
   params,
+  searchParams,
 }: TaskDetailPageProps): Promise<Metadata> {
   const { id } = await params;
   const taskId = parseTaskId(id);
@@ -29,7 +40,8 @@ export async function generateMetadata({
     notFound();
   }
 
-  const { detail } = await loadTaskDetail(taskId);
+  const taskProjectId = readTaskProjectId(await searchParams);
+  const { detail } = await loadTaskDetail(taskId, taskProjectId);
 
   return {
     title: detail?.title
@@ -44,7 +56,10 @@ export default async function TaskDetailPage({
 }: TaskDetailPageProps) {
   const [{ id }, filters] = await Promise.all([
     params,
-    searchParams.then(parseTaskListFilters),
+    searchParams.then(async (value) => ({
+      filters: parseTaskListFilters(value),
+      taskProjectId: readTaskProjectId(value),
+    })),
   ]);
   const taskId = parseTaskId(id);
 
@@ -52,15 +67,16 @@ export default async function TaskDetailPage({
     notFound();
   }
 
-  const { detail, error } = await loadTaskDetail(taskId);
+  const { detail, error } = await loadTaskDetail(taskId, filters.taskProjectId);
 
   return (
     <TaskDetail
       detail={detail}
       detailError={error}
       taskId={taskId}
-      taskListHref={getTaskListHref(filters)}
-      taskListLabel={getTaskListTitle(filters)}
+      taskListHref={getTaskListHref(filters.filters)}
+      taskListLabel={getTaskListTitle(filters.filters)}
+      taskProjectId={filters.taskProjectId}
     />
   );
 }

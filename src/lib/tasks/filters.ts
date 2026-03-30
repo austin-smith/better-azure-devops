@@ -49,6 +49,8 @@ type TaskFilterableTask = Pick<
   | "id"
   | "iterationPath"
   | "priority"
+  | "projectId"
+  | "projectName"
   | "state"
   | "title"
   | "type"
@@ -298,11 +300,9 @@ export function listTaskFilterPresets() {
 }
 
 export function getActiveTaskFilterPreset(filters: TaskListFilterInput) {
-  const normalizedFilters = normalizeTaskListFilters(filters);
-
   return (
     TASK_FILTER_PRESETS.find((preset) =>
-      areTaskListFiltersEqual(preset.filters, normalizedFilters),
+      areTaskListFiltersEqual(preset.filters, filters),
     ) ?? null
   );
 }

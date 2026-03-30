@@ -9,6 +9,7 @@ import {
   type TaskListFilters,
 } from "@/lib/tasks/filters";
 import { getDefaultWorkItemTypes } from "@/lib/tasks/work-item-type";
+import type { AzureDevOpsProject } from "@/lib/azure-devops/projects";
 import sanitizeHtml from "sanitize-html";
 
 export type AzureDevOpsTask = {
@@ -19,6 +20,9 @@ export type AzureDevOpsTask = {
   id: number;
   iterationPath: string;
   priority: string;
+  projectId: string | null;
+  projectImageUrl: string | null;
+  projectName: string;
   state: string;
   title: string;
   type: string;
@@ -72,6 +76,8 @@ export type AzureDevOpsAssigneeOption = {
 export type AzureDevOpsClassificationPathOption = {
   key: string;
   name: string;
+  projectId: string;
+  projectName: string;
   secondaryText: string;
   value: string;
 };
@@ -174,6 +180,17 @@ type WorkItemBatchRequest = {
   ids: number[];
 };
 
+type TaskProjectContext = Pick<
+  AzureDevOpsProject,
+  "defaultTeamImageUrl" | "id" | "name"
+>;
+
+type TaskRequestContext = {
+  projectId?: string | null;
+  projectImageUrl?: string | null;
+  projectName?: string | null;
+};
+
 const TASK_FIELDS = [
   "System.AreaPath",
   "System.AssignedTo",
@@ -181,6 +198,7 @@ const TASK_FIELDS = [
   "System.Description",
   "System.IterationPath",
   "System.State",
+  "System.TeamProject",
   "System.Title",
   "System.WorkItemType",
   "Microsoft.VSTS.Common.Priority",
@@ -360,6 +378,23 @@ function normalizeClassificationFilterPath(
   return [segments[0], ...segments.slice(2)].join("\\");
 }
 
+function isValidClassificationFilterPath(
+  projects: readonly TaskProjectContext[],
+  path: string,
+) {
+  const segments = normalizeTaskPath(path).split("\\").filter(Boolean);
+
+  if (segments.length < 2) {
+    return false;
+  }
+
+  const projectSegment = segments[0]?.toLowerCase() ?? "";
+
+  return projects.some(
+    (project) => normalizeTaskPath(project.name).toLowerCase() === projectSegment,
+  );
+}
+
 function chunkIds(ids: number[], size: number) {
   const chunks: number[][] = [];
 
@@ -487,8 +522,24 @@ function parsePullRequestId(relation: WorkItemRelation) {
   return Number.isInteger(pullRequestId) ? pullRequestId : null;
 }
 
-function toTask(workItem: WorkItem): AzureDevOpsTask {
+function resolveTaskProject(
+  projectName: string,
+  projectsByName: ReadonlyMap<string, TaskProjectContext>,
+) {
+  return projectsByName.get(projectName.toLowerCase()) ?? null;
+}
+
+function toTask(
+  workItem: WorkItem,
+  projectsByName: ReadonlyMap<string, TaskProjectContext> = new Map(),
+  fallbackProjectName?: string,
+): AzureDevOpsTask {
   const assignee = parseIdentity(workItem.fields["System.AssignedTo"], "Unassigned");
+  const projectName =
+    readString(workItem.fields["System.TeamProject"]) ??
+    readString(fallbackProjectName) ??
+    "Unknown project";
+  const taskProject = resolveTaskProject(projectName, projectsByName);
 
   return {
     areaPath: normalizeTaskPath(workItem.fields["System.AreaPath"]),
@@ -498,6 +549,9 @@ function toTask(workItem: WorkItem): AzureDevOpsTask {
     id: workItem.id,
     iterationPath: normalizeTaskPath(workItem.fields["System.IterationPath"]),
     priority: String(workItem.fields["Microsoft.VSTS.Common.Priority"] ?? ""),
+    projectId: taskProject?.id ?? null,
+    projectImageUrl: taskProject?.defaultTeamImageUrl ?? null,
+    projectName,
     state: String(workItem.fields["System.State"] ?? ""),
     title: String(workItem.fields["System.Title"] ?? `Work item ${workItem.id}`),
     type: String(workItem.fields["System.WorkItemType"] ?? "Task"),
@@ -518,6 +572,7 @@ function compareClassificationPathOptions(
 function flattenClassificationNodes(
   kind: ClassificationNodeKind,
   node: ClassificationNode,
+  project: TaskProjectContext,
   options: AzureDevOpsClassificationPathOption[],
   depth = 0,
   parentPath = "",
@@ -530,10 +585,17 @@ function flattenClassificationNodes(
   const secondaryText =
     normalizedPath && normalizedPath !== name ? normalizedPath : "";
 
-  if (depth > 0 && normalizedPath && normalizedPath !== parentNormalizedPath) {
+  if (
+    depth > 0 &&
+    normalizedPath &&
+    normalizedPath !== parentNormalizedPath &&
+    isValidClassificationFilterPath([project], normalizedPath)
+  ) {
     options.push({
-      key: identifier ?? String(node.id ?? normalizedPath),
+      key: `${project.id}:${identifier ?? String(node.id ?? normalizedPath)}`,
       name: name || path,
+      projectId: project.id,
+      projectName: project.name,
       secondaryText,
       value: normalizedPath,
     });
@@ -543,6 +605,7 @@ function flattenClassificationNodes(
     flattenClassificationNodes(
       kind,
       child,
+      project,
       options,
       depth + 1,
       path,
@@ -553,22 +616,38 @@ function flattenClassificationNodes(
 
 async function listClassificationPathOptions(
   accessToken: string,
+  projects: readonly TaskProjectContext[],
   kind: ClassificationNodeKind,
   query = "",
 ) {
-  const response = await azureDevOpsRequest<ClassificationNode>(
-    `/_apis/wit/classificationnodes/${kind}?$depth=100`,
-    { accessToken },
-  );
   const options: AzureDevOpsClassificationPathOption[] = [];
   const seen = new Set<string>();
   const normalizedQuery = query.trim().toLowerCase();
 
-  flattenClassificationNodes(kind, response, options);
+  const responses = await Promise.all(
+    projects.map(async (project) => {
+      const response = await azureDevOpsRequest<ClassificationNode>(
+        `/_apis/wit/classificationnodes/${kind}?$depth=100`,
+        {
+          accessToken,
+          projectName: project.name,
+        },
+      );
+
+      return {
+        project,
+        response,
+      };
+    }),
+  );
+
+  for (const { project, response } of responses) {
+    flattenClassificationNodes(kind, response, project, options);
+  }
 
   return options
     .filter((option) => {
-      const key = option.value.toLowerCase();
+      const key = `${option.projectId}:${option.value.toLowerCase()}`;
 
       if (seen.has(key)) {
         return false;
@@ -583,6 +662,7 @@ async function listClassificationPathOptions(
       }
 
       return (
+        option.projectName.toLowerCase().includes(normalizedQuery) ||
         option.name.toLowerCase().includes(normalizedQuery) ||
         option.value.toLowerCase().includes(normalizedQuery)
       );
@@ -723,22 +803,35 @@ async function listLinkedPullRequests(
 
 export async function listTasks(
   accessToken: string,
+  selectedProjects: readonly TaskProjectContext[],
   filters: TaskListFilters = getDefaultTaskListFilters(),
 ) {
+  if (selectedProjects.length === 0) {
+    return [];
+  }
+
   const workItemTypes =
     filters.types.length > 0 ? filters.types : getDefaultWorkItemTypes();
+  const projectNames = selectedProjects.map((project) => project.name);
+  const projectsByName = new Map(
+    selectedProjects.map((project) => [project.name.toLowerCase(), project]),
+  );
   const normalizedAreaPath = filters.areaPath
     ? normalizeClassificationFilterPath("areas", filters.areaPath)
     : "";
   const normalizedIterationPath = filters.iterationPath
     ? normalizeClassificationFilterPath("iterations", filters.iterationPath)
     : "";
-  const areaPathFilter = normalizedAreaPath
+  const areaPathFilter =
+    normalizedAreaPath &&
+    isValidClassificationFilterPath(selectedProjects, normalizedAreaPath)
     ? `\n  AND [System.AreaPath] UNDER '${escapeWiqlString(normalizedAreaPath)}'`
     : "";
   const assigneeFilter =
     filters.assignee === "me" ? "\n  AND [System.AssignedTo] = @Me" : "";
-  const iterationPathFilter = normalizedIterationPath
+  const iterationPathFilter =
+    normalizedIterationPath &&
+    isValidClassificationFilterPath(selectedProjects, normalizedIterationPath)
     ? `\n  AND [System.IterationPath] UNDER '${escapeWiqlString(normalizedIterationPath)}'`
     : "";
   const stateFilter =
@@ -758,7 +851,9 @@ export async function listTasks(
     .join(", ")})`;
   const wiql = `SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [System.ChangedDate]
 FROM WorkItems
-WHERE [System.TeamProject] = @Project
+WHERE [System.TeamProject] IN (${projectNames
+    .map((projectName) => `'${escapeWiqlString(projectName)}'`)
+    .join(", ")})
 ${workItemTypeFilter}
 ${areaPathFilter}
 ${assigneeFilter}
@@ -769,14 +864,25 @@ ${priorityFilter}
   AND [System.State] <> 'Removed'
 ORDER BY [System.ChangedDate] DESC`;
 
-  const result = await azureDevOpsRequest<WiqlResponse>(
-    "/_apis/wit/wiql",
-    {
-      accessToken,
-      method: "POST",
-      body: JSON.stringify({ query: wiql }),
-    },
-  );
+  let result: WiqlResponse;
+
+  try {
+    result = await azureDevOpsRequest<WiqlResponse>(
+      "/_apis/wit/wiql",
+      {
+        accessToken,
+        method: "POST",
+        body: JSON.stringify({ query: wiql }),
+      },
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Azure DevOps WIQL request failed.";
+
+    throw new Error(
+      `${message} [filters areaPath=${JSON.stringify(filters.areaPath)} normalizedAreaPath=${JSON.stringify(normalizedAreaPath)} iterationPath=${JSON.stringify(filters.iterationPath)} normalizedIterationPath=${JSON.stringify(normalizedIterationPath)} selectedProjects=${JSON.stringify(projectNames)}]`,
+    );
+  }
 
   if (result.workItems.length === 0) {
     return [];
@@ -808,13 +914,31 @@ ORDER BY [System.ChangedDate] DESC`;
   return ids
     .map((id) => workItemsById.get(id))
     .filter((workItem): workItem is WorkItem => Boolean(workItem))
-    .map(toTask);
+    .map((workItem) => toTask(workItem, projectsByName));
 }
 
-export async function getTaskDetails(accessToken: string, workItemId: number) {
+export async function getTaskDetails(
+  accessToken: string,
+  workItemId: number,
+  context: TaskRequestContext = {},
+) {
   const workItem = await azureDevOpsRequest<WorkItem>(
     `/_apis/wit/workitems/${workItemId}?$expand=relations`,
     { accessToken },
+  );
+  const projectName =
+    readString(workItem.fields["System.TeamProject"]) ?? context.projectName ?? "Unknown project";
+  const projectsByName = new Map(
+    projectName
+      ? [[
+        projectName.toLowerCase(),
+        {
+          defaultTeamImageUrl: context.projectImageUrl ?? null,
+          id: context.projectId ?? "",
+          name: projectName,
+        },
+        ]]
+      : [],
   );
 
   const [comments, linkedPullRequests] = await Promise.all([
@@ -823,7 +947,7 @@ export async function getTaskDetails(accessToken: string, workItemId: number) {
   ]);
 
   return {
-    ...toTask(workItem),
+    ...toTask(workItem, projectsByName, projectName),
     areaPath: normalizeTaskPath(workItem.fields["System.AreaPath"]),
     comments,
     iterationPath: normalizeTaskPath(workItem.fields["System.IterationPath"]),
@@ -873,12 +997,25 @@ export async function listAssignableUsers(accessToken: string, query: string) {
     });
 }
 
-export async function listAreaPathOptions(accessToken: string, query = "") {
-  return listClassificationPathOptions(accessToken, "areas", query);
+export async function listAreaPathOptions(
+  accessToken: string,
+  selectedProjects: readonly TaskProjectContext[],
+  query = "",
+) {
+  return listClassificationPathOptions(accessToken, selectedProjects, "areas", query);
 }
 
-export async function listIterationPathOptions(accessToken: string, query = "") {
-  return listClassificationPathOptions(accessToken, "iterations", query);
+export async function listIterationPathOptions(
+  accessToken: string,
+  selectedProjects: readonly TaskProjectContext[],
+  query = "",
+) {
+  return listClassificationPathOptions(
+    accessToken,
+    selectedProjects,
+    "iterations",
+    query,
+  );
 }
 
 export async function updateTaskAssignee(
@@ -886,6 +1023,7 @@ export async function updateTaskAssignee(
   workItemId: number,
   assignee: string | null,
   revision: number,
+  context: TaskRequestContext = {},
 ) {
   await azureDevOpsRequest<WorkItem>(`/_apis/wit/workitems/${workItemId}`, {
     accessToken,
@@ -903,7 +1041,8 @@ export async function updateTaskAssignee(
     ]),
     contentType: "application/json-patch+json",
     method: "PATCH",
+    projectName: context.projectName,
   });
 
-  return getTaskDetails(accessToken, workItemId);
+  return getTaskDetails(accessToken, workItemId, context);
 }

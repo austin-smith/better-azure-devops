@@ -23,6 +23,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
+import { ProjectImage } from "@/components/project-image";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
 import { ThemeToggle } from "@/components/themes/theme-toggle";
@@ -93,6 +94,7 @@ import {
 import { getTaskStateBadgeVariant } from "@/lib/tasks/state";
 
 type TaskTableProps = {
+  activeProjectCount: number;
   error: string | null;
   filterOptions: TaskFilterOptions;
   filters: TaskListFilters;
@@ -102,7 +104,7 @@ type TaskTableProps = {
 
 const columnHelper = createColumnHelper<Task>();
 
-function getColumns(taskDetailHref: (taskId: number) => string) {
+function getColumns(taskDetailHref: (task: Task) => string) {
   return [
     columnHelper.accessor("id", {
       header: "ID",
@@ -116,6 +118,25 @@ function getColumns(taskDetailHref: (taskId: number) => string) {
       header: "Title",
       cell: ({ getValue }) => (
         <div className="font-medium whitespace-normal">{getValue()}</div>
+      ),
+    }),
+    columnHelper.accessor("projectName", {
+      header: "Project",
+      cell: ({ getValue, row }) => (
+        <Tooltip>
+          <TooltipTrigger
+            render={(
+              <div className="inline-flex">
+                <ProjectImage
+                  imageUrl={row.original.projectImageUrl}
+                  name={getValue()}
+                  size="sm"
+                />
+              </div>
+            )}
+          />
+          <TooltipContent>{getValue()}</TooltipContent>
+        </Tooltip>
       ),
     }),
     columnHelper.accessor("type", {
@@ -151,7 +172,7 @@ function getColumns(taskDetailHref: (taskId: number) => string) {
           <TooltipTrigger
             render={
               <Link
-                href={taskDetailHref(row.original.id)}
+                href={taskDetailHref(row.original)}
                 className="relative z-20 inline-flex"
               >
                 <UserAvatar
@@ -432,9 +453,12 @@ function ClassificationPathFilter({
       setLoadError(null);
 
       try {
-        const response = await fetch(endpoint, {
+        const response = await fetch(
+          endpoint,
+          {
           signal: controller.signal,
-        });
+          },
+        );
         const payload = (await response.json()) as
           | {
               error?: string;
@@ -564,6 +588,7 @@ function ClassificationPathFilter({
 }
 
 export function TaskTable({
+  activeProjectCount,
   error,
   filterOptions,
   filters,
@@ -574,7 +599,10 @@ export function TaskTable({
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState(filters.query);
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const taskDetailHref = (taskId: number) => getTaskDetailHref(taskId, filters);
+  const taskDetailHref = (task: Task) =>
+    getTaskDetailHref(task.id, filters, {
+      taskProjectId: task.projectId,
+    });
   const columns = getColumns(taskDetailHref);
   const hasActiveFilters = isTaskListFiltered(filters);
   const hasTypeFilter = filters.types.length > 0;
@@ -632,7 +660,7 @@ export function TaskTable({
     navigate(getDefaultTaskListFilters());
   }
 
-  // TanStack Table manages imperative table state internally and is not React Compiler-compatible.
+  // TanStack Table's hook returns non-memoizable functions, so React Compiler skips it.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: items,
@@ -673,7 +701,7 @@ export function TaskTable({
           <div className="flex flex-wrap items-center gap-2">
             <ClassificationPathFilter
               currentPath={filters.areaPath}
-              disabled={isPending}
+              disabled={isPending || activeProjectCount === 0}
               emptyMessage="No area paths found."
               endpoint="/api/task-filter-options/areas"
               label="Area"
@@ -725,7 +753,7 @@ export function TaskTable({
                 State
                 <ChevronDownIcon data-icon="inline-end" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-44">
+              <DropdownMenuContent align="end" className="min-w-64">
                 <DropdownMenuGroup>
                   <DropdownMenuLabel>Filter by state</DropdownMenuLabel>
                   {filterOptions.states.length > 0 ? (
@@ -761,7 +789,7 @@ export function TaskTable({
             />
             <ClassificationPathFilter
               currentPath={filters.iterationPath}
-              disabled={isPending}
+              disabled={isPending || activeProjectCount === 0}
               emptyMessage="No iteration paths found."
               endpoint="/api/task-filter-options/iterations"
               label="Iteration"
@@ -966,12 +994,16 @@ export function TaskTable({
                           <EmptyTitle className="text-base">
                             {hasActiveFilters
                               ? "No matching work items"
-                              : "No work items"}
+                              : activeProjectCount === 0
+                                ? "No projects selected"
+                                : "No work items"}
                           </EmptyTitle>
                           <EmptyDescription>
                             {hasActiveFilters
                               ? "Try adjusting your filters or search query to find what you're looking for."
-                              : "Work items that match your project will show up here."}
+                              : activeProjectCount === 0
+                                ? "Pick one or more Azure DevOps projects."
+                                : "Work items from your selected projects will show up here."}
                           </EmptyDescription>
                         </EmptyHeader>
                         {hasActiveFilters ? (
@@ -997,7 +1029,7 @@ export function TaskTable({
                         <TableCell key={cell.id} className="relative">
                           <Link
                             aria-hidden={cell.column.id !== "id"}
-                            href={taskDetailHref(row.original.id)}
+                            href={taskDetailHref(row.original)}
                             tabIndex={cell.column.id === "id" ? 0 : -1}
                             className="absolute inset-0 z-0"
                           >
@@ -1007,7 +1039,7 @@ export function TaskTable({
                           </Link>
                           <div
                             className={
-                              cell.column.id === "assignee"
+                              cell.column.id === "assignee" || cell.column.id === "projectName"
                                 ? "relative z-10"
                                 : "pointer-events-none relative z-10"
                             }

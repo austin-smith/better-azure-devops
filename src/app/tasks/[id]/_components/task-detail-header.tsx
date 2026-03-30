@@ -1,4 +1,5 @@
 import { ArrowUpRightIcon } from "lucide-react";
+import { ProjectImage } from "@/components/project-image";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,16 @@ export function TaskDetailHeader({
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {detail ? (
             <>
+              <Badge variant="outline">
+                <ProjectImage
+                  className="size-3.5 rounded-sm ring-0"
+                  imageClassName="rounded-sm"
+                  imageUrl={detail.projectImageUrl}
+                  name={detail.projectName}
+                  size="sm"
+                />
+                <span>{detail.projectName}</span>
+              </Badge>
               <Badge variant="outline">
                 <WorkItemTypeLabel type={detail.type} />
               </Badge>

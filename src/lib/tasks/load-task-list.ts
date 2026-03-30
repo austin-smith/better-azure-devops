@@ -1,8 +1,8 @@
-import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import {
   listTasks,
   type AzureDevOpsTask,
 } from "@/lib/azure-devops/tasks";
+import type { AzureDevOpsProject } from "@/lib/azure-devops/projects";
 import {
   applyTaskListFilters,
   areTaskListFiltersEqual,
@@ -36,11 +36,12 @@ function getServerScopedFilters(filters: TaskListFilters): TaskListFilters {
 }
 
 export async function loadTaskList(
+  accessToken: string,
+  selectedProjects: readonly AzureDevOpsProject[],
   filters: TaskListFilters,
   options: LoadTaskListOptions = {},
 ): Promise<LoadTaskListResult> {
   try {
-    const accessToken = await getAzureDevOpsAccessToken();
     const includeFilterOptions = options.includeFilterOptions ?? false;
     const serverScopedFilters = getServerScopedFilters(filters);
     const hasServerScopedFilters = !areTaskListFiltersEqual(
@@ -50,9 +51,9 @@ export async function loadTaskList(
 
     if (includeFilterOptions) {
       const [allItems, scopedItems] = await Promise.all([
-        listTasks(accessToken),
+        listTasks(accessToken, selectedProjects),
         hasServerScopedFilters
-          ? listTasks(accessToken, serverScopedFilters)
+          ? listTasks(accessToken, selectedProjects, serverScopedFilters)
           : Promise.resolve<AzureDevOpsTask[] | null>(null),
       ]);
 
@@ -67,7 +68,7 @@ export async function loadTaskList(
       };
     }
 
-    const items = await listTasks(accessToken, serverScopedFilters);
+    const items = await listTasks(accessToken, selectedProjects, serverScopedFilters);
 
     return {
       error: null,
