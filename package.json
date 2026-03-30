@@ -2,6 +2,7 @@
   "name": "devops-project",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10",
   "engines": {
     "node": "24.x"
   },
