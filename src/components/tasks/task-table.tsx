@@ -241,7 +241,7 @@ const TASK_TABLE_COLUMN_WIDTHS = [
   "5.5rem",
   undefined,
   "3.5rem",
-  "5.5rem",
+  "7rem",
   "9rem",
   "4.5rem",
   "4.5rem",
