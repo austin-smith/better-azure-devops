@@ -750,11 +750,18 @@ function toLinkedPullRequest(pullRequest: PullRequest): AzureDevOpsLinkedPullReq
   };
 }
 
-async function listTaskComments(accessToken: string, workItemId: number) {
+async function listTaskComments(
+  accessToken: string,
+  workItemId: number,
+  projectName: string,
+) {
   try {
     const response = await azureDevOpsRequest<CommentsResponse>(
       `/_apis/wit/workItems/${workItemId}/comments?$top=20&order=desc&$expand=renderedText&api-version=7.1-preview.4`,
-      { accessToken },
+      {
+        accessToken,
+        projectName,
+      },
     );
 
     return (response.comments ?? [])
@@ -942,7 +949,7 @@ export async function getTaskDetails(
   );
 
   const [comments, linkedPullRequests] = await Promise.all([
-    listTaskComments(accessToken, workItemId),
+    listTaskComments(accessToken, workItemId, projectName),
     listLinkedPullRequests(accessToken, workItem.relations),
   ]);
 

@@ -324,6 +324,7 @@ describe("azure-devops task helpers", () => {
           "System.IterationPath": "Project\\Iterations\\Sprint 1",
           "System.Reason": "Work started",
           "System.State": "Active",
+          "System.TeamProject": "Project",
           "System.Tags": "backend; urgent",
           "System.Title": "Investigate issue",
           "System.WorkItemType": "Task",
@@ -392,6 +393,15 @@ describe("azure-devops task helpers", () => {
       tags: ["backend", "urgent"],
       url: "https://dev.azure.com/example/workitems/42",
     });
+
+    expect(azureDevOpsRequestMock).toHaveBeenNthCalledWith(
+      2,
+      "/_apis/wit/workItems/42/comments?$top=20&order=desc&$expand=renderedText&api-version=7.1-preview.4",
+      {
+        accessToken: "token",
+        projectName: "Project",
+      },
+    );
 
     expect(azureDevOpsRequestMock).toHaveBeenNthCalledWith(
       3,
