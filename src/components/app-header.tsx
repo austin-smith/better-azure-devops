@@ -28,8 +28,8 @@ export function AppHeader({
   items,
 }: AppHeaderProps) {
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background">
-      <div className="flex min-w-0 flex-1 items-center gap-2 px-4">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <SidebarTrigger className="-ml-1" />
         <Separator
           className="mr-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
@@ -64,7 +64,7 @@ export function AppHeader({
         </Breadcrumb>
       </div>
 
-      {actions ? <div className="ml-auto flex items-center gap-2 px-4">{actions}</div> : null}
+      {actions ? <div className="ml-auto flex items-center gap-2">{actions}</div> : null}
     </header>
   );
 }

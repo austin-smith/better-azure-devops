@@ -411,10 +411,10 @@ export function AppSidebar({
             >
               <Image
                 alt=""
-                className="size-8 rounded-lg object-cover"
-                height={32}
+                className="size-4 rounded-sm object-cover"
+                height={16}
                 src="/logo.png"
-                width={32}
+                width={16}
               />
               <span className="truncate font-medium">{orgLabel}</span>
             </SidebarMenuButton>
