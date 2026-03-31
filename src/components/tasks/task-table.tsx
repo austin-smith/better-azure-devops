@@ -5,6 +5,7 @@ import {
   type ComponentProps,
   useDeferredValue,
   useEffect,
+  useMemo,
   useState,
   useTransition,
 } from "react";
@@ -85,6 +86,7 @@ import {
   getTaskDetailHref,
 } from "@/lib/tasks/navigation";
 import {
+  applyTaskListFilters,
   getCompactTaskPathBreadcrumb,
   getDefaultTaskListFilters,
   isTaskListFiltered,
@@ -103,7 +105,48 @@ type TaskTableProps = {
   title: string;
 };
 
+type TaskSearchInputProps = {
+  disabled?: boolean;
+  value: string;
+  onChange: (value: string) => void;
+};
+
 const columnHelper = createColumnHelper<Task>();
+
+function TaskSearchInput({
+  disabled = false,
+  value,
+  onChange,
+}: TaskSearchInputProps) {
+  const [inputValue, setInputValue] = useState(value);
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (inputValue === value) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      onChange(inputValue);
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [inputValue, onChange, value]);
+
+  return (
+    <Input
+      className="w-72 max-w-full"
+      disabled={disabled}
+      onChange={(event) => setInputValue(event.target.value)}
+      placeholder="Search work items"
+      type="search"
+      value={inputValue}
+    />
+  );
+}
 
 function getColumns(taskDetailHref: (task: Task) => string) {
   return [
@@ -127,7 +170,7 @@ function getColumns(taskDetailHref: (task: Task) => string) {
         <Tooltip>
           <TooltipTrigger
             render={(
-              <div className="inline-flex">
+              <div className="flex size-6 items-center justify-center leading-none">
                 <ProjectImage
                   imageUrl={row.original.projectImageUrl}
                   name={getValue()}
@@ -203,6 +246,17 @@ function getColumns(taskDetailHref: (task: Task) => string) {
     }),
   ];
 }
+
+const TASK_TABLE_COLUMN_WIDTHS = [
+  "5.5rem",
+  undefined,
+  "3.5rem",
+  "5.5rem",
+  "9rem",
+  "4.5rem",
+  "4.5rem",
+  "6.5rem",
+] as const;
 
 function toggleSelection(values: readonly string[], value: string) {
   return values.includes(value)
@@ -604,22 +658,43 @@ export function TaskTable({
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState(filters.query);
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const taskDetailHref = (task: Task) =>
-    getTaskDetailHref(task.id, filters, {
-      taskProjectId: task.projectId,
-    });
-  const columns = getColumns(taskDetailHref);
-  const hasActiveFilters = isTaskListFiltered(filters);
+  const taskDetailHref = useMemo(
+    () => (task: Task) =>
+      getTaskDetailHref(task.id, filters, {
+        taskProjectId: task.projectId,
+      }),
+    [filters],
+  );
+  const columns = useMemo(() => getColumns(taskDetailHref), [taskDetailHref]);
+  const visibleItems = useMemo(
+    () => applyTaskListFilters(items, { query: deferredSearchQuery }),
+    [deferredSearchQuery, items],
+  );
+  const hasActiveFilters = isTaskListFiltered({
+    ...filters,
+    query: searchQuery,
+  });
   const hasTypeFilter = filters.types.length > 0;
-  const showEmptyState = !error && items.length === 0;
+  const showEmptyState = !error && visibleItems.length === 0;
 
   useEffect(() => {
     setSearchQuery(filters.query);
   }, [filters.query]);
 
-  function navigate(nextFilters: TaskListFilters, mode: "push" | "replace" = "push") {
+  function navigate(
+    nextFilters: TaskListFilters,
+    mode: "push" | "replace" = "push",
+    options: { preserveLocalQuery?: boolean } = {},
+  ) {
     startTransition(() => {
-      const href = getTaskListHref(nextFilters);
+      const href = getTaskListHref(
+        options.preserveLocalQuery === false
+          ? nextFilters
+          : {
+              ...nextFilters,
+              query: searchQuery,
+            },
+      );
 
       if (mode === "replace") {
         router.replace(href);
@@ -631,44 +706,44 @@ export function TaskTable({
   }
 
   useEffect(() => {
-    if (deferredSearchQuery === filters.query) {
+    if (searchQuery === filters.query) {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      startTransition(() => {
-        router.replace(
-          getTaskListHref({
-            ...filters,
-            query: deferredSearchQuery,
-          }),
-        );
-      });
-    }, 250);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [deferredSearchQuery, filters, router, startTransition]);
+    startTransition(() => {
+      router.replace(
+        getTaskListHref({
+          ...filters,
+          query: searchQuery,
+        }),
+      );
+    });
+  }, [filters, router, searchQuery, startTransition]);
 
   function clearSearch() {
     setSearchQuery("");
-    navigate(
-      {
-        ...filters,
-        query: "",
-      },
-      "replace",
-    );
+
+    if (filters.query) {
+      navigate(
+        {
+          ...filters,
+          query: "",
+        },
+        "replace",
+        { preserveLocalQuery: false },
+      );
+    }
   }
 
   function clearAllFilters() {
     setSearchQuery("");
-    navigate(getDefaultTaskListFilters());
+    navigate(getDefaultTaskListFilters(), "push", { preserveLocalQuery: false });
   }
 
   // TanStack Table's hook returns non-memoizable functions, so React Compiler skips it.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
-    data: items,
+    data: visibleItems,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getRowId: (row) => String(row.id),
@@ -695,12 +770,10 @@ export function TaskTable({
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex max-w-full flex-none flex-wrap items-center gap-2">
-            <Input
-              className="w-72 max-w-full"
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search work items"
-              type="search"
+            <TaskSearchInput
+              disabled={isPending}
               value={searchQuery}
+              onChange={setSearchQuery}
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -843,9 +916,9 @@ export function TaskTable({
 
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span>
-            {items.length} work item{items.length === 1 ? "" : "s"}
+            {visibleItems.length} work item{visibleItems.length === 1 ? "" : "s"}
           </span>
-          {filters.query ? (
+          {searchQuery ? (
             <Button
               disabled={isPending}
               onClick={clearSearch}
@@ -853,7 +926,7 @@ export function TaskTable({
               type="button"
               variant="outline"
             >
-              Query: {filters.query}
+              Query: {searchQuery}
               <XIcon data-icon="inline-end" />
             </Button>
           ) : null}
@@ -970,7 +1043,15 @@ export function TaskTable({
 
         <div className="min-h-0 flex-1 overflow-hidden rounded-xl border bg-background">
           <div className="h-full overflow-auto">
-            <Table className="text-sm">
+            <Table className="table-fixed text-sm">
+              <colgroup>
+                {TASK_TABLE_COLUMN_WIDTHS.map((width, index) => (
+                  <col
+                    key={String(index)}
+                    style={width ? { width } : undefined}
+                  />
+                ))}
+              </colgroup>
               <TableHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>

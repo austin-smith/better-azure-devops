@@ -16,10 +16,12 @@ import { loadCurrentAzureDevOpsUser } from "@/lib/azure-devops/current-user";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import {
   PREFERRED_THEME_FAMILY_KEY,
+  RESOLVED_THEME_MODE_COOKIE_NAME,
   THEME_MODE_COOKIE_NAME,
   getThemeModeScript,
   isKnownThemeFamily,
   normalizeThemeMode,
+  resolveServerThemeMode,
 } from "@/lib/theme/constants";
 import { loadDashboardOverview } from "@/lib/tasks/load-dashboard-overview";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
@@ -67,8 +69,14 @@ export default async function RootLayout({
   const familyCookieRaw =
     cookieStore.get(PREFERRED_THEME_FAMILY_KEY)?.value ?? "";
   const themeModeCookieRaw = cookieStore.get(THEME_MODE_COOKIE_NAME)?.value ?? "";
+  const resolvedThemeModeCookieRaw =
+    cookieStore.get(RESOLVED_THEME_MODE_COOKIE_NAME)?.value ?? "";
   const sidebarOpenCookieRaw = cookieStore.get("sidebar_state")?.value;
   const serverThemeMode = normalizeThemeMode(themeModeCookieRaw);
+  const serverResolvedThemeMode = resolveServerThemeMode(
+    themeModeCookieRaw,
+    resolvedThemeModeCookieRaw,
+  );
   const defaultSidebarOpen =
     sidebarOpenCookieRaw === "false" ? false : true;
   const serverThemeFamilyClass =
@@ -79,7 +87,7 @@ export default async function RootLayout({
     "h-full",
     geistMonoFont.variable,
     sourceCodePro.variable,
-    serverThemeMode === "dark" ? "dark" : "",
+    serverResolvedThemeMode === "dark" ? "dark" : "",
     serverThemeFamilyClass,
   ]
     .filter(Boolean)

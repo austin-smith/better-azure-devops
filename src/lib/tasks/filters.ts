@@ -45,7 +45,6 @@ type TaskFilterableTask = Pick<
   AzureDevOpsTask,
   | "areaPath"
   | "assignee"
-  | "descriptionHtml"
   | "id"
   | "iterationPath"
   | "priority"
@@ -166,10 +165,6 @@ function readManyValues(value: SearchParamValue) {
 
 function normalizeMatchValue(value: string) {
   return value.trim().toLowerCase();
-}
-
-function stripHtml(value: string) {
-  return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 export function getDefaultTaskListFilters(): TaskListFilters {
@@ -494,13 +489,13 @@ export function applyTaskListFilters<T extends TaskFilterableTask>(
     const haystack = [
       String(task.id),
       task.title,
+      task.projectName,
       task.state,
       task.priority,
       task.assignee,
       task.areaPath,
       task.iterationPath,
       task.type,
-      stripHtml(task.descriptionHtml),
     ]
       .join(" ")
       .toLowerCase();

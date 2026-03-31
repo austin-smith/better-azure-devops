@@ -43,11 +43,10 @@ export function ProjectImage({
   size,
 }: ProjectImageProps) {
   const resolvedSize = size ?? "default";
-  const [hasLoaded, setHasLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const imageSrc = imageUrl ? buildAzureDevOpsAssetProxyPath(imageUrl) : undefined;
   const imageSize = imagePixelSizes[resolvedSize];
-  const showFallback = !imageSrc || hasError || !hasLoaded;
+  const showFallback = !imageSrc || hasError;
 
   return (
     <span
@@ -63,15 +62,11 @@ export function ProjectImage({
           alt={name}
           className={cn(
             "absolute inset-0 size-full rounded-md object-cover",
-            hasLoaded ? "opacity-100" : "opacity-0",
             imageClassName,
           )}
           height={imageSize}
           onError={() => {
             setHasError(true);
-          }}
-          onLoad={() => {
-            setHasLoaded(true);
           }}
           src={imageSrc}
           unoptimized

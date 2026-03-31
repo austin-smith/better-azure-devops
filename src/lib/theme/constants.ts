@@ -9,6 +9,7 @@ export const PREFERRED_THEME_FAMILY_KEY = "user-preferred-theme-family";
 export const THEME_FAMILY_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 export const THEME_MODE_STORAGE_KEY = "theme";
 export const THEME_MODE_COOKIE_NAME = "theme";
+export const RESOLVED_THEME_MODE_COOKIE_NAME = "resolved-theme";
 export const THEME_MODE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 export const THEME_MODE_OPTIONS = [
@@ -19,6 +20,7 @@ export const THEME_MODE_OPTIONS = [
 
 export type ThemeModeOption = (typeof THEME_MODE_OPTIONS)[number];
 export type ThemeModeValue = ThemeModeOption["value"];
+export type ResolvedThemeMode = Exclude<ThemeModeValue, "system">;
 
 export const THEME_MODE_ICON_MAP: Record<ThemeModeValue, LucideIcon> = {
   light: Sun,
@@ -44,6 +46,10 @@ export function isThemeMode(value: string): value is ThemeModeValue {
   return THEME_MODE_OPTIONS.some((option) => option.value === value);
 }
 
+export function isResolvedThemeMode(value: string): value is ResolvedThemeMode {
+  return value === "light" || value === "dark";
+}
+
 export function isThemeFamily(value: string): value is ThemeFamilyValue {
   return THEME_FAMILY_OPTIONS.some((option) => option.value === value);
 }
@@ -56,6 +62,23 @@ export function normalizeThemeMode(
   value: string | null | undefined,
 ): ThemeModeValue {
   return value && isThemeMode(value) ? value : "system";
+}
+
+export function normalizeResolvedThemeMode(
+  value: string | null | undefined,
+): ResolvedThemeMode {
+  return value && isResolvedThemeMode(value) ? value : "light";
+}
+
+export function resolveServerThemeMode(
+  themeModeValue: string | null | undefined,
+  resolvedThemeModeValue: string | null | undefined,
+): ResolvedThemeMode {
+  const themeMode = normalizeThemeMode(themeModeValue);
+
+  return themeMode === "system"
+    ? normalizeResolvedThemeMode(resolvedThemeModeValue)
+    : themeMode;
 }
 
 export function normalizeThemeFamily(
@@ -78,8 +101,16 @@ export function getThemeModeScript() {
   return `
     (() => {
       const storageKey = ${JSON.stringify(THEME_MODE_STORAGE_KEY)};
+      const themeCookieName = ${JSON.stringify(THEME_MODE_COOKIE_NAME)};
+      const resolvedThemeCookieName = ${JSON.stringify(RESOLVED_THEME_MODE_COOKIE_NAME)};
+      const cookieMaxAge = ${JSON.stringify(THEME_MODE_COOKIE_MAX_AGE_SECONDS)};
       const darkClass = "dark";
       const root = document.documentElement;
+      const writeCookie = (name, value) => {
+        const secure = window.location.protocol === "https:" ? "; Secure" : "";
+
+        document.cookie = \`\${name}=\${encodeURIComponent(value)}; path=/; max-age=\${cookieMaxAge}; SameSite=Lax\${secure}\`;
+      };
       const getSystemTheme = () =>
         window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 
@@ -92,10 +123,13 @@ export function getThemeModeScript() {
 
         root.classList.toggle(darkClass, resolved === "dark");
         root.style.colorScheme = resolved;
+        writeCookie(themeCookieName, theme);
+        writeCookie(resolvedThemeCookieName, resolved);
       } catch {
         const resolved = getSystemTheme();
         root.classList.toggle(darkClass, resolved === "dark");
         root.style.colorScheme = resolved;
+        writeCookie(resolvedThemeCookieName, resolved);
       }
     })();
   `;

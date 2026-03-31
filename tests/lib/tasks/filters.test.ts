@@ -111,7 +111,6 @@ describe("task filters", () => {
     const matchingTask = createTask({
       areaPath: "Project\\Area\\Platform",
       assignee: "Ada Lovelace",
-      descriptionHtml: "<p>Fixes flaky deployment notification</p>",
       id: 204,
       iterationPath: "Project\\Iteration\\Sprint 2",
       priority: "1",

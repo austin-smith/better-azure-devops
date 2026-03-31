@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   PREFERRED_THEME_FAMILY_KEY,
+  RESOLVED_THEME_MODE_COOKIE_NAME,
   THEME_FAMILIES,
   THEME_FAMILY_COOKIE_MAX_AGE_SECONDS,
   THEME_FAMILY_OPTIONS,
@@ -118,6 +119,12 @@ function persistThemeModeCookie(value: ThemeModeValue) {
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
 
   document.cookie = `${THEME_MODE_COOKIE_NAME}=${encodeURIComponent(value)}; path=/; max-age=${THEME_MODE_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax${secure}`;
+}
+
+function persistResolvedThemeModeCookie(value: "light" | "dark") {
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+
+  document.cookie = `${RESOLVED_THEME_MODE_COOKIE_NAME}=${encodeURIComponent(value)}; path=/; max-age=${THEME_MODE_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax${secure}`;
 }
 
 function persistThemeModeValue(value: ThemeModeValue) {
@@ -287,6 +294,7 @@ export function ThemeProvider({
 
     setResolvedTheme(resolved);
     persistThemeModeCookie(theme);
+    persistResolvedThemeModeCookie(resolved);
   }, [disableTransitionOnChange, theme]);
 
   React.useEffect(() => {
@@ -300,6 +308,7 @@ export function ThemeProvider({
       const resolved = applyThemeModeToDocument(theme, disableTransitionOnChange);
 
       setResolvedTheme(resolved);
+      persistResolvedThemeModeCookie(resolved);
       window.dispatchEvent(new Event(THEME_MODE_CHANGE_EVENT));
     };
 

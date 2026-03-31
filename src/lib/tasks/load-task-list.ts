@@ -60,11 +60,18 @@ export async function loadTaskList(
       return {
         error: null,
         filterOptions: getTaskFilterOptions(allItems, filters),
-        items: applyTaskListFilters(scopedItems ?? allItems, filters, {
-          assigneeAlreadyScopedToMe: hasServerScopedFilters
-            ? serverScopedFilters.assignee === "me"
-            : false,
-        }),
+        items: applyTaskListFilters(
+          scopedItems ?? allItems,
+          {
+            ...filters,
+            query: "",
+          },
+          {
+            assigneeAlreadyScopedToMe: hasServerScopedFilters
+              ? serverScopedFilters.assignee === "me"
+              : false,
+          },
+        ),
       };
     }
 
@@ -73,9 +80,16 @@ export async function loadTaskList(
     return {
       error: null,
       filterOptions: getEmptyTaskFilterOptions(),
-      items: applyTaskListFilters(items, filters, {
-        assigneeAlreadyScopedToMe: serverScopedFilters.assignee === "me",
-      }),
+      items: applyTaskListFilters(
+        items,
+        {
+          ...filters,
+          query: "",
+        },
+        {
+          assigneeAlreadyScopedToMe: serverScopedFilters.assignee === "me",
+        },
+      ),
     };
   } catch (error) {
     return {

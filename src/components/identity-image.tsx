@@ -44,14 +44,13 @@ export function IdentityImage({
   size,
 }: IdentityImageProps) {
   const resolvedSize = size ?? "default";
-  const [hasLoaded, setHasLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const imageSrc = imageUrl ? buildImageSrc(imageUrl) : undefined;
   const imageSize = imagePixelSizes[resolvedSize];
   const shapeClassName =
     shape === "rounded" ? "rounded-md after:rounded-md" : undefined;
   const imageShapeClassName = shape === "rounded" ? "rounded-md" : undefined;
-  const showFallback = !imageSrc || hasError || !hasLoaded;
+  const showFallback = !imageSrc || hasError;
 
   return (
     <Avatar className={cn(shapeClassName, className)} size={resolvedSize}>
@@ -65,16 +64,12 @@ export function IdentityImage({
           alt={label}
           className={cn(
             "absolute inset-0 size-full object-cover",
-            hasLoaded ? "opacity-100" : "opacity-0",
             imageShapeClassName,
             imageClassName,
           )}
           height={imageSize}
           onError={() => {
             setHasError(true);
-          }}
-          onLoad={() => {
-            setHasLoaded(true);
           }}
           src={imageSrc}
           unoptimized

@@ -150,7 +150,6 @@ describe("azure-devops task helpers", () => {
     expect(result[1]).toMatchObject({
       areaPath: "Project\\Areas\\Platform",
       assignee: "Ada Lovelace",
-      descriptionHtml: '<p>Safe html</p><img src="/proxy?src=https://dev.azure.com/example/avatar?id=1" />',
       iterationPath: "Project\\Iterations\\Sprint 1",
       priority: "2",
       projectImageUrl: "https://dev.azure.com/example/_apis/projects/project-id/image",
@@ -181,6 +180,9 @@ describe("azure-devops task helpers", () => {
     ).toContain("[System.IterationPath] UNDER 'Project\\Sprint 1'");
     expect(String(azureDevOpsRequestMock.mock.calls[1]?.[1]?.body)).toContain(
       '"ids":[11,10]',
+    );
+    expect(String(azureDevOpsRequestMock.mock.calls[1]?.[1]?.body)).not.toContain(
+      "System.Description",
     );
   });
 

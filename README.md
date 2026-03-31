@@ -56,17 +56,17 @@ AZURE_DEVOPS_ORG_URL=https://dev.azure.com/your-org
 
 ### 4. Sign in
 
+#### macOS and Linux shells
+
+```bash
+AZURE_CONFIG_DIR=.azure az login
+```
+
 #### Windows PowerShell
 
 ```powershell
 $env:AZURE_CONFIG_DIR=".azure"
 az login
-```
-
-#### macOS and Linux shells
-
-```bash
-AZURE_CONFIG_DIR=.azure az login
 ```
 
 ## Run

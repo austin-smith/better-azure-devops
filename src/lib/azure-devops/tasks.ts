@@ -12,11 +12,10 @@ import { getDefaultWorkItemTypes } from "@/lib/tasks/work-item-type";
 import type { AzureDevOpsProject } from "@/lib/azure-devops/projects";
 import sanitizeHtml from "sanitize-html";
 
-export type AzureDevOpsTask = {
+export type AzureDevOpsTaskListItem = {
   areaPath: string;
   assignee: string;
   assigneeAvatarUrl: string | null;
-  descriptionHtml: string;
   id: number;
   iterationPath: string;
   priority: string;
@@ -28,6 +27,8 @@ export type AzureDevOpsTask = {
   type: string;
   updatedAt: string;
 };
+
+export type AzureDevOpsTask = AzureDevOpsTaskListItem;
 
 export type AzureDevOpsTaskComment = {
   authorAvatarUrl: string | null;
@@ -54,14 +55,12 @@ export type AzureDevOpsLinkedPullRequest = {
 };
 
 export type AzureDevOpsTaskDetail = AzureDevOpsTask & {
-  areaPath: string;
   comments: AzureDevOpsTaskComment[];
-  iterationPath: string;
+  descriptionHtml: string;
   linkedPullRequests: AzureDevOpsLinkedPullRequest[];
   revision: number;
   reason: string;
   tags: string[];
-  type: string;
   url: string;
 };
 
@@ -191,11 +190,10 @@ type TaskRequestContext = {
   projectName?: string | null;
 };
 
-const TASK_FIELDS = [
+const TASK_LIST_FIELDS = [
   "System.AreaPath",
   "System.AssignedTo",
   "System.ChangedDate",
-  "System.Description",
   "System.IterationPath",
   "System.State",
   "System.TeamProject",
@@ -529,7 +527,7 @@ function resolveTaskProject(
   return projectsByName.get(projectName.toLowerCase()) ?? null;
 }
 
-function toTask(
+function toTaskListItem(
   workItem: WorkItem,
   projectsByName: ReadonlyMap<string, TaskProjectContext> = new Map(),
   fallbackProjectName?: string,
@@ -545,7 +543,6 @@ function toTask(
     areaPath: normalizeTaskPath(workItem.fields["System.AreaPath"]),
     assignee: assignee.name,
     assigneeAvatarUrl: assignee.avatarUrl,
-    descriptionHtml: sanitizeAzureDevOpsHtml(workItem.fields["System.Description"]),
     id: workItem.id,
     iterationPath: normalizeTaskPath(workItem.fields["System.IterationPath"]),
     priority: String(workItem.fields["Microsoft.VSTS.Common.Priority"] ?? ""),
@@ -905,7 +902,7 @@ ORDER BY [System.ChangedDate] DESC`;
           method: "POST",
           body: JSON.stringify({
             errorPolicy: "omit",
-            fields: TASK_FIELDS,
+            fields: TASK_LIST_FIELDS,
             ids: batchIds,
           } satisfies WorkItemBatchRequest),
         },
@@ -921,7 +918,7 @@ ORDER BY [System.ChangedDate] DESC`;
   return ids
     .map((id) => workItemsById.get(id))
     .filter((workItem): workItem is WorkItem => Boolean(workItem))
-    .map((workItem) => toTask(workItem, projectsByName));
+    .map((workItem) => toTaskListItem(workItem, projectsByName));
 }
 
 export async function getTaskDetails(
@@ -954,9 +951,10 @@ export async function getTaskDetails(
   ]);
 
   return {
-    ...toTask(workItem, projectsByName, projectName),
+    ...toTaskListItem(workItem, projectsByName, projectName),
     areaPath: normalizeTaskPath(workItem.fields["System.AreaPath"]),
     comments,
+    descriptionHtml: sanitizeAzureDevOpsHtml(workItem.fields["System.Description"]),
     iterationPath: normalizeTaskPath(workItem.fields["System.IterationPath"]),
     linkedPullRequests,
     revision: Number(workItem.rev ?? 0),

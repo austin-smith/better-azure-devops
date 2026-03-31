@@ -59,7 +59,7 @@ describe("ProjectImage", () => {
     expect(screen.queryByTestId("project-image")).not.toBeInTheDocument();
   });
 
-  it("removes the fallback once the project image has loaded", () => {
+  it("keeps rendering the image without waiting for a load event", () => {
     render(
       <ProjectImage
         imageUrl="https://dev.azure.com/example/_apis/projects/1/image"
@@ -67,10 +67,7 @@ describe("ProjectImage", () => {
       />,
     );
 
-    expect(screen.getByText("P")).toBeInTheDocument();
-
-    fireEvent.load(screen.getByTestId("project-image"));
-
+    expect(screen.getByTestId("project-image")).toBeInTheDocument();
     expect(screen.queryByText("P")).not.toBeInTheDocument();
   });
 });
