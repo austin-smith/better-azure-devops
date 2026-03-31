@@ -6,7 +6,7 @@ import "./globals.css";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/components/themes/theme-provider";
 import { ThemeShortcut } from "@/components/themes/theme-shortcut";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   getAzureDevOpsConfig,
@@ -109,7 +109,9 @@ export default async function RootLayout({
                 selectedProjectIds={projectSelection?.selectedProjectIds ?? []}
                 taskCount={overview?.error ? null : (overview?.openTaskCount ?? null)}
               />
-              <SidebarInset>{children}</SidebarInset>
+              <main className="flex min-h-svh flex-1 flex-col bg-background">
+                {children}
+              </main>
             </SidebarProvider>
           </TooltipProvider>
         </ThemeProvider>

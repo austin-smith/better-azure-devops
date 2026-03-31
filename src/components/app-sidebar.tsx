@@ -402,7 +402,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="h-12 border-b border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -422,15 +422,13 @@ export function AppSidebar({
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarSeparator />
-
       <SidebarContent>
         <ActiveProjectsControl
           availableProjects={availableProjects}
           selectedProjectIds={selectedProjectIds}
         />
 
-        <SidebarSeparator />
+        <SidebarSeparator className="mx-0" />
 
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>

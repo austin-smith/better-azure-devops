@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
@@ -27,11 +28,11 @@ export function AppHeader({
   items,
 }: AppHeaderProps) {
   return (
-    <div className="flex h-14 items-center gap-2 border-b px-3">
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background">
+      <div className="flex min-w-0 flex-1 items-center gap-2 px-4">
         <SidebarTrigger className="-ml-1" />
         <Separator
-          className="mr-1 h-4 data-[orientation=vertical]:h-4"
+          className="mr-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
           orientation="vertical"
         />
         <Breadcrumb className="min-w-0">
@@ -47,12 +48,12 @@ export function AppHeader({
                         {item.label}
                       </BreadcrumbPage>
                     ) : (
-                      <Link
+                      <BreadcrumbLink
                         className="truncate"
-                        href={item.href}
+                        render={<Link href={item.href} />}
                       >
                         {item.label}
-                      </Link>
+                      </BreadcrumbLink>
                     )}
                   </BreadcrumbItem>
                   {isCurrentPage ? null : <BreadcrumbSeparator />}
@@ -63,7 +64,7 @@ export function AppHeader({
         </Breadcrumb>
       </div>
 
-      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
-    </div>
+      {actions ? <div className="ml-auto flex items-center gap-2 px-4">{actions}</div> : null}
+    </header>
   );
 }
