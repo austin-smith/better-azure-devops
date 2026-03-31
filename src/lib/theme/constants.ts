@@ -28,6 +28,7 @@ export const THEME_MODE_ICON_MAP: Record<ThemeModeValue, LucideIcon> = {
 
 export const THEME_FAMILY_OPTIONS = [
   { value: "default", label: "Default" },
+  { value: "mono", label: "Mono" },
   { value: "perpetuity", label: "Perpetuity" },
 ] as const;
 

@@ -92,6 +92,7 @@ import {
   type TaskListFilters,
 } from "@/lib/tasks/filters";
 import { getTaskStateBadgeVariant } from "@/lib/tasks/state";
+import { getWorkItemTypeMeta } from "@/lib/tasks/work-item-type";
 
 type TaskTableProps = {
   activeProjectCount: number;
@@ -141,13 +142,17 @@ function getColumns(taskDetailHref: (task: Task) => string) {
     }),
     columnHelper.accessor("type", {
       header: "Type",
-      cell: ({ getValue }) => (
-        <div className="whitespace-nowrap">
-          <Badge variant="outline">
-            <WorkItemTypeLabel type={getValue()} />
-          </Badge>
-        </div>
-      ),
+      cell: ({ getValue }) => {
+        const type = getValue();
+        const meta = getWorkItemTypeMeta(type);
+        return (
+          <div className="whitespace-nowrap">
+            <Badge variant="outline">
+              <WorkItemTypeLabel type={type} iconClassName={meta.colorClass} />
+            </Badge>
+          </div>
+        );
+      },
     }),
     columnHelper.accessor("state", {
       header: "State",

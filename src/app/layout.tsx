@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { Source_Code_Pro } from "next/font/google";
+import { Geist_Mono, Source_Code_Pro } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -27,6 +27,12 @@ import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 const sourceCodePro = Source_Code_Pro({
   subsets: ["latin"],
   variable: "--font-perpetuity-dark",
+  display: "swap",
+});
+
+const geistMonoFont = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
@@ -58,10 +64,6 @@ export default async function RootLayout({
   const orgLabel = config
     ? new URL(config.orgUrl).pathname.replace(/^\/|\/$/g, "")
     : "Azure DevOps";
-  const projectLabel =
-    projectSelection?.selectedProjectIds.length && projectSelection.selectedProjectIds.length > 0
-      ? `${projectSelection.selectedProjectIds.length} project${projectSelection.selectedProjectIds.length === 1 ? "" : "s"}`
-      : "Projects";
   const familyCookieRaw =
     cookieStore.get(PREFERRED_THEME_FAMILY_KEY)?.value ?? "";
   const themeModeCookieRaw = cookieStore.get(THEME_MODE_COOKIE_NAME)?.value ?? "";
@@ -75,6 +77,7 @@ export default async function RootLayout({
       : "";
   const htmlClassName = [
     "h-full",
+    geistMonoFont.variable,
     sourceCodePro.variable,
     serverThemeMode === "dark" ? "dark" : "",
     serverThemeFamilyClass,
@@ -102,7 +105,6 @@ export default async function RootLayout({
                 availableProjects={projectSelection?.availableProjects ?? []}
                 currentUser={currentUser}
                 orgLabel={orgLabel}
-                projectLabel={projectLabel}
                 queueCount={overview?.error ? null : (overview?.queueCount ?? null)}
                 selectedProjectIds={projectSelection?.selectedProjectIds ?? []}
                 taskCount={overview?.error ? null : (overview?.openTaskCount ?? null)}

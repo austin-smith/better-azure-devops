@@ -56,7 +56,6 @@ type AppSidebarProps = {
   selectedProjectIds: readonly string[];
   taskCount: number | null;
   orgLabel: string;
-  projectLabel: string;
 };
 
 type SidebarNavigationProps = Pick<AppSidebarProps, "queueCount" | "taskCount">;
@@ -400,7 +399,6 @@ export function AppSidebar({
   selectedProjectIds,
   taskCount,
   orgLabel,
-  projectLabel,
 }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon">
@@ -408,8 +406,7 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              size="lg"
-              tooltip={projectLabel}
+              tooltip={orgLabel}
               render={<Link href="/" />}
             >
               <Image
@@ -419,12 +416,7 @@ export function AppSidebar({
                 src="/logo.png"
                 width={32}
               />
-              <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{projectLabel}</span>
-                <span className="truncate text-xs text-sidebar-foreground/70">
-                  {orgLabel}
-                </span>
-              </div>
+              <span className="truncate font-medium">{orgLabel}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

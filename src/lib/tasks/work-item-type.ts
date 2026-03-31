@@ -21,10 +21,21 @@ export const SUPPORTED_WORK_ITEM_TYPES = [
 export type SupportedWorkItemType = (typeof SUPPORTED_WORK_ITEM_TYPES)[number];
 
 type WorkItemTypeMeta = Readonly<{
+  colorClass: string;
   icon: LucideIcon;
   isSupported: boolean;
   label: string;
 }>;
+
+const WORK_ITEM_TYPE_COLORS: Record<SupportedWorkItemType, string> = {
+  Bug: "text-red-600 dark:text-red-400",
+  Feature: "text-purple-600 dark:text-purple-400",
+  Task: "text-amber-600 dark:text-amber-400",
+  "Test Case": "text-teal-600 dark:text-teal-400",
+  "Test Plan": "text-teal-600 dark:text-teal-400",
+  "Test Suite": "text-teal-600 dark:text-teal-400",
+  "User Story": "text-blue-600 dark:text-blue-400",
+};
 
 const SUPPORTED_WORK_ITEM_TYPE_LOOKUP = new Map(
   SUPPORTED_WORK_ITEM_TYPES.map((type) => [type.toLowerCase(), type] as const),
@@ -120,7 +131,12 @@ export function getWorkItemTypeMeta(type: string): WorkItemTypeMeta {
     WORK_ITEM_TYPE_ICONS[normalizedType as SupportedWorkItemType] ??
     FALLBACK_WORK_ITEM_TYPE_ICON;
 
+  const colorClass =
+    WORK_ITEM_TYPE_COLORS[normalizedType as SupportedWorkItemType] ??
+    "border-border bg-secondary text-secondary-foreground";
+
   return {
+    colorClass,
     icon,
     isSupported: SUPPORTED_WORK_ITEM_TYPE_LOOKUP.has(normalizedType.toLowerCase()),
     label: normalizedType,
