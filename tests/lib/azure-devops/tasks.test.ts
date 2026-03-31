@@ -1,8 +1,10 @@
 import {
+  getTaskEditMetadata,
   getTaskDetails,
   listAreaPathOptions,
   listAssignableUsers,
   listTasks,
+  updateTask,
   updateTaskAssignee,
 } from "@/lib/azure-devops/tasks";
 
@@ -305,79 +307,141 @@ describe("azure-devops task helpers", () => {
   });
 
   it("loads task details, comments, and linked pull requests", async () => {
-    azureDevOpsRequestMock
-      .mockResolvedValueOnce({
-        _links: {
-          html: { href: "https://dev.azure.com/example/workitems/42" },
-        },
-        fields: {
-          "Microsoft.VSTS.Common.Priority": 2,
-          "System.AreaPath": "Project\\Areas\\Platform",
-          "System.AssignedTo": {
+    azureDevOpsRequestMock.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/_apis/wit/workitems/42?$expand=relations":
+          return {
             _links: {
-              avatar: {
-                href: "https://dev.azure.com/example/avatar/ada",
-              },
+              html: { href: "https://dev.azure.com/example/workitems/42" },
             },
-            displayName: "Ada Lovelace",
-          },
-          "System.ChangedDate": "2025-01-05T12:00:00.000Z",
-          "System.Description": "<p>Hello</p>",
-          "System.IterationPath": "Project\\Iterations\\Sprint 1",
-          "System.Reason": "Work started",
-          "System.State": "Active",
-          "System.TeamProject": "Project",
-          "System.Tags": "backend; urgent",
-          "System.Title": "Investigate issue",
-          "System.WorkItemType": "Task",
-        },
-        id: 42,
-        relations: [
-          {
-            attributes: { name: "Pull Request" },
-            url: "vstfs:///Git/PullRequestId/example%2Frepo%2F501",
-          },
-        ],
-        rev: 7,
-      })
-      .mockResolvedValueOnce({
-        comments: [
-          {
-            commentId: 1,
+            fields: {
+              "Microsoft.VSTS.Common.Priority": 2,
+              "System.AreaPath": "Project\\Areas\\Platform",
+              "System.AssignedTo": {
+                _links: {
+                  avatar: {
+                    href: "https://dev.azure.com/example/avatar/ada",
+                  },
+                },
+                displayName: "Ada Lovelace",
+              },
+              "System.ChangedDate": "2025-01-05T12:00:00.000Z",
+              "System.Description": "<p>Hello</p>",
+              "System.IterationPath": "Project\\Iterations\\Sprint 1",
+              "System.Reason": "Work started",
+              "System.State": "Active",
+              "System.TeamProject": "Project",
+              "System.Tags": "backend; urgent",
+              "System.Title": "Investigate issue",
+              "System.WorkItemType": "Task",
+            },
+            id: 42,
+            relations: [
+              {
+                attributes: { name: "Pull Request" },
+                url: "vstfs:///Git/PullRequestId/example%2Frepo%2F501",
+              },
+            ],
+            rev: 7,
+          };
+        case "/_apis/wit/workItems/42/comments?$top=20&order=desc&$expand=all&api-version=7.1-preview.4":
+          return {
+            comments: [
+              {
+                commentId: 1,
+                createdBy: { displayName: "Grace Hopper" },
+                createdDate: "2025-01-05T13:00:00.000Z",
+                format: "markdown",
+                reactions: [
+                  {
+                    count: 2,
+                    isCurrentUserEngaged: true,
+                    type: "heart",
+                  },
+                  {
+                    count: 1,
+                    isCurrentUserEngaged: false,
+                    type: "like",
+                  },
+                  {
+                    count: 0,
+                    type: "smile",
+                  },
+                ],
+                renderedText:
+                  '<a data-vss-mention="aad,123">Ada &amp; Team</a>',
+                text: "Ping @<123>",
+              },
+              {
+                commentId: 2,
+                isDeleted: true,
+                text: "deleted",
+              },
+            ],
+          };
+        case "/_apis/wit/workItems/42/comments/1/reactions/like/users?$top=1&api-version=7.1-preview.1":
+          return {
+            count: 1,
+            value: [
+              {
+                displayName: "Ada Lovelace",
+              },
+            ],
+          };
+        case "/_apis/wit/workItems/42/comments/1/reactions/heart/users?$top=2&api-version=7.1-preview.1":
+          return {
+            count: 2,
+            value: [
+              {
+                displayName: "Grace Hopper",
+              },
+              {
+                displayName: "Barbara Liskov",
+              },
+            ],
+          };
+        case "/_apis/git/pullrequests/501":
+          return {
+            _links: {
+              web: { href: "https://dev.azure.com/example/pullrequest/501" },
+            },
             createdBy: { displayName: "Grace Hopper" },
-            createdDate: "2025-01-05T13:00:00.000Z",
-            format: "markdown",
-            renderedText:
-              '<a data-vss-mention="aad,123">Ada &amp; Team</a>',
-            text: "Ping @<123>",
-          },
-          {
-            commentId: 2,
-            isDeleted: true,
-            text: "deleted",
-          },
-        ],
-      })
-      .mockResolvedValueOnce({
-        _links: {
-          web: { href: "https://dev.azure.com/example/pullrequest/501" },
-        },
-        createdBy: { displayName: "Grace Hopper" },
-        creationDate: "2025-01-05T14:00:00.000Z",
-        isDraft: true,
-        pullRequestId: 501,
-        repository: { name: "platform" },
-        sourceRefName: "refs/heads/feature/task",
-        status: "active",
-        targetRefName: "refs/heads/main",
-        title: "Fix task details",
-      });
+            creationDate: "2025-01-05T14:00:00.000Z",
+            isDraft: true,
+            pullRequestId: 501,
+            repository: { name: "platform" },
+            sourceRefName: "refs/heads/feature/task",
+            status: "active",
+            targetRefName: "refs/heads/main",
+            title: "Fix task details",
+          };
+        default:
+          throw new Error(`Unexpected path: ${path}`);
+      }
+    });
 
     await expect(getTaskDetails("token", 42)).resolves.toMatchObject({
       comments: [
         expect.objectContaining({
           authorName: "Grace Hopper",
           format: "markdown",
+          reactions: [
+            {
+              count: 1,
+              isCurrentUserEngaged: false,
+              type: "like",
+              users: [{ avatarUrl: null, name: "Ada Lovelace" }],
+            },
+            {
+              count: 2,
+              isCurrentUserEngaged: true,
+              type: "heart",
+              users: [
+                { avatarUrl: null, name: "Grace Hopper" },
+                { avatarUrl: null, name: "Barbara Liskov" },
+              ],
+            },
+          ],
           text: "Ping [Ada & Team](./ado-mention/123)",
         }),
       ],
@@ -398,15 +462,30 @@ describe("azure-devops task helpers", () => {
 
     expect(azureDevOpsRequestMock).toHaveBeenNthCalledWith(
       2,
-      "/_apis/wit/workItems/42/comments?$top=20&order=desc&$expand=renderedText&api-version=7.1-preview.4",
+      "/_apis/wit/workItems/42/comments?$top=20&order=desc&$expand=all&api-version=7.1-preview.4",
       {
         accessToken: "token",
         projectName: "Project",
       },
     );
 
-    expect(azureDevOpsRequestMock).toHaveBeenNthCalledWith(
-      3,
+    expect(azureDevOpsRequestMock).toHaveBeenCalledWith(
+      "/_apis/wit/workItems/42/comments/1/reactions/like/users?$top=1&api-version=7.1-preview.1",
+      {
+        accessToken: "token",
+        projectName: "Project",
+      },
+    );
+
+    expect(azureDevOpsRequestMock).toHaveBeenCalledWith(
+      "/_apis/wit/workItems/42/comments/1/reactions/heart/users?$top=2&api-version=7.1-preview.1",
+      {
+        accessToken: "token",
+        projectName: "Project",
+      },
+    );
+
+    expect(azureDevOpsRequestMock).toHaveBeenCalledWith(
       "/_apis/git/pullrequests/501",
       { accessToken: "token" },
     );
@@ -437,6 +516,32 @@ describe("azure-devops task helpers", () => {
       projectImageUrl: "https://dev.azure.com/example/_apis/projects/project-id/image",
       projectName: "Project",
     });
+  });
+
+  it("loads task edit metadata from the work item type field definition", async () => {
+    azureDevOpsRequestMock
+      .mockResolvedValueOnce({
+        fields: {
+          "System.TeamProject": "Project",
+          "System.WorkItemType": "Task",
+        },
+      })
+      .mockResolvedValueOnce({
+        allowedValues: [1, 2, 3, 2],
+      });
+
+    await expect(getTaskEditMetadata("token", 42)).resolves.toEqual({
+      priorities: ["1", "2", "3"],
+    });
+
+    expect(azureDevOpsRequestMock).toHaveBeenNthCalledWith(
+      2,
+      "/_apis/wit/workitemtypes/Task/fields/Microsoft.VSTS.Common.Priority?$expand=allowedValues",
+      {
+        accessToken: "token",
+        projectName: "Project",
+      },
+    );
   });
 
   it("patches the assignee field using optimistic revision checks", async () => {
@@ -480,5 +585,64 @@ describe("azure-devops task helpers", () => {
     );
     expect(result.revision).toBe(8);
     expect(result.assignee).toBe("Unassigned");
+  });
+
+  it("patches multiple task fields using optimistic revision checks", async () => {
+    azureDevOpsRequestMock
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        fields: {
+          "Microsoft.VSTS.Common.Priority": 1,
+          "System.AreaPath": "Project\\Area\\Platform",
+          "System.AssignedTo": {
+            displayName: "Ada Lovelace",
+            uniqueName: "ada@example.com",
+          },
+          "System.ChangedDate": "2025-01-05T12:00:00.000Z",
+          "System.Description": "",
+          "System.IterationPath": "Project\\Iteration\\Sprint 2",
+          "System.Reason": "Updated",
+          "System.State": "Active",
+          "System.Tags": "",
+          "System.Title": "Updated title",
+          "System.WorkItemType": "Task",
+        },
+        id: 42,
+        rev: 8,
+      })
+      .mockResolvedValueOnce({ comments: [] });
+
+    const result = await updateTask(
+      "token",
+      42,
+      {
+        areaPath: "Project\\Area\\Platform",
+        assignee: "ada@example.com",
+        iterationPath: "Project\\Iteration\\Sprint 2",
+        priority: "1",
+        title: "Updated title",
+      },
+      7,
+    );
+
+    expect(azureDevOpsRequestMock.mock.calls[0]?.[1]?.body).toBe(
+      JSON.stringify([
+        { op: "test", path: "/rev", value: 7 },
+        { op: "add", path: "/fields/System.Title", value: "Updated title" },
+        { op: "add", path: "/fields/System.AssignedTo", value: "ada@example.com" },
+        { op: "add", path: "/fields/Microsoft.VSTS.Common.Priority", value: 1 },
+        { op: "add", path: "/fields/System.AreaPath", value: "Project\\Area\\Platform" },
+        { op: "add", path: "/fields/System.IterationPath", value: "Project\\Iteration\\Sprint 2" },
+      ]),
+    );
+    expect(result).toMatchObject({
+      areaPath: "Project\\Area\\Platform",
+      assignee: "Ada Lovelace",
+      assigneeValue: "ada@example.com",
+      iterationPath: "Project\\Iteration\\Sprint 2",
+      priority: "1",
+      revision: 8,
+      title: "Updated title",
+    });
   });
 });

@@ -1,12 +1,11 @@
 "use client";
 
 import {
-  startTransition,
+  useDeferredValue,
   useEffect,
   useState,
   type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2Icon } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
 import { ProjectImage } from "@/components/project-image";
@@ -20,27 +19,54 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
+import type {
+  AzureDevOpsTaskDetail as TaskDetailData,
+  AzureDevOpsTaskEditMetadata,
+} from "@/lib/azure-devops/tasks";
+import type { TaskDetailEditableValues } from "@/lib/tasks/task-detail-edit";
 
 type TaskDetailSidebarProps = {
   detail: TaskDetailData | null;
-  onUpdated: (detail: TaskDetailData) => void;
-  taskId: number;
+  draftValues: TaskDetailEditableValues | null;
+  editMetadata: AzureDevOpsTaskEditMetadata | null;
+  editMetadataError: string | null;
+  isDirty: boolean;
+  isLoadingEditMetadata: boolean;
+  isSaving: boolean;
+  onDraftChange: (values: TaskDetailEditableValues) => void;
+  saveError: string | null;
   taskProjectId: string | null;
 };
 
-type AssigneeOption = {
-  avatarUrl: string | null;
+type SearchOption = {
+  avatarUrl?: string | null;
+  key: string;
+  label: string;
+  secondaryText: string;
+  value: string | null;
+};
+
+type SearchOptionResponseItem = {
+  avatarUrl?: string | null;
   key: string;
   name: string;
   secondaryText: string;
-  value: string;
+  value: string | null;
 };
 
 function SidebarField({
@@ -51,46 +77,63 @@ function SidebarField({
   label: string;
 }) {
   return (
-    <div>
+    <div className="flex flex-col gap-1.5">
       <div className="text-[11px] font-medium text-muted-foreground uppercase">
         {label}
       </div>
-      <div className="mt-1 text-sm text-foreground">{children}</div>
+      <div className="text-sm text-foreground">{children}</div>
     </div>
   );
 }
 
-function AssigneeField({
-  detail,
-  onUpdated,
-  taskId,
-  taskProjectId,
+function SearchPopoverField({
+  disabled,
+  emptyMessage,
+  endpoint,
+  minQueryLength = 2,
+  onSelect,
+  placeholder,
+  selectedContent,
+  staticOptions = [],
 }: {
-  detail: TaskDetailData | null;
-  onUpdated: (detail: TaskDetailData) => void;
-  taskId: number;
-  taskProjectId: string | null;
+  disabled: boolean;
+  emptyMessage: string;
+  endpoint: string;
+  minQueryLength?: number;
+  onSelect: (option: SearchOption) => void;
+  placeholder: string;
+  selectedContent: ReactNode;
+  staticOptions?: readonly SearchOption[];
 }) {
-  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<AssigneeOption[]>([]);
+  const deferredQuery = useDeferredValue(query);
+  const [isLoading, setIsLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const showResults = results.length > 0;
-  const showEmpty = !isLoading && query.trim().length >= 2 && results.length === 0;
+  const [results, setResults] = useState<SearchOption[]>([]);
+  const trimmedQuery = deferredQuery.trim();
+  const shouldLookup = trimmedQuery.length >= minQueryLength;
+  const showDynamicResults = results.length > 0;
+  const showStaticOptions = staticOptions.length > 0;
+  const showEmpty =
+    !isLoading &&
+    !lookupError &&
+    (shouldLookup || minQueryLength === 0) &&
+    !showStaticOptions &&
+    results.length === 0;
   const showList =
-    isLoading || Boolean(lookupError) || Boolean(saveError) || showResults || showEmpty;
+    isLoading ||
+    Boolean(lookupError) ||
+    showStaticOptions ||
+    showDynamicResults ||
+    showEmpty;
 
   useEffect(() => {
     if (!isOpen) {
       setQuery("");
       setResults([]);
-      setIsLoading(false);
       setLookupError(null);
-      setSaveError(null);
+      setIsLoading(false);
     }
   }, [isOpen]);
 
@@ -99,12 +142,10 @@ function AssigneeField({
       return;
     }
 
-    const trimmedQuery = query.trim();
-
-    if (trimmedQuery.length < 2) {
+    if (!shouldLookup && minQueryLength > 0) {
       setResults([]);
-      setIsLoading(false);
       setLookupError(null);
+      setIsLoading(false);
       return;
     }
 
@@ -114,24 +155,32 @@ function AssigneeField({
       setLookupError(null);
 
       try {
-        const response = await fetch(
-          `/api/assignees?q=${encodeURIComponent(trimmedQuery)}`,
-          {
-            signal: controller.signal,
-          },
-        );
+        const requestUrl = new URL(endpoint, window.location.origin);
+        requestUrl.searchParams.set("q", trimmedQuery);
+
+        const response = await fetch(requestUrl, {
+          signal: controller.signal,
+        });
         const payload = (await response.json()) as
           | {
               error?: string;
-              items?: AssigneeOption[];
+              items?: SearchOptionResponseItem[];
             }
           | undefined;
 
         if (!response.ok) {
-          throw new Error(payload?.error ?? "Failed to load assignees.");
+          throw new Error(payload?.error ?? "Failed to load options.");
         }
 
-        setResults(payload?.items ?? []);
+        setResults(
+          (payload?.items ?? []).map((item) => ({
+            avatarUrl: item.avatarUrl,
+            key: item.key,
+            label: item.name,
+            secondaryText: item.secondaryText,
+            value: item.value,
+          })),
+        );
       } catch (error) {
         if (controller.signal.aborted) {
           return;
@@ -139,195 +188,323 @@ function AssigneeField({
 
         setResults([]);
         setLookupError(
-          error instanceof Error ? error.message : "Failed to load assignees.",
+          error instanceof Error ? error.message : "Failed to load options.",
         );
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);
         }
       }
-    }, 250);
+    }, 200);
 
     return () => {
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [isOpen, query]);
-
-  async function updateAssignee(assignee: string | null) {
-    if (!detail) {
-      return;
-    }
-
-    setIsSaving(true);
-    setSaveError(null);
-
-    try {
-      const params = new URLSearchParams();
-
-      if (detail.projectId ?? taskProjectId) {
-        params.set("project", detail.projectId ?? taskProjectId ?? "");
-      }
-
-      const response = await fetch(
-        `/api/tasks/${taskId}${params.size > 0 ? `?${params.toString()}` : ""}`,
-        {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          assignee,
-          revision: detail.revision,
-        }),
-      },
-      );
-      const payload = (await response.json()) as
-        | {
-            error?: string;
-            item?: TaskDetailData;
-          }
-        | undefined;
-
-      if (!response.ok || !payload?.item) {
-        throw new Error(payload?.error ?? "Failed to update assignee.");
-      }
-
-      onUpdated(payload.item);
-      setIsOpen(false);
-      setQuery("");
-      setResults([]);
-      setLookupError(null);
-      startTransition(() => {
-        router.refresh();
-      });
-    } catch (error) {
-      setSaveError(
-        error instanceof Error ? error.message : "Failed to update assignee.",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  }
+  }, [endpoint, isOpen, minQueryLength, shouldLookup, trimmedQuery]);
 
   return (
-    <SidebarField label="Assignee">
-      {detail ? (
-        <Popover
-          modal={false}
-          open={isOpen}
-          onOpenChange={(open) => {
-            setIsOpen(open);
-            if (open) {
-              setQuery("");
-            }
-          }}
-        >
-          <PopoverTrigger
-            className="flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
-            disabled={isSaving}
-          >
-            <UserAvatar
-              avatarUrl={detail.assigneeAvatarUrl}
-              name={detail.assignee}
-              size="sm"
-            />
-            <span className="min-w-0 flex-1 truncate">{detail.assignee}</span>
-          </PopoverTrigger>
+    <Popover
+      modal={false}
+      open={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+      }}
+    >
+      <PopoverTrigger
+        className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-input bg-transparent px-2.5 py-2 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
+        disabled={disabled}
+      >
+        {selectedContent}
+      </PopoverTrigger>
 
-          <PopoverContent
-            align="start"
-            className="w-(--anchor-width) min-w-0 overflow-hidden p-0"
-            sideOffset={6}
-          >
-            <Command className="bg-transparent p-0" shouldFilter={false}>
-              <CommandInput
-                autoFocus
-                disabled={isSaving}
-                onValueChange={setQuery}
-                placeholder="Search assignee"
-                value={query}
-              />
+      <PopoverContent
+        align="start"
+        className="w-(--anchor-width) min-w-0 overflow-hidden p-0"
+        sideOffset={6}
+      >
+        <Command className="bg-transparent p-0" shouldFilter={false}>
+          <CommandInput
+            autoFocus
+            disabled={disabled}
+            onValueChange={setQuery}
+            placeholder={placeholder}
+            value={query}
+          />
 
-              {showList ? (
-                <CommandList className="max-h-52">
-                  {isLoading ? (
-                    <div className="flex items-center justify-center py-3 text-muted-foreground">
-                      <Loader2Icon className="size-4 animate-spin" />
-                    </div>
-                  ) : null}
-
-                  {lookupError ? (
-                    <div className="px-3 py-2 text-xs text-destructive">{lookupError}</div>
-                  ) : null}
-
-                  {saveError ? (
-                    <div className="px-3 py-2 text-xs text-destructive">{saveError}</div>
-                  ) : null}
-
-                  {showEmpty ? <CommandEmpty>No assignees found.</CommandEmpty> : null}
-
-                  {!isLoading && showResults ? (
-                    <CommandGroup>
-                      {results.map((result) => (
-                        <CommandItem
-                          key={result.key}
-                          disabled={isSaving}
-                          onSelect={() => {
-                            void updateAssignee(result.value);
-                          }}
-                          value={result.key}
-                        >
-                          <UserAvatar
-                            avatarUrl={result.avatarUrl}
-                            name={result.name}
-                            size="sm"
-                          />
-                          <div className="min-w-0">
-                            <div className="truncate text-foreground">{result.name}</div>
-                            {result.secondaryText ? (
-                              <div className="truncate text-xs text-muted-foreground">
-                                {result.secondaryText}
-                              </div>
-                            ) : null}
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  ) : null}
-                </CommandList>
+          {showList ? (
+            <CommandList className="max-h-56">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-3 text-muted-foreground">
+                  <Loader2Icon className="size-4 animate-spin" />
+                </div>
               ) : null}
-            </Command>
-          </PopoverContent>
-        </Popover>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      )}
-    </SidebarField>
+
+              {lookupError ? (
+                <div className="px-3 py-2 text-xs text-destructive">{lookupError}</div>
+              ) : null}
+
+              {showStaticOptions ? (
+                <CommandGroup>
+                  {staticOptions.map((option) => (
+                    <CommandItem
+                      key={option.key}
+                      disabled={disabled}
+                      onSelect={() => {
+                        onSelect(option);
+                        setIsOpen(false);
+                      }}
+                      value={option.key}
+                    >
+                      {option.avatarUrl !== undefined ? (
+                        <UserAvatar
+                          avatarUrl={option.avatarUrl}
+                          name={option.label}
+                          size="sm"
+                        />
+                      ) : null}
+                      <div className="min-w-0">
+                        <div className="truncate text-foreground">{option.label}</div>
+                        {option.secondaryText ? (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {option.secondaryText}
+                          </div>
+                        ) : null}
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ) : null}
+
+              {!isLoading && showDynamicResults ? (
+                <CommandGroup>
+                  {results.map((option) => (
+                    <CommandItem
+                      key={option.key}
+                      disabled={disabled}
+                      onSelect={() => {
+                        onSelect(option);
+                        setIsOpen(false);
+                      }}
+                      value={option.key}
+                    >
+                      {option.avatarUrl !== undefined ? (
+                        <UserAvatar
+                          avatarUrl={option.avatarUrl}
+                          name={option.label}
+                          size="sm"
+                        />
+                      ) : null}
+                      <div className="min-w-0">
+                        <div className="truncate text-foreground">{option.label}</div>
+                        {option.secondaryText ? (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {option.secondaryText}
+                          </div>
+                        ) : null}
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ) : null}
+
+              {showEmpty ? <CommandEmpty>{emptyMessage}</CommandEmpty> : null}
+            </CommandList>
+          ) : null}
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
+}
+
+function sortPriorityOptions(values: readonly string[]) {
+  return [...values].sort((left, right) => {
+    const leftValue = Number(left);
+    const rightValue = Number(right);
+
+    if (Number.isFinite(leftValue) && Number.isFinite(rightValue)) {
+      return leftValue - rightValue;
+    }
+
+    return left.localeCompare(right, undefined, {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
 }
 
 export function TaskDetailSidebar({
   detail,
-  onUpdated,
-  taskId,
+  draftValues,
+  editMetadata,
+  editMetadataError,
+  isDirty,
+  isLoadingEditMetadata,
+  isSaving,
+  onDraftChange,
+  saveError,
   taskProjectId,
 }: TaskDetailSidebarProps) {
+  const lookupProjectId = detail?.projectId ?? taskProjectId;
+  const areaLookupEndpoint = `/api/task-filter-options/areas${
+    lookupProjectId ? `?project=${encodeURIComponent(lookupProjectId)}` : ""
+  }`;
+  const iterationLookupEndpoint = `/api/task-filter-options/iterations${
+    lookupProjectId ? `?project=${encodeURIComponent(lookupProjectId)}` : ""
+  }`;
+  const priorityOptions = sortPriorityOptions([
+    ...(draftValues?.priority ? [draftValues.priority] : []),
+    ...(editMetadata?.priorities ?? []),
+  ].filter((value, index, array) => array.indexOf(value) === index));
+
   return (
-    <aside className="w-52 shrink-0 overflow-y-auto border-l p-4 md:w-60">
-      <div className="space-y-4">
-        <AssigneeField
-          detail={detail}
-          onUpdated={onUpdated}
-          taskId={taskId}
-          taskProjectId={taskProjectId}
-        />
+    <aside className="w-72 shrink-0 overflow-y-auto border-l p-4">
+      <div className="flex flex-col gap-4">
+        {draftValues ? (
+          <>
+            {isDirty ? (
+              <div className="text-xs text-muted-foreground">
+                You have unsaved changes.
+              </div>
+            ) : null}
+
+            {saveError ? (
+              <div className="text-xs text-destructive">{saveError}</div>
+            ) : null}
+
+            <SidebarField label="Title">
+              <Input
+                disabled={isSaving}
+                onChange={(event) =>
+                  onDraftChange({
+                    ...draftValues,
+                    title: event.target.value,
+                  })
+                }
+                value={draftValues.title}
+              />
+            </SidebarField>
+
+            <SidebarField label="Assignee">
+              <SearchPopoverField
+                disabled={isSaving}
+                emptyMessage="No assignees found."
+                endpoint="/api/assignees"
+                onSelect={(option) =>
+                  onDraftChange({
+                    ...draftValues,
+                    assignee: {
+                      avatarUrl: option.avatarUrl ?? null,
+                      label: option.label,
+                      value: option.value,
+                    },
+                  })
+                }
+                placeholder="Search assignee"
+                selectedContent={
+                  <>
+                    <UserAvatar
+                      avatarUrl={draftValues.assignee.avatarUrl}
+                      name={draftValues.assignee.label}
+                      size="sm"
+                    />
+                    <span className="min-w-0 flex-1 truncate">
+                      {draftValues.assignee.label}
+                    </span>
+                  </>
+                }
+                staticOptions={[
+                  {
+                    avatarUrl: null,
+                    key: "unassigned",
+                    label: "Unassigned",
+                    secondaryText: "",
+                    value: null,
+                  },
+                ]}
+              />
+            </SidebarField>
+
+            <SidebarField label="Priority">
+              <Select
+                disabled={isSaving || isLoadingEditMetadata || priorityOptions.length === 0}
+                onValueChange={(priority) => {
+                  if (!priority) {
+                    return;
+                  }
+
+                  onDraftChange({
+                    ...draftValues,
+                    priority,
+                  });
+                }}
+                value={draftValues.priority}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>
+                    {draftValues.priority ? `P${draftValues.priority}` : "Select priority"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent align="start">
+                  <SelectGroup>
+                    {priorityOptions.map((priority) => (
+                      <SelectItem key={priority} value={priority}>
+                        P{priority}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {editMetadataError ? (
+                <div className="mt-1 text-xs text-destructive">{editMetadataError}</div>
+              ) : null}
+            </SidebarField>
+
+            <SidebarField label="Area">
+              <SearchPopoverField
+                disabled={isSaving}
+                emptyMessage="No areas found."
+                endpoint={areaLookupEndpoint}
+                minQueryLength={0}
+                onSelect={(option) =>
+                  onDraftChange({
+                    ...draftValues,
+                    areaPath: option.value ?? draftValues.areaPath,
+                  })
+                }
+                placeholder="Search area path"
+                selectedContent={
+                  <span className="truncate text-left">{draftValues.areaPath}</span>
+                }
+              />
+            </SidebarField>
+
+            <SidebarField label="Iteration">
+              <SearchPopoverField
+                disabled={isSaving}
+                emptyMessage="No iterations found."
+                endpoint={iterationLookupEndpoint}
+                minQueryLength={0}
+                onSelect={(option) =>
+                  onDraftChange({
+                    ...draftValues,
+                    iterationPath: option.value ?? draftValues.iterationPath,
+                  })
+                }
+                placeholder="Search iteration path"
+                selectedContent={
+                  <span className="truncate text-left">{draftValues.iterationPath}</span>
+                }
+              />
+            </SidebarField>
+
+            <Separator />
+          </>
+        ) : null}
 
         <SidebarField label="Updated">
           {detail ? <DateLabel value={detail.updatedAt} /> : <span className="text-muted-foreground">—</span>}
         </SidebarField>
-
-        <Separator />
 
         <SidebarField label="Type">
           {detail ? (
@@ -353,10 +530,6 @@ export function TaskDetailSidebar({
             "—"
           )}
         </SidebarField>
-
-        <SidebarField label="Area">{detail?.areaPath || "—"}</SidebarField>
-
-        <SidebarField label="Iteration">{detail?.iterationPath || "—"}</SidebarField>
 
         <SidebarField label="Reason">{detail?.reason || "—"}</SidebarField>
       </div>

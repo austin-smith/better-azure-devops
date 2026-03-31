@@ -1,5 +1,6 @@
 import { TaskDetailSectionLabel } from "./task-detail-section-label";
 import { DateLabel } from "@/components/date-label";
+import { CommentReactions } from "@/components/tasks/comment-reactions";
 import { TaskMarkup } from "@/components/tasks/task-markup";
 import { UserAvatar } from "@/components/user-avatar";
 import { Card } from "@/components/ui/card";
@@ -50,6 +51,7 @@ export function TaskComments({ comments }: TaskCommentsProps) {
                 </div>
               </div>
               <CommentBody comment={comment} />
+              <CommentReactions reactions={comment.reactions} />
             </Card>
           ))
         ) : (

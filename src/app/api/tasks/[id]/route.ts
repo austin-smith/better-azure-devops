@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
-import { getTaskDetails, updateTaskAssignee } from "@/lib/azure-devops/tasks";
+import { getTaskDetails, updateTask } from "@/lib/azure-devops/tasks";
 
 function parseTaskId(value: string) {
   const taskId = Number(value);
@@ -21,6 +21,47 @@ function parseAssignee(value: unknown) {
   }
 
   return typeof value === "string" ? value.trim() || null : undefined;
+}
+
+function parseRequiredString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function parseTaskChanges(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  const assignee = parseAssignee(record.assignee);
+  const areaPath =
+    record.areaPath === undefined ? undefined : parseRequiredString(record.areaPath);
+  const iterationPath =
+    record.iterationPath === undefined
+      ? undefined
+      : parseRequiredString(record.iterationPath);
+  const priority =
+    record.priority === undefined ? undefined : parseRequiredString(record.priority);
+  const title =
+    record.title === undefined ? undefined : parseRequiredString(record.title);
+
+  if (
+    (record.assignee !== undefined && assignee === undefined) ||
+    (record.areaPath !== undefined && areaPath === undefined) ||
+    (record.iterationPath !== undefined && iterationPath === undefined) ||
+    (record.priority !== undefined && priority === undefined) ||
+    (record.title !== undefined && title === undefined)
+  ) {
+    return undefined;
+  }
+
+  return {
+    ...(assignee !== undefined ? { assignee } : {}),
+    ...(areaPath !== undefined ? { areaPath } : {}),
+    ...(iterationPath !== undefined ? { iterationPath } : {}),
+    ...(priority !== undefined ? { priority } : {}),
+    ...(title !== undefined ? { title } : {}),
+  };
 }
 
 async function resolveTaskContext(accessToken: string, projectId: string | null) {
@@ -117,12 +158,12 @@ export async function PATCH(
   }
 
   const record = payload as Record<string, unknown>;
-  const assignee = parseAssignee(record.assignee);
+  const changes = parseTaskChanges(record.changes);
   const revision = parseRevision(record.revision);
 
-  if (assignee === undefined || !revision) {
+  if (changes === undefined || !revision) {
     return NextResponse.json(
-      { error: "Request must include a valid assignee and revision." },
+      { error: "Request must include valid changes and revision." },
       { status: 400 },
     );
   }
@@ -133,10 +174,10 @@ export async function PATCH(
       accessToken,
       request.nextUrl.searchParams.get("project"),
     );
-    const task = await updateTaskAssignee(
+    const task = await updateTask(
       accessToken,
       taskId,
-      assignee,
+      changes,
       revision,
       context,
     );
@@ -144,7 +185,7 @@ export async function PATCH(
     return NextResponse.json({ item: task });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to update task assignee.";
+      error instanceof Error ? error.message : "Failed to update task.";
     const status = errorStatus(error);
 
     if (status === 412 || (status === 400 && message.toLowerCase().includes("rev"))) {

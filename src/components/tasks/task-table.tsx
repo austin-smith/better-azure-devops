@@ -167,20 +167,16 @@ function getColumns(taskDetailHref: (task: Task) => string) {
     columnHelper.accessor("projectName", {
       header: "Project",
       cell: ({ getValue, row }) => (
-        <Tooltip>
-          <TooltipTrigger
-            render={(
-              <div className="flex size-6 items-center justify-center leading-none">
-                <ProjectImage
-                  imageUrl={row.original.projectImageUrl}
-                  name={getValue()}
-                  size="sm"
-                />
-              </div>
-            )}
+        <div
+          className="flex size-6 items-center justify-center leading-none"
+          title={getValue()}
+        >
+          <ProjectImage
+            imageUrl={row.original.projectImageUrl}
+            name={getValue()}
+            size="sm"
           />
-          <TooltipContent>{getValue()}</TooltipContent>
-        </Tooltip>
+        </div>
       ),
     }),
     columnHelper.accessor("type", {
@@ -216,23 +212,17 @@ function getColumns(taskDetailHref: (task: Task) => string) {
     columnHelper.accessor("assignee", {
       header: "Assignee",
       cell: ({ getValue, row }) => (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Link
-                href={taskDetailHref(row.original)}
-                className="relative z-20 inline-flex"
-              >
-                <UserAvatar
-                  avatarUrl={row.original.assigneeAvatarUrl}
-                  name={getValue()}
-                  size="sm"
-                />
-              </Link>
-            }
+        <Link
+          href={taskDetailHref(row.original)}
+          className="relative z-20 inline-flex"
+          title={getValue()}
+        >
+          <UserAvatar
+            avatarUrl={row.original.assigneeAvatarUrl}
+            name={getValue()}
+            size="sm"
           />
-          <TooltipContent>{getValue()}</TooltipContent>
-        </Tooltip>
+        </Link>
       ),
     }),
     columnHelper.accessor("updatedAt", {

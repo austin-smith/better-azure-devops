@@ -16,6 +16,7 @@ export type AzureDevOpsTaskListItem = {
   areaPath: string;
   assignee: string;
   assigneeAvatarUrl: string | null;
+  assigneeValue: string | null;
   id: number;
   iterationPath: string;
   priority: string;
@@ -37,7 +38,20 @@ export type AzureDevOpsTaskComment = {
   format: "html" | "markdown" | "unknown";
   html: string;
   id: number;
+  reactions: AzureDevOpsTaskCommentReaction[];
   text: string;
+};
+
+export type AzureDevOpsTaskCommentReaction = {
+  count: number;
+  isCurrentUserEngaged: boolean;
+  type: CommentReactionType;
+  users: AzureDevOpsTaskCommentReactionUser[];
+};
+
+export type AzureDevOpsTaskCommentReactionUser = {
+  avatarUrl: string | null;
+  name: string;
 };
 
 export type AzureDevOpsLinkedPullRequest = {
@@ -62,6 +76,10 @@ export type AzureDevOpsTaskDetail = AzureDevOpsTask & {
   reason: string;
   tags: string[];
   url: string;
+};
+
+export type AzureDevOpsTaskEditMetadata = {
+  priorities: string[];
 };
 
 export type AzureDevOpsAssigneeOption = {
@@ -105,6 +123,10 @@ type WorkItem = {
   rev?: number;
 };
 
+type WorkItemTypeField = {
+  allowedValues?: unknown[];
+};
+
 type WorkItemsResponse = {
   value: WorkItem[];
 };
@@ -116,12 +138,34 @@ type Comment = {
   format?: string;
   id?: number;
   isDeleted?: boolean;
+  reactions?: CommentReaction[];
   renderedText?: string;
   text?: string;
 };
 
 type CommentsResponse = {
   comments?: Comment[];
+};
+
+type CommentReactionEngagedUser = unknown;
+
+type CommentReactionEngagedUsersResponse = {
+  count?: number;
+  value?: CommentReactionEngagedUser[];
+};
+
+type CommentReactionType =
+  | "like"
+  | "dislike"
+  | "heart"
+  | "hooray"
+  | "smile"
+  | "confused";
+
+type CommentReaction = {
+  count?: number;
+  isCurrentUserEngaged?: boolean;
+  type?: unknown;
 };
 
 type PullRequest = {
@@ -160,6 +204,7 @@ type UserEntitlementsResponse = {
 type ParsedIdentity = {
   avatarUrl: string | null;
   name: string;
+  value: string | null;
 };
 
 type ClassificationNodeKind = "areas" | "iterations";
@@ -190,6 +235,14 @@ type TaskRequestContext = {
   projectName?: string | null;
 };
 
+type TaskUpdateFields = Partial<{
+  areaPath: string;
+  assignee: string | null;
+  iterationPath: string;
+  priority: string;
+  title: string;
+}>;
+
 const TASK_LIST_FIELDS = [
   "System.AreaPath",
   "System.AssignedTo",
@@ -216,6 +269,14 @@ const SANITIZE_ALLOWED_ATTRIBUTES = {
   img: ["alt", "src", "title"],
 };
 const WORK_ITEMS_BATCH_LIMIT = 200;
+const COMMENT_REACTION_ORDER: readonly CommentReactionType[] = [
+  "like",
+  "heart",
+  "hooray",
+  "smile",
+  "confused",
+  "dislike",
+] as const;
 const HTML_ENTITY_MAP: Record<string, string> = {
   amp: "&",
   apos: "'",
@@ -229,11 +290,18 @@ function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function readPositiveInteger(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : null;
+}
+
 function parseIdentity(value: unknown, fallbackName = "Unknown user"): ParsedIdentity {
   if (typeof value === "string") {
     return {
       avatarUrl: null,
       name: value,
+      value: readString(value),
     };
   }
 
@@ -254,12 +322,18 @@ function parseIdentity(value: unknown, fallbackName = "Unknown user"): ParsedIde
         readString(record.displayName) ??
         readString(record.uniqueName) ??
         fallbackName,
+      value:
+        readString(record.uniqueName) ??
+        readString(record.mailAddress) ??
+        readString(record.principalName) ??
+        readString(record.displayName),
     };
   }
 
   return {
     avatarUrl: null,
     name: fallbackName,
+    value: null,
   };
 }
 
@@ -470,6 +544,63 @@ function parseCommentFormat(value: unknown): AzureDevOpsTaskComment["format"] {
   }
 }
 
+function parseCommentReactionType(value: unknown): CommentReactionType | null {
+  switch (value) {
+    case "like":
+    case "dislike":
+    case "heart":
+    case "hooray":
+    case "smile":
+    case "confused":
+      return value;
+    default:
+      return null;
+  }
+}
+
+function normalizeCommentReactions(
+  reactions: Comment["reactions"],
+): AzureDevOpsTaskCommentReaction[] {
+  const normalizedReactions = (reactions ?? [])
+    .map((reaction) => {
+      const type = parseCommentReactionType(reaction.type);
+      const count = readPositiveInteger(reaction.count);
+
+      if (!type || count === null) {
+        return null;
+      }
+
+      return {
+        count,
+        isCurrentUserEngaged: Boolean(reaction.isCurrentUserEngaged),
+        type,
+        users: [] as AzureDevOpsTaskCommentReactionUser[],
+      } satisfies AzureDevOpsTaskCommentReaction;
+    })
+    .filter(
+      (
+        reaction,
+      ): reaction is AzureDevOpsTaskCommentReaction => reaction !== null,
+    );
+
+  return normalizedReactions.sort(
+    (left, right) =>
+      COMMENT_REACTION_ORDER.indexOf(left.type) -
+      COMMENT_REACTION_ORDER.indexOf(right.type),
+  );
+}
+
+function toCommentReactionUser(
+  value: CommentReactionEngagedUser,
+): AzureDevOpsTaskCommentReactionUser {
+  const identity = parseIdentity(value);
+
+  return {
+    avatarUrl: identity.avatarUrl,
+    name: identity.name,
+  };
+}
+
 function parseStringList(value: unknown) {
   if (typeof value !== "string") {
     return [];
@@ -543,6 +674,7 @@ function toTaskListItem(
     areaPath: normalizeTaskPath(workItem.fields["System.AreaPath"]),
     assignee: assignee.name,
     assigneeAvatarUrl: assignee.avatarUrl,
+    assigneeValue: assignee.value,
     id: workItem.id,
     iterationPath: normalizeTaskPath(workItem.fields["System.IterationPath"]),
     priority: String(workItem.fields["Microsoft.VSTS.Common.Priority"] ?? ""),
@@ -717,6 +849,7 @@ function toComment(comment: Comment): AzureDevOpsTaskComment | null {
     format,
     html: format === "html" ? sanitizeAzureDevOpsHtml(comment.text) : "",
     id,
+    reactions: normalizeCommentReactions(comment.reactions),
     text:
       typeof comment.text === "string"
         ? format === "markdown"
@@ -747,6 +880,101 @@ function toLinkedPullRequest(pullRequest: PullRequest): AzureDevOpsLinkedPullReq
   };
 }
 
+function parseAllowedValues(values: unknown) {
+  const seen = new Set<string>();
+  const allowedValues: string[] = [];
+
+  for (const value of Array.isArray(values) ? values : []) {
+    const normalizedValue =
+      typeof value === "string" || typeof value === "number"
+        ? String(value).trim()
+        : "";
+
+    if (!normalizedValue) {
+      continue;
+    }
+
+    const key = normalizedValue.toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    allowedValues.push(normalizedValue);
+  }
+
+  return allowedValues;
+}
+
+function toPriorityFieldValue(priority: string) {
+  const trimmedPriority = priority.trim();
+  const numericPriority = Number(trimmedPriority);
+
+  return Number.isInteger(numericPriority) && String(numericPriority) === trimmedPriority
+    ? numericPriority
+    : trimmedPriority;
+}
+
+function buildTaskUpdateDocument(
+  revision: number,
+  fields: TaskUpdateFields,
+) {
+  const document: Array<{
+    op: "add" | "test";
+    path: string;
+    value: number | string;
+  }> = [
+    {
+      op: "test",
+      path: "/rev",
+      value: revision,
+    },
+  ];
+
+  if (fields.title !== undefined) {
+    document.push({
+      op: "add",
+      path: "/fields/System.Title",
+      value: fields.title,
+    });
+  }
+
+  if (fields.assignee !== undefined) {
+    document.push({
+      op: "add",
+      path: "/fields/System.AssignedTo",
+      value: fields.assignee ?? "",
+    });
+  }
+
+  if (fields.priority !== undefined) {
+    document.push({
+      op: "add",
+      path: "/fields/Microsoft.VSTS.Common.Priority",
+      value: toPriorityFieldValue(fields.priority),
+    });
+  }
+
+  if (fields.areaPath !== undefined) {
+    document.push({
+      op: "add",
+      path: "/fields/System.AreaPath",
+      value: fields.areaPath,
+    });
+  }
+
+  if (fields.iterationPath !== undefined) {
+    document.push({
+      op: "add",
+      path: "/fields/System.IterationPath",
+      value: fields.iterationPath,
+    });
+  }
+
+  return document;
+}
+
 async function listTaskComments(
   accessToken: string,
   workItemId: number,
@@ -754,17 +982,67 @@ async function listTaskComments(
 ) {
   try {
     const response = await azureDevOpsRequest<CommentsResponse>(
-      `/_apis/wit/workItems/${workItemId}/comments?$top=20&order=desc&$expand=renderedText&api-version=7.1-preview.4`,
+      `/_apis/wit/workItems/${workItemId}/comments?$top=20&order=desc&$expand=all&api-version=7.1-preview.4`,
       {
         accessToken,
         projectName,
       },
     );
 
-    return (response.comments ?? [])
+    const comments = (response.comments ?? [])
       .filter((comment) => !comment.isDeleted)
       .map(toComment)
       .filter((comment): comment is AzureDevOpsTaskComment => Boolean(comment));
+
+    const commentsWithReactionUsers = await Promise.all(
+      comments.map(async (comment) => ({
+        ...comment,
+        reactions: await Promise.all(
+          comment.reactions.map(async (reaction) => ({
+            ...reaction,
+            users: await listCommentReactionUsers(
+              accessToken,
+              workItemId,
+              comment.id,
+              projectName,
+              reaction.type,
+              reaction.count,
+            ),
+          })),
+        ),
+      })),
+    );
+
+    return commentsWithReactionUsers;
+  } catch {
+    return [];
+  }
+}
+
+async function listCommentReactionUsers(
+  accessToken: string,
+  workItemId: number,
+  commentId: number,
+  projectName: string,
+  reactionType: CommentReactionType,
+  count: number,
+) {
+  if (count <= 0) {
+    return [];
+  }
+
+  try {
+    const response = await azureDevOpsRequest<CommentReactionEngagedUsersResponse>(
+      `/_apis/wit/workItems/${workItemId}/comments/${commentId}/reactions/${reactionType}/users?$top=${count}&api-version=7.1-preview.1`,
+      {
+        accessToken,
+        projectName,
+      },
+    );
+
+    return (Array.isArray(response.value) ? response.value : []).map(
+      toCommentReactionUser,
+    );
   } catch {
     return [];
   }
@@ -968,6 +1246,38 @@ export async function getTaskDetails(
   } satisfies AzureDevOpsTaskDetail;
 }
 
+export async function getTaskEditMetadata(
+  accessToken: string,
+  workItemId: number,
+  context: TaskRequestContext = {},
+) {
+  const workItem = await azureDevOpsRequest<WorkItem>(
+    `/_apis/wit/workitems/${workItemId}`,
+    { accessToken },
+  );
+  const projectName =
+    readString(workItem.fields["System.TeamProject"]) ?? context.projectName ?? null;
+  const workItemType = readString(workItem.fields["System.WorkItemType"]);
+
+  if (!projectName || !workItemType) {
+    return {
+      priorities: [],
+    } satisfies AzureDevOpsTaskEditMetadata;
+  }
+
+  const priorityField = await azureDevOpsRequest<WorkItemTypeField>(
+    `/_apis/wit/workitemtypes/${encodeURIComponent(workItemType)}/fields/${encodeURIComponent("Microsoft.VSTS.Common.Priority")}?$expand=allowedValues`,
+    {
+      accessToken,
+      projectName,
+    },
+  );
+
+  return {
+    priorities: parseAllowedValues(priorityField.allowedValues),
+  } satisfies AzureDevOpsTaskEditMetadata;
+}
+
 export async function listAssignableUsers(accessToken: string, query: string) {
   const trimmedQuery = query.trim();
 
@@ -1030,20 +1340,25 @@ export async function updateTaskAssignee(
   revision: number,
   context: TaskRequestContext = {},
 ) {
+  return updateTask(accessToken, workItemId, { assignee }, revision, context);
+}
+
+export async function updateTask(
+  accessToken: string,
+  workItemId: number,
+  fields: TaskUpdateFields,
+  revision: number,
+  context: TaskRequestContext = {},
+) {
+  const document = buildTaskUpdateDocument(revision, fields);
+
+  if (document.length === 1) {
+    return getTaskDetails(accessToken, workItemId, context);
+  }
+
   await azureDevOpsRequest<WorkItem>(`/_apis/wit/workitems/${workItemId}`, {
     accessToken,
-    body: JSON.stringify([
-      {
-        op: "test",
-        path: "/rev",
-        value: revision,
-      },
-      {
-        op: "add",
-        path: "/fields/System.AssignedTo",
-        value: assignee ?? "",
-      },
-    ]),
+    body: JSON.stringify(document),
     contentType: "application/json-patch+json",
     method: "PATCH",
     projectName: context.projectName,

@@ -15,7 +15,11 @@ export async function GET(request: NextRequest) {
   try {
     const accessToken = await getAzureDevOpsAccessToken();
     const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
-    const selection = await loadAzureDevOpsProjectSelection(accessToken);
+    const projectId = request.nextUrl.searchParams.get("project")?.trim() ?? "";
+    const selection = await loadAzureDevOpsProjectSelection(
+      accessToken,
+      projectId ? [projectId] : undefined,
+    );
     const items =
       selection.selectedProjects.length > 0
         ? await listIterationPathOptions(accessToken, selection.selectedProjects, query)

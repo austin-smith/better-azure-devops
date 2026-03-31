@@ -5,12 +5,12 @@ const {
   getAzureDevOpsAccessTokenMock,
   getTaskDetailsMock,
   hasAzureDevOpsConfigMock,
-  updateTaskAssigneeMock,
+  updateTaskMock,
 } = vi.hoisted(() => ({
   getAzureDevOpsAccessTokenMock: vi.fn(),
   getTaskDetailsMock: vi.fn(),
   hasAzureDevOpsConfigMock: vi.fn(),
-  updateTaskAssigneeMock: vi.fn(),
+  updateTaskMock: vi.fn(),
 }));
 
 vi.mock("@/lib/azure-devops/access-token", () => ({
@@ -23,7 +23,7 @@ vi.mock("@/lib/azure-devops/config", () => ({
 
 vi.mock("@/lib/azure-devops/tasks", () => ({
   getTaskDetails: getTaskDetailsMock,
-  updateTaskAssignee: updateTaskAssigneeMock,
+  updateTask: updateTaskMock,
 }));
 
 describe("task detail route", () => {
@@ -31,7 +31,7 @@ describe("task detail route", () => {
     getAzureDevOpsAccessTokenMock.mockReset();
     getTaskDetailsMock.mockReset();
     hasAzureDevOpsConfigMock.mockReset();
-    updateTaskAssigneeMock.mockReset();
+    updateTaskMock.mockReset();
     hasAzureDevOpsConfigMock.mockReturnValue(true);
   });
 
@@ -72,13 +72,13 @@ describe("task detail route", () => {
 
   it("maps Azure DevOps revision conflicts to 409", async () => {
     getAzureDevOpsAccessTokenMock.mockResolvedValue("token");
-    updateTaskAssigneeMock.mockRejectedValue(
+    updateTaskMock.mockRejectedValue(
       new Error("Azure DevOps request failed (412 Precondition Failed): rev mismatch"),
     );
 
     const response = await PATCH(
       new NextRequest("http://localhost/api/tasks/42", {
-        body: JSON.stringify({ assignee: null, revision: 7 }),
+        body: JSON.stringify({ changes: { assignee: null }, revision: 7 }),
         headers: { "content-type": "application/json" },
         method: "PATCH",
       }),
@@ -91,13 +91,29 @@ describe("task detail route", () => {
     });
   });
 
-  it("updates the assignee when the request body is valid", async () => {
+  it("updates task fields when the request body is valid", async () => {
     getAzureDevOpsAccessTokenMock.mockResolvedValue("token");
-    updateTaskAssigneeMock.mockResolvedValue({ id: 42, assignee: "ada@example.com" });
+    updateTaskMock.mockResolvedValue({
+      areaPath: "Project\\Area\\Platform",
+      assignee: "Ada Lovelace",
+      id: 42,
+      iterationPath: "Project\\Iteration\\Sprint 2",
+      priority: "1",
+      title: "Updated title",
+    });
 
     const response = await PATCH(
       new NextRequest("http://localhost/api/tasks/42", {
-        body: JSON.stringify({ assignee: " ada@example.com ", revision: 7 }),
+        body: JSON.stringify({
+          changes: {
+            areaPath: " Project\\Area\\Platform ",
+            assignee: " ada@example.com ",
+            iterationPath: " Project\\Iteration\\Sprint 2 ",
+            priority: " 1 ",
+            title: " Updated title ",
+          },
+          revision: 7,
+        }),
         headers: { "content-type": "application/json" },
         method: "PATCH",
       }),
@@ -106,12 +122,25 @@ describe("task detail route", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      item: { id: 42, assignee: "ada@example.com" },
+      item: {
+        areaPath: "Project\\Area\\Platform",
+        assignee: "Ada Lovelace",
+        id: 42,
+        iterationPath: "Project\\Iteration\\Sprint 2",
+        priority: "1",
+        title: "Updated title",
+      },
     });
-    expect(updateTaskAssigneeMock).toHaveBeenCalledWith(
+    expect(updateTaskMock).toHaveBeenCalledWith(
       "token",
       42,
-      "ada@example.com",
+      {
+        areaPath: "Project\\Area\\Platform",
+        assignee: "ada@example.com",
+        iterationPath: "Project\\Iteration\\Sprint 2",
+        priority: "1",
+        title: "Updated title",
+      },
       7,
       {},
     );
