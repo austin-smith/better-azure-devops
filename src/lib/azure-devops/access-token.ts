@@ -103,7 +103,7 @@ async function runAzureCli() {
       comSpec ?? "cmd.exe",
       ["/d", "/s", "/c", `az ${AZURE_CLI_ACCESS_TOKEN_ARGS.join(" ")}`],
       {
-        cwd: comSpec ? path.dirname(comSpec) : undefined,
+        cwd: comSpec ? path.win32.dirname(comSpec) : undefined,
         env,
       },
     );
