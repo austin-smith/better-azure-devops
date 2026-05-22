@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { TaskTable } from "@/components/tasks/task-table";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
+import type { AzureDevOpsProject } from "@/lib/azure-devops/projects";
 import type { AzureDevOpsTask } from "@/lib/azure-devops/tasks";
 import {
   hasAzureDevOpsConfig,
@@ -49,6 +50,10 @@ export default async function TaskListPage({
     types: getDefaultWorkItemTypes(),
   };
   let items: AzureDevOpsTask[] = [];
+  let selectedProjects: Pick<
+    AzureDevOpsProject,
+    "defaultTeamImageUrl" | "id" | "name"
+  >[] = [];
   let activeProjectCount = 0;
 
   if (hasAzureDevOpsConfig()) {
@@ -58,6 +63,11 @@ export default async function TaskListPage({
       const accessToken = await getAzureDevOpsAccessToken();
       const selection = await loadAzureDevOpsProjectSelection(accessToken);
       activeProjectCount = selection.selectedProjects.length;
+      selectedProjects = selection.selectedProjects.map((project) => ({
+        defaultTeamImageUrl: project.defaultTeamImageUrl,
+        id: project.id,
+        name: project.name,
+      }));
 
       if (selection.selectedProjects.length === 0) {
         error = EMPTY_PROJECTS_ERROR;
@@ -84,6 +94,7 @@ export default async function TaskListPage({
       filterOptions={filterOptions}
       filters={filters}
       items={items}
+      projects={selectedProjects}
       title={title}
       activeProjectCount={activeProjectCount}
     />

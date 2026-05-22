@@ -20,8 +20,11 @@ import {
 } from "@/lib/tasks/task-detail-edit";
 
 type TaskDetailProps = {
+  createProjectId?: string | null;
   detail: TaskDetailData | null;
   detailError: string | null;
+  mode?: "create" | "edit";
+  onCreateDiscard?: () => void;
   taskId: number;
   taskListHref: string;
   taskListLabel: string;
@@ -29,8 +32,11 @@ type TaskDetailProps = {
 };
 
 export function TaskDetail({
+  createProjectId = null,
   detail,
   detailError,
+  mode = "edit",
+  onCreateDiscard,
   taskId,
   taskListHref,
   taskListLabel,
@@ -56,7 +62,7 @@ export function TaskDetail({
   }, [detail]);
 
   useEffect(() => {
-    if (!detail) {
+    if (!detail || mode === "create") {
       setEditMetadata(null);
       setEditMetadataError(null);
       setIsLoadingEditMetadata(false);
@@ -115,7 +121,7 @@ export function TaskDetail({
     return () => {
       controller.abort();
     };
-  }, [detail, taskId, taskProjectId]);
+  }, [detail, mode, taskId, taskProjectId]);
 
   const displayDetail =
     currentDetail && draftValues
@@ -123,7 +129,8 @@ export function TaskDetail({
       : currentDetail;
   const isDirty =
     currentDetail && draftValues
-      ? hasTaskDetailEditableChanges(
+      ? mode === "create" ||
+        hasTaskDetailEditableChanges(
           createTaskDetailEditableValues(currentDetail),
           draftValues,
         )
@@ -139,12 +146,74 @@ export function TaskDetail({
       return;
     }
 
+    if (mode === "create") {
+      onCreateDiscard?.();
+      return;
+    }
+
     setDraftValues(createTaskDetailEditableValues(currentDetail));
     setSaveError(null);
   }
 
   async function saveDraft() {
     if (!currentDetail || !draftValues) {
+      return;
+    }
+
+    if (mode === "create") {
+      if (!draftValues.title.trim()) {
+        setSaveError("Title is required.");
+        return;
+      }
+
+      setIsSaving(true);
+      setSaveError(null);
+
+      try {
+        const response = await fetch("/api/tasks", {
+          body: JSON.stringify({
+            areaPath: draftValues.areaPath || undefined,
+            description: draftValues.description.trim()
+              ? draftValues.description
+              : undefined,
+            priority: draftValues.priority,
+            projectId: currentDetail.projectId ?? createProjectId,
+            title: draftValues.title,
+            type: currentDetail.type,
+          }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          method: "POST",
+        });
+        const payload = (await response.json()) as
+          | {
+              error?: string;
+              item?: TaskDetailData;
+            }
+          | undefined;
+
+        if (!response.ok || !payload?.item) {
+          throw new Error(payload?.error ?? "Failed to create work item.");
+        }
+
+        const createdTask = payload.item;
+        const projectId = createdTask.projectId ?? createProjectId;
+
+        startTransition(() => {
+          router.push(
+            `/tasks/${createdTask.id}${projectId ? `?taskProject=${encodeURIComponent(projectId)}` : ""}`,
+          );
+          router.refresh();
+        });
+      } catch (error) {
+        setSaveError(
+          error instanceof Error ? error.message : "Failed to create work item.",
+        );
+      } finally {
+        setIsSaving(false);
+      }
+
       return;
     }
 
@@ -207,7 +276,7 @@ export function TaskDetail({
   const headerItems = [
     { href: "/", label: "Home" },
     { href: taskListHref, label: taskListLabel },
-    { label: `Work Item #${taskId}` },
+    { label: mode === "create" ? "New Work Item" : `Work Item #${taskId}` },
   ];
 
   return (
@@ -223,6 +292,7 @@ export function TaskDetail({
             detail={displayDetail}
             isDirty={isDirty}
             isSaving={isSaving}
+            mode={mode}
             onDiscard={resetDraft}
             onSave={() => {
               void saveDraft();
@@ -231,7 +301,22 @@ export function TaskDetail({
           />
 
           <div className="flex min-h-0 flex-1">
-            <TaskDetailContent detail={displayDetail} detailError={detailError} />
+            <TaskDetailContent
+              descriptionDraft={draftValues?.description ?? ""}
+              detail={displayDetail}
+              detailError={detailError}
+              isSaving={isSaving}
+              onDescriptionChange={(description) => {
+                if (!draftValues) {
+                  return;
+                }
+
+                handleDraftChange({
+                  ...draftValues,
+                  description,
+                });
+              }}
+            />
             <TaskDetailSidebar
               detail={displayDetail}
               editMetadata={editMetadata}
@@ -240,6 +325,7 @@ export function TaskDetail({
               isDirty={isDirty}
               isLoadingEditMetadata={isLoadingEditMetadata}
               isSaving={isSaving}
+              mode={mode}
               onDraftChange={handleDraftChange}
               taskProjectId={taskProjectId}
               saveError={saveError}

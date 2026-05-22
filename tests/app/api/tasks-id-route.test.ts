@@ -108,6 +108,7 @@ describe("task detail route", () => {
           changes: {
             areaPath: " Project\\Area\\Platform ",
             assignee: " ada@example.com ",
+            description: "Updated\r\ndescription",
             iterationPath: " Project\\Iteration\\Sprint 2 ",
             priority: " 1 ",
             title: " Updated title ",
@@ -137,6 +138,7 @@ describe("task detail route", () => {
       {
         areaPath: "Project\\Area\\Platform",
         assignee: "ada@example.com",
+        description: "Updated\ndescription",
         iterationPath: "Project\\Iteration\\Sprint 2",
         priority: "1",
         title: "Updated title",

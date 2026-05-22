@@ -73,6 +73,7 @@ describe("TaskTable", () => {
           assignee: "me",
         }}
         items={[createTask()]}
+        projects={[{ defaultTeamImageUrl: null, id: "project-id", name: "Project" }]}
         title="Work Items"
       />,
     );

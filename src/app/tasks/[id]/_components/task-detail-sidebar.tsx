@@ -8,6 +8,7 @@ import {
 } from "react";
 import { Loader2Icon } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
+import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { ProjectImage } from "@/components/project-image";
 import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
 import { UserAvatar } from "@/components/user-avatar";
@@ -48,6 +49,7 @@ type TaskDetailSidebarProps = {
   isDirty: boolean;
   isLoadingEditMetadata: boolean;
   isSaving: boolean;
+  mode?: "create" | "edit";
   onDraftChange: (values: TaskDetailEditableValues) => void;
   saveError: string | null;
   taskProjectId: string | null;
@@ -341,10 +343,12 @@ export function TaskDetailSidebar({
   isDirty,
   isLoadingEditMetadata,
   isSaving,
+  mode = "edit",
   onDraftChange,
   saveError,
   taskProjectId,
 }: TaskDetailSidebarProps) {
+  const isCreateMode = mode === "create";
   const lookupProjectId = detail?.projectId ?? taskProjectId;
   const areaLookupEndpoint = `/api/task-filter-options/areas${
     lookupProjectId ? `?project=${encodeURIComponent(lookupProjectId)}` : ""
@@ -372,18 +376,20 @@ export function TaskDetailSidebar({
               <div className="text-xs text-destructive">{saveError}</div>
             ) : null}
 
-            <SidebarField label="Title">
-              <Input
-                disabled={isSaving}
-                onChange={(event) =>
-                  onDraftChange({
-                    ...draftValues,
-                    title: event.target.value,
-                  })
-                }
-                value={draftValues.title}
-              />
-            </SidebarField>
+            {isCreateMode ? null : (
+              <SidebarField label="Title">
+                <Input
+                  disabled={isSaving}
+                  onChange={(event) =>
+                    onDraftChange({
+                      ...draftValues,
+                      title: event.target.value,
+                    })
+                  }
+                  value={draftValues.title}
+                />
+              </SidebarField>
+            )}
 
             <SidebarField label="Assignee">
               <SearchPopoverField
@@ -442,14 +448,18 @@ export function TaskDetailSidebar({
               >
                 <SelectTrigger className="w-full">
                   <SelectValue>
-                    {draftValues.priority ? `P${draftValues.priority}` : "Select priority"}
+                    {draftValues.priority ? (
+                      <PriorityBadge priority={draftValues.priority} />
+                    ) : (
+                      "Select priority"
+                    )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent align="start">
                   <SelectGroup>
                     {priorityOptions.map((priority) => (
                       <SelectItem key={priority} value={priority}>
-                        P{priority}
+                        <PriorityBadge priority={priority} />
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -502,9 +512,11 @@ export function TaskDetailSidebar({
           </>
         ) : null}
 
-        <SidebarField label="Updated">
-          {detail ? <DateLabel value={detail.updatedAt} /> : <span className="text-muted-foreground">—</span>}
-        </SidebarField>
+        {isCreateMode ? null : (
+          <SidebarField label="Updated">
+            {detail ? <DateLabel value={detail.updatedAt} /> : <span className="text-muted-foreground">—</span>}
+          </SidebarField>
+        )}
 
         <SidebarField label="Type">
           {detail ? (
@@ -531,7 +543,9 @@ export function TaskDetailSidebar({
           )}
         </SidebarField>
 
-        <SidebarField label="Reason">{detail?.reason || "—"}</SidebarField>
+        {isCreateMode ? null : (
+          <SidebarField label="Reason">{detail?.reason || "—"}</SidebarField>
+        )}
       </div>
     </aside>
   );

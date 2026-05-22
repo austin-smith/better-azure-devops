@@ -5,11 +5,15 @@ import { DateLabel } from "@/components/date-label";
 import { TaskMarkup } from "@/components/tasks/task-markup";
 import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
 
 type TaskDetailContentProps = {
+  descriptionDraft: string;
   detail: TaskDetailData | null;
   detailError: string | null;
+  isSaving: boolean;
+  onDescriptionChange: (description: string) => void;
 };
 
 function pullRequestVariant(state: string) {
@@ -24,8 +28,11 @@ function pullRequestVariant(state: string) {
 }
 
 export function TaskDetailContent({
+  descriptionDraft,
   detail,
   detailError,
+  isSaving,
+  onDescriptionChange,
 }: TaskDetailContentProps) {
   const comments = detail?.comments ?? [];
   const linkedPullRequests = detail?.linkedPullRequests ?? [];
@@ -38,7 +45,25 @@ export function TaskDetailContent({
         </div>
       ) : null}
 
-      <TaskMarkup emptyMessage="No description." markup={detail?.description} />
+      {detail ? (
+        <div className="grid gap-3">
+          <TaskDetailSectionLabel title="Description" />
+          <Textarea
+            className="h-72 min-h-72 resize-y rounded-lg border bg-background p-4 text-sm leading-6 [field-sizing:fixed]"
+            disabled={isSaving}
+            onChange={(event) => onDescriptionChange(event.target.value)}
+            placeholder="Add a description..."
+            value={descriptionDraft}
+          />
+          {detail.description.content.trim() ? (
+            <div className="rounded-lg border bg-muted/20 p-4">
+              <TaskMarkup markup={detail.description} />
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <TaskMarkup emptyMessage="No description." markup={null} />
+      )}
 
       <div className="mt-8">
         <TaskDetailSectionLabel

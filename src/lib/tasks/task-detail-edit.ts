@@ -9,6 +9,7 @@ export type TaskDetailEditableAssignee = {
 export type TaskDetailEditableValues = {
   areaPath: string;
   assignee: TaskDetailEditableAssignee;
+  description: string;
   iterationPath: string;
   priority: string;
   title: string;
@@ -17,6 +18,7 @@ export type TaskDetailEditableValues = {
 export type TaskDetailEditableChanges = Partial<{
   areaPath: string;
   assignee: string | null;
+  description: string;
   iterationPath: string;
   priority: string;
   title: string;
@@ -24,6 +26,10 @@ export type TaskDetailEditableChanges = Partial<{
 
 function normalizeEditableString(value: string) {
   return value.trim();
+}
+
+function normalizeEditableMarkup(value: string) {
+  return value.replace(/\r\n?/g, "\n");
 }
 
 function normalizeEditableAssignee(
@@ -46,7 +52,14 @@ function comparableAssigneeValue(assignee: TaskDetailEditableAssignee) {
 export function createTaskDetailEditableValues(
   detail: Pick<
     AzureDevOpsTaskDetail,
-    "areaPath" | "assignee" | "assigneeAvatarUrl" | "assigneeValue" | "iterationPath" | "priority" | "title"
+    | "areaPath"
+    | "assignee"
+    | "assigneeAvatarUrl"
+    | "assigneeValue"
+    | "description"
+    | "iterationPath"
+    | "priority"
+    | "title"
   >,
 ): TaskDetailEditableValues {
   return normalizeTaskDetailEditableValues({
@@ -56,6 +69,7 @@ export function createTaskDetailEditableValues(
       label: detail.assignee,
       value: detail.assigneeValue,
     },
+    description: detail.description.content,
     iterationPath: detail.iterationPath,
     priority: detail.priority,
     title: detail.title,
@@ -68,6 +82,7 @@ export function normalizeTaskDetailEditableValues(
   return {
     areaPath: normalizeEditableString(values.areaPath),
     assignee: normalizeEditableAssignee(values.assignee),
+    description: normalizeEditableMarkup(values.description),
     iterationPath: normalizeEditableString(values.iterationPath),
     priority: normalizeEditableString(values.priority),
     title: normalizeEditableString(values.title),
@@ -92,6 +107,10 @@ export function getTaskDetailEditableChanges(
 
   if (draft.areaPath !== initial.areaPath) {
     changes.areaPath = draft.areaPath;
+  }
+
+  if (draft.description !== initial.description) {
+    changes.description = draft.description;
   }
 
   if (draft.iterationPath !== initial.iterationPath) {
@@ -124,6 +143,13 @@ export function applyTaskDetailEditableValues(
     assignee: normalizedValues.assignee.label,
     assigneeAvatarUrl: normalizedValues.assignee.avatarUrl,
     assigneeValue: normalizedValues.assignee.value,
+    description: {
+      content: normalizedValues.description,
+      format:
+        normalizedValues.description === normalizeEditableMarkup(detail.description.content)
+          ? detail.description.format
+          : "markdown",
+    },
     iterationPath: normalizedValues.iterationPath,
     priority: normalizedValues.priority,
     title: normalizedValues.title,

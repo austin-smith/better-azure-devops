@@ -101,6 +101,16 @@ export type AzureDevOpsClassificationPathOption = {
   value: string;
 };
 
+export type AzureDevOpsTeamAreaOption = {
+  includeChildren: boolean;
+  value: string;
+};
+
+export type AzureDevOpsTeamAreaSettings = {
+  areas: AzureDevOpsTeamAreaOption[];
+  defaultAreaPath: string | null;
+};
+
 type WiqlResponse = {
   workItems: Array<{
     id: number;
@@ -204,6 +214,17 @@ type UserEntitlementsResponse = {
   items?: UserEntitlement[];
 };
 
+type TeamFieldValuesResponse = {
+  defaultValue?: unknown;
+  field?: {
+    referenceName?: unknown;
+  };
+  values?: Array<{
+    includeChildren?: unknown;
+    value?: unknown;
+  }>;
+};
+
 type ParsedIdentity = {
   avatarUrl: string | null;
   name: string;
@@ -241,10 +262,20 @@ type TaskRequestContext = {
 type TaskUpdateFields = Partial<{
   areaPath: string;
   assignee: string | null;
+  description: string;
   iterationPath: string;
   priority: string;
   title: string;
 }>;
+
+export type TaskCreateFields = {
+  areaPath?: string;
+  description?: string;
+  priority?: string;
+  projectName: string;
+  title: string;
+  type: string;
+};
 
 const TASK_LIST_FIELDS = [
   "System.AreaPath",
@@ -938,6 +969,56 @@ function parseAllowedValues(values: unknown) {
   return allowedValues;
 }
 
+function toTeamAreaSettings(
+  response: TeamFieldValuesResponse,
+): AzureDevOpsTeamAreaSettings {
+  const fieldReferenceName = readString(response.field?.referenceName);
+
+  if (fieldReferenceName !== "System.AreaPath") {
+    return {
+      areas: [],
+      defaultAreaPath: null,
+    };
+  }
+
+  const seen = new Set<string>();
+  const areas: AzureDevOpsTeamAreaOption[] = [];
+
+  for (const item of response.values ?? []) {
+    const value = normalizeTaskPath(item.value);
+
+    if (!value) {
+      continue;
+    }
+
+    const key = value.toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    areas.push({
+      includeChildren: Boolean(item.includeChildren),
+      value,
+    });
+  }
+
+  const defaultAreaPath = normalizeTaskPath(response.defaultValue) || null;
+
+  if (defaultAreaPath && !seen.has(defaultAreaPath.toLowerCase())) {
+    areas.unshift({
+      includeChildren: false,
+      value: defaultAreaPath,
+    });
+  }
+
+  return {
+    areas,
+    defaultAreaPath,
+  };
+}
+
 function toPriorityFieldValue(priority: string) {
   const trimmedPriority = priority.trim();
   const numericPriority = Number(trimmedPriority);
@@ -979,6 +1060,14 @@ function buildTaskUpdateDocument(
     });
   }
 
+  if (fields.description !== undefined) {
+    document.push({
+      op: "add",
+      path: "/fields/System.Description",
+      value: fields.description,
+    });
+  }
+
   if (fields.priority !== undefined) {
     document.push({
       op: "add",
@@ -1000,6 +1089,46 @@ function buildTaskUpdateDocument(
       op: "add",
       path: "/fields/System.IterationPath",
       value: fields.iterationPath,
+    });
+  }
+
+  return document;
+}
+
+function buildTaskCreateDocument(fields: TaskCreateFields) {
+  const document: Array<{
+    op: "add";
+    path: string;
+    value: number | string;
+  }> = [
+    {
+      op: "add",
+      path: "/fields/System.Title",
+      value: fields.title,
+    },
+  ];
+
+  if (fields.areaPath) {
+    document.push({
+      op: "add",
+      path: "/fields/System.AreaPath",
+      value: fields.areaPath,
+    });
+  }
+
+  if (fields.description) {
+    document.push({
+      op: "add",
+      path: "/fields/System.Description",
+      value: fields.description,
+    });
+  }
+
+  if (fields.priority) {
+    document.push({
+      op: "add",
+      path: "/fields/Microsoft.VSTS.Common.Priority",
+      value: toPriorityFieldValue(fields.priority),
     });
   }
 
@@ -1369,6 +1498,64 @@ export async function listIterationPathOptions(
     "iterations",
     query,
   );
+}
+
+export async function getTeamAreaSettings(
+  accessToken: string,
+  project: TaskProjectContext,
+) {
+  const response = await azureDevOpsRequest<TeamFieldValuesResponse>(
+    "/_apis/work/teamsettings/teamfieldvalues",
+    {
+      accessToken,
+      projectName: project.name,
+    },
+  );
+
+  return toTeamAreaSettings(response);
+}
+
+export async function createTask(
+  accessToken: string,
+  fields: TaskCreateFields,
+  context: TaskRequestContext = {},
+) {
+  const projectName = readString(fields.projectName);
+  const title = readString(fields.title);
+  const workItemType = readString(fields.type);
+  const areaPath = readString(fields.areaPath);
+
+  if (!projectName || !title || !workItemType) {
+    throw new Error("Project, work item type, and title are required.");
+  }
+
+  const workItem = await azureDevOpsRequest<WorkItem>(
+    `/_apis/wit/workitems/${encodeURIComponent(`$${workItemType}`)}`,
+    {
+      accessToken,
+      body: JSON.stringify(buildTaskCreateDocument({
+        areaPath: areaPath ?? undefined,
+        description: fields.description,
+        priority: fields.priority,
+        projectName,
+        title,
+        type: workItemType,
+      })),
+      contentType: "application/json-patch+json",
+      method: "POST",
+      projectName,
+    },
+  );
+  const workItemId = readPositiveInteger(workItem.id);
+
+  if (!workItemId) {
+    throw new Error("Azure DevOps did not return a valid work item id.");
+  }
+
+  return getTaskDetails(accessToken, workItemId, {
+    ...context,
+    projectName,
+  });
 }
 
 export async function updateTaskAssignee(

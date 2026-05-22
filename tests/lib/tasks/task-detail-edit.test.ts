@@ -11,6 +11,10 @@ describe("task detail edit helpers", () => {
     assignee: "Ada Lovelace",
     assigneeAvatarUrl: "https://example.com/ada.png",
     assigneeValue: "ada@example.com",
+    description: {
+      content: "Initial **markdown**",
+      format: "markdown" as const,
+    },
     iterationPath: "Project\\Iteration\\Sprint 1",
     priority: "2",
     title: "Investigate issue",
@@ -24,6 +28,7 @@ describe("task detail edit helpers", () => {
         label: "Ada Lovelace",
         value: "ada@example.com",
       },
+      description: "Initial **markdown**",
       iterationPath: "Project\\Iteration\\Sprint 1",
       priority: "2",
       title: "Investigate issue",
@@ -39,11 +44,13 @@ describe("task detail edit helpers", () => {
         label: "Grace Hopper",
         value: "grace@example.com",
       },
+      description: "Updated **markdown**",
       title: "Updated title",
     };
 
     expect(getTaskDetailEditableChanges(initialValues, draftValues)).toEqual({
       assignee: "grace@example.com",
+      description: "Updated **markdown**",
       title: "Updated title",
     });
     expect(hasTaskDetailEditableChanges(initialValues, draftValues)).toBe(true);
@@ -52,6 +59,7 @@ describe("task detail edit helpers", () => {
   it("applies editable values back to task detail data", () => {
     const nextValues = {
       ...createTaskDetailEditableValues(detail),
+      description: "Updated **markdown**",
       priority: "1",
       title: "Updated title",
     };
@@ -62,8 +70,8 @@ describe("task detail edit helpers", () => {
           ...detail,
           comments: [],
           description: {
-            content: "",
-            format: "html",
+            content: "Initial **markdown**",
+            format: "markdown",
           },
           id: 42,
           linkedPullRequests: [],
@@ -85,6 +93,10 @@ describe("task detail edit helpers", () => {
       assigneeValue: "ada@example.com",
       priority: "1",
       title: "Updated title",
+      description: {
+        content: "Updated **markdown**",
+        format: "markdown",
+      },
     });
   });
 });

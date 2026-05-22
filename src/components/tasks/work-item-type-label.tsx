@@ -19,7 +19,7 @@ export function WorkItemTypeLabel({
 
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-1.5", className)}>
-      <Icon className={cn("size-3.5 shrink-0", iconClassName)} />
+      <Icon className={cn("size-3.5 shrink-0", meta.colorClass, iconClassName)} />
       <span className={cn("truncate", labelClassName)}>{meta.label}</span>
     </span>
   );

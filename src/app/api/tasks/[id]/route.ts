@@ -27,6 +27,10 @@ function parseRequiredString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
+function parseDescription(value: unknown) {
+  return typeof value === "string" ? value.replace(/\r\n?/g, "\n") : undefined;
+}
+
 function parseTaskChanges(value: unknown) {
   if (!value || typeof value !== "object") {
     return undefined;
@@ -36,6 +40,8 @@ function parseTaskChanges(value: unknown) {
   const assignee = parseAssignee(record.assignee);
   const areaPath =
     record.areaPath === undefined ? undefined : parseRequiredString(record.areaPath);
+  const description =
+    record.description === undefined ? undefined : parseDescription(record.description);
   const iterationPath =
     record.iterationPath === undefined
       ? undefined
@@ -48,6 +54,7 @@ function parseTaskChanges(value: unknown) {
   if (
     (record.assignee !== undefined && assignee === undefined) ||
     (record.areaPath !== undefined && areaPath === undefined) ||
+    (record.description !== undefined && description === undefined) ||
     (record.iterationPath !== undefined && iterationPath === undefined) ||
     (record.priority !== undefined && priority === undefined) ||
     (record.title !== undefined && title === undefined)
@@ -58,6 +65,7 @@ function parseTaskChanges(value: unknown) {
   return {
     ...(assignee !== undefined ? { assignee } : {}),
     ...(areaPath !== undefined ? { areaPath } : {}),
+    ...(description !== undefined ? { description } : {}),
     ...(iterationPath !== undefined ? { iterationPath } : {}),
     ...(priority !== undefined ? { priority } : {}),
     ...(title !== undefined ? { title } : {}),

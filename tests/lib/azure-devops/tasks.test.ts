@@ -1,6 +1,8 @@
 import {
+  createTask,
   getTaskEditMetadata,
   getTaskDetails,
+  getTeamAreaSettings,
   listAreaPathOptions,
   listAssignableUsers,
   listTasks,
@@ -585,6 +587,148 @@ describe("azure-devops task helpers", () => {
         projectName: "Project",
       },
     );
+  });
+
+  it("loads team area defaults from team field values", async () => {
+    azureDevOpsRequestMock.mockResolvedValue({
+      defaultValue: "Project\\Platform",
+      field: {
+        referenceName: "System.AreaPath",
+      },
+      values: [
+        {
+          includeChildren: true,
+          value: "Project\\Platform",
+        },
+        {
+          includeChildren: false,
+          value: " Project\\Support ",
+        },
+        {
+          includeChildren: false,
+          value: "Project\\Platform",
+        },
+      ],
+    });
+
+    await expect(
+      getTeamAreaSettings("token", {
+        defaultTeamImageUrl: null,
+        id: "project-id",
+        name: "Project",
+      }),
+    ).resolves.toEqual({
+      areas: [
+        {
+          includeChildren: true,
+          value: "Project\\Platform",
+        },
+        {
+          includeChildren: false,
+          value: "Project\\Support",
+        },
+      ],
+      defaultAreaPath: "Project\\Platform",
+    });
+
+    expect(azureDevOpsRequestMock).toHaveBeenCalledWith(
+      "/_apis/work/teamsettings/teamfieldvalues",
+      {
+        accessToken: "token",
+        projectName: "Project",
+      },
+    );
+  });
+
+  it("creates work items with Azure DevOps JSON Patch fields", async () => {
+    azureDevOpsRequestMock.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/_apis/wit/workitems/%24User%20Story":
+          return {
+            id: 99,
+          };
+        case "/_apis/wit/workitems/99?$expand=relations":
+          return {
+            fields: {
+              "Microsoft.VSTS.Common.Priority": 2,
+              "System.AreaPath": "Project\\Area",
+              "System.ChangedDate": "2025-01-05T12:00:00.000Z",
+              "System.Description": "<p>Hello</p>",
+              "System.IterationPath": "Project\\Sprint 1",
+              "System.State": "New",
+              "System.TeamProject": "Project",
+              "System.Title": "Created story",
+              "System.WorkItemType": "User Story",
+            },
+            id: 99,
+            rev: 1,
+          };
+        case "/_apis/wit/workItems/99/comments?$top=20&order=desc&$expand=all&api-version=7.1-preview.4":
+          return {
+            comments: [],
+          };
+        default:
+          throw new Error(`Unexpected path: ${path}`);
+      }
+    });
+
+    await expect(
+      createTask(
+        "token",
+        {
+          areaPath: "Project\\Area",
+          description: "# Heading\n\nDetails",
+          priority: "2",
+          projectName: "Project",
+          title: "Created story",
+          type: "User Story",
+        },
+        {
+          projectId: "project-id",
+          projectImageUrl: "https://dev.azure.com/example/_apis/projects/project-id/image",
+          projectName: "Project",
+        },
+      ),
+    ).resolves.toMatchObject({
+      id: 99,
+      projectId: "project-id",
+      projectImageUrl: "https://dev.azure.com/example/_apis/projects/project-id/image",
+      title: "Created story",
+      type: "User Story",
+    });
+
+    expect(azureDevOpsRequestMock).toHaveBeenNthCalledWith(
+      1,
+      "/_apis/wit/workitems/%24User%20Story",
+      expect.objectContaining({
+        accessToken: "token",
+        contentType: "application/json-patch+json",
+        method: "POST",
+        projectName: "Project",
+      }),
+    );
+    expect(JSON.parse(String(azureDevOpsRequestMock.mock.calls[0]?.[1]?.body))).toEqual([
+      {
+        op: "add",
+        path: "/fields/System.Title",
+        value: "Created story",
+      },
+      {
+        op: "add",
+        path: "/fields/System.AreaPath",
+        value: "Project\\Area",
+      },
+      {
+        op: "add",
+        path: "/fields/System.Description",
+        value: "# Heading\n\nDetails",
+      },
+      {
+        op: "add",
+        path: "/fields/Microsoft.VSTS.Common.Priority",
+        value: 2,
+      },
+    ]);
   });
 
   it("patches the assignee field using optimistic revision checks", async () => {

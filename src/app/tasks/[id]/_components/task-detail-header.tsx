@@ -11,6 +11,7 @@ type TaskDetailHeaderProps = {
   detail: TaskDetailData | null;
   isDirty: boolean;
   isSaving: boolean;
+  mode?: "create" | "edit";
   onDiscard: () => void;
   onSave: () => void;
   taskId: number;
@@ -20,15 +21,22 @@ export function TaskDetailHeader({
   detail,
   isDirty,
   isSaving,
+  mode = "edit",
   onDiscard,
   onSave,
   taskId,
 }: TaskDetailHeaderProps) {
+  const isCreateMode = mode === "create";
+
   return (
     <div className="flex items-start gap-4 border-b px-4 py-3 md:px-6">
       <div className="min-w-0 flex-1">
         <h2 className="text-[15px] font-semibold leading-normal text-foreground">
-          {detail?.url ? (
+          {isCreateMode ? (
+            <span className="font-mono font-normal text-muted-foreground">
+              New work item*
+            </span>
+          ) : detail?.url ? (
             <a
               className="font-mono font-normal text-muted-foreground hover:text-foreground"
               href={detail.url}
@@ -55,10 +63,18 @@ export function TaskDetailHeader({
                 />
                 <span>{detail.projectName}</span>
               </Badge>
-<Badge variant="outline">
+              <Badge variant="outline">
                 <WorkItemTypeLabel type={detail.type} />
               </Badge>
-              <Badge variant={getTaskStateBadgeVariant(detail.state)}>{detail.state}</Badge>
+              <Badge
+                variant={
+                  isCreateMode
+                    ? "secondary"
+                    : getTaskStateBadgeVariant(detail.state)
+                }
+              >
+                {isCreateMode ? "Unsaved" : detail.state}
+              </Badge>
               <PriorityBadge priority={detail.priority} />
             </>
           ) : null}
@@ -81,7 +97,7 @@ export function TaskDetailHeader({
           {isSaving ? <Loader2Icon className="animate-spin" data-icon="inline-start" /> : null}
           Save
         </Button>
-        {detail?.url ? (
+        {detail?.url && !isCreateMode ? (
           <a
             className={buttonVariants({ size: "icon-xs", variant: "ghost" })}
             href={detail.url}

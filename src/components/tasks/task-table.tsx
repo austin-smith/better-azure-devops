@@ -19,11 +19,15 @@ import {
 import {
   ChevronDownIcon,
   Loader2Icon,
-  PlusIcon,
   SearchIcon,
   XIcon,
 } from "lucide-react";
 import { DateLabel } from "@/components/date-label";
+import {
+  NewWorkItemDialog,
+  type NewWorkItemDraft,
+  type NewWorkItemProjectOption,
+} from "@/components/tasks/new-work-item-dialog";
 import { ProjectImage } from "@/components/project-image";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
@@ -80,7 +84,9 @@ import type {
   AzureDevOpsClassificationPathOption,
   AzureDevOpsAssigneeOption,
   AzureDevOpsTask as Task,
+  AzureDevOpsTaskDetail,
 } from "@/lib/azure-devops/tasks";
+import { TaskDetail } from "@/app/tasks/[id]/_components/task-detail-client";
 import {
   getTaskListHref,
   getTaskDetailHref,
@@ -94,7 +100,6 @@ import {
   type TaskListFilters,
 } from "@/lib/tasks/filters";
 import { getTaskStateBadgeVariant } from "@/lib/tasks/state";
-import { getWorkItemTypeMeta } from "@/lib/tasks/work-item-type";
 
 type TaskTableProps = {
   activeProjectCount: number;
@@ -102,6 +107,7 @@ type TaskTableProps = {
   filterOptions: TaskFilterOptions;
   filters: TaskListFilters;
   items: Task[];
+  projects: readonly NewWorkItemProjectOption[];
   title: string;
 };
 
@@ -112,6 +118,35 @@ type TaskSearchInputProps = {
 };
 
 const columnHelper = createColumnHelper<Task>();
+
+function createDraftDetail(draft: NewWorkItemDraft): AzureDevOpsTaskDetail {
+  return {
+    areaPath: draft.areaPath,
+    assignee: "Unassigned",
+    assigneeAvatarUrl: null,
+    assigneeValue: null,
+    comments: [],
+    description: {
+      content: "",
+      format: "markdown",
+    },
+    id: 0,
+    iterationPath: "",
+    linkedPullRequests: [],
+    priority: draft.priority,
+    projectId: draft.project.id,
+    projectImageUrl: draft.project.defaultTeamImageUrl,
+    projectName: draft.project.name,
+    reason: "",
+    revision: 0,
+    state: "New",
+    tags: [],
+    title: draft.title,
+    type: draft.type,
+    updatedAt: "",
+    url: "",
+  };
+}
 
 function TaskSearchInput({
   disabled = false,
@@ -183,11 +218,10 @@ function getColumns(taskDetailHref: (task: Task) => string) {
       header: "Type",
       cell: ({ getValue }) => {
         const type = getValue();
-        const meta = getWorkItemTypeMeta(type);
         return (
           <div className="whitespace-nowrap">
             <Badge variant="outline">
-              <WorkItemTypeLabel type={type} iconClassName={meta.colorClass} />
+              <WorkItemTypeLabel type={type} />
             </Badge>
           </div>
         );
@@ -642,9 +676,11 @@ export function TaskTable({
   filterOptions,
   filters,
   items,
+  projects,
   title,
 }: TaskTableProps) {
   const router = useRouter();
+  const [draftDetail, setDraftDetail] = useState<AzureDevOpsTaskDetail | null>(null);
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState(filters.query);
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -739,16 +775,33 @@ export function TaskTable({
     getRowId: (row) => String(row.id),
   });
 
+  if (draftDetail) {
+    return (
+      <TaskDetail
+        createProjectId={draftDetail.projectId}
+        detail={draftDetail}
+        detailError={null}
+        mode="create"
+        onCreateDiscard={() => setDraftDetail(null)}
+        taskId={0}
+        taskListHref={getTaskListHref(filters)}
+        taskListLabel={title}
+        taskProjectId={draftDetail.projectId}
+      />
+    );
+  }
+
   return (
     <>
       <AppHeader
         actions={(
           <>
             <ThemeToggle />
-            <Button size="sm">
-              <PlusIcon data-icon="inline-start" />
-              <span>New Work Item</span>
-            </Button>
+            <NewWorkItemDialog
+              disabled={isPending || activeProjectCount === 0}
+              onContinue={(draft) => setDraftDetail(createDraftDetail(draft))}
+              projects={projects}
+            />
           </>
         )}
         items={[
