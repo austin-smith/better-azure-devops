@@ -61,7 +61,10 @@ describe("task detail edit helpers", () => {
         {
           ...detail,
           comments: [],
-          descriptionHtml: "",
+          description: {
+            content: "",
+            format: "html",
+          },
           id: 42,
           linkedPullRequests: [],
           projectId: "project-id",

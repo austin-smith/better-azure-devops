@@ -442,9 +442,13 @@ describe("azure-devops task helpers", () => {
               ],
             },
           ],
-          text: "Ping [Ada & Team](./ado-mention/123)",
+          content: "Ping [Ada & Team](./ado-mention/123)",
         }),
       ],
+      description: {
+        content: "<p>Hello</p>",
+        format: "unknown",
+      },
       linkedPullRequests: [
         expect.objectContaining({
           id: 501,
@@ -489,6 +493,45 @@ describe("azure-devops task helpers", () => {
       "/_apis/git/pullrequests/501",
       { accessToken: "token" },
     );
+  });
+
+  it("uses Azure DevOps multiline field format for task descriptions", async () => {
+    azureDevOpsRequestMock.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/_apis/wit/workitems/42?$expand=relations":
+          return {
+            fields: {
+              "Microsoft.VSTS.Common.Priority": 2,
+              "System.AreaPath": "Project\\Area",
+              "System.ChangedDate": "2025-01-05T12:00:00.000Z",
+              "System.Description": "# Heading\n\n- **Done**",
+              "System.IterationPath": "Project\\Sprint 1",
+              "System.State": "Active",
+              "System.TeamProject": "Project",
+              "System.Title": "Markdown task",
+              "System.WorkItemType": "Task",
+            },
+            id: 42,
+            multilineFieldsFormat: {
+              "System.Description": "markdown",
+            },
+            rev: 3,
+          };
+        case "/_apis/wit/workItems/42/comments?$top=20&order=desc&$expand=all&api-version=7.1-preview.4":
+          return {
+            comments: [],
+          };
+        default:
+          throw new Error(`Unexpected path: ${path}`);
+      }
+    });
+
+    await expect(getTaskDetails("token", 42)).resolves.toMatchObject({
+      description: {
+        content: "# Heading\n\n- **Done**",
+        format: "markdown",
+      },
+    });
   });
 
   it("uses the task context project image when loading task details", async () => {

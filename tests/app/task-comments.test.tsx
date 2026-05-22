@@ -11,14 +11,12 @@ vi.mock("@/components/date-label", () => ({
 
 vi.mock("@/components/tasks/task-markup", () => ({
   TaskMarkup: ({
-    html,
-    markdown,
-    text,
+    markup,
   }: {
-    html?: string;
-    markdown?: string;
-    text?: string;
-  }) => <div>{html ?? markdown ?? text ?? null}</div>,
+    markup?: {
+      content: string;
+    } | null;
+  }) => <div>{markup?.content ?? null}</div>,
 }));
 
 vi.mock("@/components/user-avatar", () => ({
@@ -57,9 +55,9 @@ describe("TaskComments", () => {
       {
         authorAvatarUrl: null,
         authorName: "Grace Hopper",
+        content: "Ping team",
         createdAt: "2025-01-05T13:00:00.000Z",
         format: "markdown",
-        html: "",
         id: 1,
         reactions: [
           {
@@ -93,7 +91,6 @@ describe("TaskComments", () => {
             ],
           },
         ],
-        text: "Ping team",
       },
     ];
 
@@ -113,12 +110,11 @@ describe("TaskComments", () => {
       {
         authorAvatarUrl: null,
         authorName: "Grace Hopper",
+        content: "Ping team",
         createdAt: "2025-01-05T13:00:00.000Z",
         format: "markdown",
-        html: "",
         id: 1,
         reactions: [],
-        text: "Ping team",
       },
     ];
 

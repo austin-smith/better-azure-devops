@@ -19,9 +19,7 @@ function CommentBody({
     <TaskMarkup
       className="mt-1"
       emptyMessage="No comment text."
-      html={comment.format === "html" ? comment.html : undefined}
-      markdown={comment.format === "markdown" ? comment.text : undefined}
-      text={comment.format === "unknown" ? comment.text : undefined}
+      markup={comment}
     />
   );
 }

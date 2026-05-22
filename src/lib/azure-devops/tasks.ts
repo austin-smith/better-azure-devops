@@ -31,16 +31,18 @@ export type AzureDevOpsTaskListItem = {
 
 export type AzureDevOpsTask = AzureDevOpsTaskListItem;
 
+export type AzureDevOpsMarkup = {
+  content: string;
+  format: "html" | "markdown" | "unknown";
+};
+
 export type AzureDevOpsTaskComment = {
   authorAvatarUrl: string | null;
   authorName: string;
   createdAt: string;
-  format: "html" | "markdown" | "unknown";
-  html: string;
   id: number;
   reactions: AzureDevOpsTaskCommentReaction[];
-  text: string;
-};
+} & AzureDevOpsMarkup;
 
 export type AzureDevOpsTaskCommentReaction = {
   count: number;
@@ -70,7 +72,7 @@ export type AzureDevOpsLinkedPullRequest = {
 
 export type AzureDevOpsTaskDetail = AzureDevOpsTask & {
   comments: AzureDevOpsTaskComment[];
-  descriptionHtml: string;
+  description: AzureDevOpsMarkup;
   linkedPullRequests: AzureDevOpsLinkedPullRequest[];
   revision: number;
   reason: string;
@@ -119,6 +121,7 @@ type WorkItem = {
   _links?: Record<string, unknown>;
   fields: Record<string, unknown>;
   id: number;
+  multilineFieldsFormat?: Record<string, unknown>;
   relations?: WorkItemRelation[];
   rev?: number;
 };
@@ -529,7 +532,7 @@ function sanitizeAzureDevOpsHtml(value: unknown) {
   });
 }
 
-function parseCommentFormat(value: unknown): AzureDevOpsTaskComment["format"] {
+function parseAzureDevOpsMarkupFormat(value: unknown): AzureDevOpsMarkup["format"] {
   if (typeof value !== "string") {
     return "unknown";
   }
@@ -541,6 +544,37 @@ function parseCommentFormat(value: unknown): AzureDevOpsTaskComment["format"] {
       return "markdown";
     default:
       return "unknown";
+  }
+}
+
+function normalizeAzureDevOpsMarkup(
+  value: unknown,
+  format: AzureDevOpsMarkup["format"],
+  renderedText?: string,
+) {
+  if (typeof value !== "string") {
+    return {
+      content: "",
+      format,
+    };
+  }
+
+  switch (format) {
+    case "html":
+      return {
+        content: sanitizeAzureDevOpsHtml(value),
+        format,
+      };
+    case "markdown":
+      return {
+        content: normalizeAzureDevOpsMarkdown(value, renderedText),
+        format,
+      };
+    case "unknown":
+      return {
+        content: normalizePlainText(value),
+        format,
+      };
   }
 }
 
@@ -840,22 +874,19 @@ function toComment(comment: Comment): AzureDevOpsTaskComment | null {
   }
 
   const author = parseIdentity(comment.createdBy);
-  const format = parseCommentFormat(comment.format);
+  const markup = normalizeAzureDevOpsMarkup(
+    comment.text,
+    parseAzureDevOpsMarkupFormat(comment.format),
+    comment.renderedText,
+  );
 
   return {
     authorAvatarUrl: author.avatarUrl,
     authorName: author.name,
     createdAt: String(comment.createdDate ?? ""),
-    format,
-    html: format === "html" ? sanitizeAzureDevOpsHtml(comment.text) : "",
     id,
     reactions: normalizeCommentReactions(comment.reactions),
-    text:
-      typeof comment.text === "string"
-        ? format === "markdown"
-          ? normalizeAzureDevOpsMarkdown(comment.text, comment.renderedText)
-          : normalizePlainText(comment.text)
-        : "",
+    ...markup,
   };
 }
 
@@ -1227,12 +1258,19 @@ export async function getTaskDetails(
     listTaskComments(accessToken, workItemId, projectName),
     listLinkedPullRequests(accessToken, workItem.relations),
   ]);
+  const descriptionFormat = parseAzureDevOpsMarkupFormat(
+    workItem.multilineFieldsFormat?.["System.Description"],
+  );
+  const description = normalizeAzureDevOpsMarkup(
+    workItem.fields["System.Description"],
+    descriptionFormat,
+  );
 
   return {
     ...toTaskListItem(workItem, projectsByName, projectName),
     areaPath: normalizeTaskPath(workItem.fields["System.AreaPath"]),
     comments,
-    descriptionHtml: sanitizeAzureDevOpsHtml(workItem.fields["System.Description"]),
+    description,
     iterationPath: normalizeTaskPath(workItem.fields["System.IterationPath"]),
     linkedPullRequests,
     revision: Number(workItem.rev ?? 0),

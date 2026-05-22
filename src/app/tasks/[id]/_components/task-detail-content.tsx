@@ -38,7 +38,7 @@ export function TaskDetailContent({
         </div>
       ) : null}
 
-      <TaskMarkup emptyMessage="No description." html={detail?.descriptionHtml} />
+      <TaskMarkup emptyMessage="No description." markup={detail?.description} />
 
       <div className="mt-8">
         <TaskDetailSectionLabel

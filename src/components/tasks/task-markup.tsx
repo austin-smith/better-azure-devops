@@ -4,13 +4,12 @@ import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+import type { AzureDevOpsMarkup } from "@/lib/azure-devops/tasks";
 
 type TaskMarkupProps = {
   className?: string;
   emptyMessage?: string;
-  html?: string;
-  markdown?: string;
-  text?: string;
+  markup?: AzureDevOpsMarkup | null;
 };
 
 const proseClassName =
@@ -55,35 +54,36 @@ const markdownComponents: Components = {
 export function TaskMarkup({
   className,
   emptyMessage,
-  html,
-  markdown,
-  text,
+  markup,
 }: TaskMarkupProps) {
-  if (html?.trim()) {
-    return (
-      <div
-        className={cn(proseClassName, mentionClassName, className)}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    );
-  }
-
-  if (markdown?.trim()) {
-    return (
-      <div className={cn(proseClassName, mentionClassName, className)}>
-        <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
-          {markdown}
-        </ReactMarkdown>
-      </div>
-    );
-  }
-
-  if (text?.trim()) {
-    return (
-      <div className={cn("whitespace-pre-wrap text-sm leading-relaxed", className)}>
-        {text}
-      </div>
-    );
+  if (markup?.content.trim()) {
+    switch (markup.format) {
+      case "html":
+        return (
+          <div
+            className={cn(proseClassName, mentionClassName, className)}
+            dangerouslySetInnerHTML={{ __html: markup.content }}
+          />
+        );
+      case "markdown":
+        return (
+          <div className={cn(proseClassName, mentionClassName, className)}>
+            <ReactMarkdown
+              components={markdownComponents}
+              remarkPlugins={[remarkGfm]}
+              skipHtml
+            >
+              {markup.content}
+            </ReactMarkdown>
+          </div>
+        );
+      case "unknown":
+        return (
+          <div className={cn("whitespace-pre-wrap text-sm leading-relaxed", className)}>
+            {markup.content}
+          </div>
+        );
+    }
   }
 
   return emptyMessage ? (
