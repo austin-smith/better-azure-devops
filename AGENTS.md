@@ -35,7 +35,6 @@ This repo expects direct, modern, maintainable code. Match the stack and convent
 - If a shadcn component is needed and not present, add it with the CLI. Do not hand-build a replacement in `src/components/ui`.
 - When a UI need maps to an existing shadcn component, use that component directly or add the missing component with the CLI before creating anything custom.
 - Do not edit installed shadcn component files just to create a different API or a one-off variant unless the user explicitly asks for that.
-- Use the existing `next-auth` setup for authentication work.
 - Use TanStack Table for complex table behavior.
 - Prefer existing utilities and helpers over adding duplicate formatting, class-merging, or data-mapping helpers.
 
