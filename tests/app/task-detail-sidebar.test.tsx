@@ -105,6 +105,14 @@ describe("TaskDetailSidebar", () => {
     expect(container.querySelector("label button")).toBeNull();
   });
 
+  it("only enables sidebar scrolling in the desktop side-by-side layout", () => {
+    const { container } = renderSidebar();
+    const sidebar = container.querySelector("aside");
+
+    expect(sidebar).toHaveClass("lg:overflow-y-auto");
+    expect(sidebar).not.toHaveClass("overflow-y-auto");
+  });
+
   it("renders lookup errors with the shared alert component", async () => {
     vi.stubGlobal("ResizeObserver", class ResizeObserver {
       disconnect() {}

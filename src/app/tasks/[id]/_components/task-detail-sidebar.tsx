@@ -394,7 +394,7 @@ export function TaskDetailSidebar({
   ].filter((value, index, array) => array.indexOf(value) === index));
 
   return (
-    <aside className="w-full shrink-0 overflow-y-auto border-t p-4 lg:w-72 lg:border-t-0 lg:border-l">
+    <aside className="w-full shrink-0 border-t p-4 lg:w-72 lg:overflow-y-auto lg:border-t-0 lg:border-l">
       <div className="flex flex-col gap-4">
         {draftValues ? (
           <>

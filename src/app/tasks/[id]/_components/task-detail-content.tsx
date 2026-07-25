@@ -170,7 +170,7 @@ export function TaskDetailContent({
   );
 
   return (
-    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
+    <div className="min-h-0 min-w-0 flex-1 p-4 md:p-6 lg:overflow-y-auto">
       {detailError ? (
         <Alert className="mb-4" variant="destructive">
           <AlertDescription>{detailError}</AlertDescription>

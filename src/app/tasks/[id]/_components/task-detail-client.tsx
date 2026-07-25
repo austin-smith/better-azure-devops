@@ -22,6 +22,7 @@ import {
   applyTaskDetailEditableValues,
   createTaskDetailEditableValues,
   getTaskDetailEditableChanges,
+  serializeEditableMarkdownForAzureDevOps,
   type TaskDetailEditableValues,
 } from "@/lib/tasks/task-detail-edit";
 
@@ -182,12 +183,14 @@ export function TaskDetail({
       setSaveError(null);
 
       try {
+        const description = draftValues.description.trim()
+          ? serializeEditableMarkdownForAzureDevOps(draftValues.description)
+          : undefined;
+
         const response = await fetch("/api/tasks", {
           body: JSON.stringify({
             areaPath: draftValues.areaPath || undefined,
-            description: draftValues.description.trim()
-              ? draftValues.description
-              : undefined,
+            description,
             priority: draftValues.priority,
             projectId: currentDetail.projectId ?? createProjectId,
             title: draftValues.title,
@@ -337,7 +340,7 @@ export function TaskDetail({
             taskId={taskId}
           />
 
-          <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
             <TaskDetailContent
               descriptionDraft={draftValues?.description ?? ""}
               descriptionHasUnsavedChanges={descriptionHasUnsavedChanges}
