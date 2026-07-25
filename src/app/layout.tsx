@@ -104,6 +104,7 @@ export default async function RootLayout({
         <ThemeProvider
           defaultTheme="system"
           disableTransitionOnChange
+          initialResolvedTheme={serverResolvedThemeMode}
           initialTheme={serverThemeMode}
         >
           <ThemeShortcut />
@@ -117,7 +118,7 @@ export default async function RootLayout({
                 selectedProjectIds={projectSelection?.selectedProjectIds ?? []}
                 taskCount={overview?.error ? null : (overview?.openTaskCount ?? null)}
               />
-              <main className="flex min-h-svh flex-1 flex-col bg-background">
+              <main className="flex min-h-svh min-w-0 flex-1 flex-col bg-background">
                 {children}
               </main>
             </SidebarProvider>

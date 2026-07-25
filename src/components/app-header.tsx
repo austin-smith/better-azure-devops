@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 type AppHeaderItem = {
+  action?: ReactNode;
   href?: string;
   label: string;
 };
@@ -44,8 +45,9 @@ export function AppHeader({
                 <Fragment key={`${item.label}-${index}`}>
                   <BreadcrumbItem className="min-w-0">
                     {isCurrentPage || !item.href ? (
-                      <BreadcrumbPage className="truncate">
-                        {item.label}
+                      <BreadcrumbPage className="flex min-w-0 items-center gap-1">
+                        <span className="truncate">{item.label}</span>
+                        {item.action}
                       </BreadcrumbPage>
                     ) : (
                       <BreadcrumbLink

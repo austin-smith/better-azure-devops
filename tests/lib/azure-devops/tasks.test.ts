@@ -536,6 +536,133 @@ describe("azure-devops task helpers", () => {
     });
   });
 
+  it("preserves HTML task checkboxes as inert description markup", async () => {
+    azureDevOpsRequestMock.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/_apis/wit/workitems/42?$expand=relations":
+          return {
+            fields: {
+              "Microsoft.VSTS.Common.Priority": 2,
+              "System.AreaPath": "Project\\Area",
+              "System.ChangedDate": "2025-01-05T12:00:00.000Z",
+              "System.Description": [
+                "<ul>",
+                '<li><input type="checkbox" checked onclick="alert(1)"> Done</li>',
+                '<li><input type="checkbox"> Todo</li>',
+                '<li><input type="text" value="Unsafe"></li>',
+                "</ul>",
+              ].join(""),
+              "System.IterationPath": "Project\\Sprint 1",
+              "System.State": "Active",
+              "System.TeamProject": "Project",
+              "System.Title": "HTML checklist task",
+              "System.WorkItemType": "Task",
+            },
+            id: 42,
+            multilineFieldsFormat: {
+              "System.Description": "html",
+            },
+            rev: 3,
+          };
+        case "/_apis/wit/workItems/42/comments?$top=20&order=desc&$expand=all&api-version=7.1-preview.4":
+          return {
+            comments: [],
+          };
+        default:
+          throw new Error(`Unexpected path: ${path}`);
+      }
+    });
+
+    const result = await getTaskDetails("token", 42);
+
+    expect(result.description.format).toBe("html");
+    expect(result.description.content).toContain('type="checkbox"');
+    expect(result.description.content).toContain('checked="checked"');
+    expect(result.description.content).toContain('disabled="disabled"');
+    expect(result.description.content).not.toContain("onclick");
+    expect(result.description.content).not.toContain('type="text"');
+  });
+
+  it("renders sanitized Azure DevOps mentions as non-link HTML markup", async () => {
+    azureDevOpsRequestMock.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/_apis/wit/workitems/42?$expand=relations":
+          return {
+            fields: {
+              "Microsoft.VSTS.Common.Priority": 2,
+              "System.AreaPath": "Project\\Area",
+              "System.ChangedDate": "2025-01-05T12:00:00.000Z",
+              "System.Description":
+                '<p>Ping <a data-vss-mention="aad,123" href="https://example.com/profile" target="_blank">Ada Lovelace</a></p>',
+              "System.IterationPath": "Project\\Sprint 1",
+              "System.State": "Active",
+              "System.TeamProject": "Project",
+              "System.Title": "HTML mention task",
+              "System.WorkItemType": "Task",
+            },
+            id: 42,
+            multilineFieldsFormat: {
+              "System.Description": "html",
+            },
+            rev: 3,
+          };
+        case "/_apis/wit/workItems/42/comments?$top=20&order=desc&$expand=all&api-version=7.1-preview.4":
+          return {
+            comments: [],
+          };
+        default:
+          throw new Error(`Unexpected path: ${path}`);
+      }
+    });
+
+    const result = await getTaskDetails("token", 42);
+
+    expect(result.description.content).toContain(
+      '<span data-vss-mention="aad,123">Ada Lovelace</span>',
+    );
+    expect(result.description.content).not.toContain("<a");
+    expect(result.description.content).not.toContain("href=");
+    expect(result.description.content).not.toContain("target=");
+  });
+
+  it("adds lazy async loading hints to sanitized HTML description images", async () => {
+    azureDevOpsRequestMock.mockImplementation(async (path: string) => {
+      switch (path) {
+        case "/_apis/wit/workitems/42?$expand=relations":
+          return {
+            fields: {
+              "Microsoft.VSTS.Common.Priority": 2,
+              "System.AreaPath": "Project\\Area",
+              "System.ChangedDate": "2025-01-05T12:00:00.000Z",
+              "System.Description":
+                '<p><img alt="Diagram" src="https://example.com/diagram.png"></p>',
+              "System.IterationPath": "Project\\Sprint 1",
+              "System.State": "Active",
+              "System.TeamProject": "Project",
+              "System.Title": "HTML image task",
+              "System.WorkItemType": "Task",
+            },
+            id: 42,
+            multilineFieldsFormat: {
+              "System.Description": "html",
+            },
+            rev: 3,
+          };
+        case "/_apis/wit/workItems/42/comments?$top=20&order=desc&$expand=all&api-version=7.1-preview.4":
+          return {
+            comments: [],
+          };
+        default:
+          throw new Error(`Unexpected path: ${path}`);
+      }
+    });
+
+    const result = await getTaskDetails("token", 42);
+
+    expect(result.description.content).toContain('loading="lazy"');
+    expect(result.description.content).toContain('decoding="async"');
+  });
+
   it("uses the task context project image when loading task details", async () => {
     azureDevOpsRequestMock.mockResolvedValue({
       fields: {
@@ -725,6 +852,11 @@ describe("azure-devops task helpers", () => {
       },
       {
         op: "add",
+        path: "/multilineFieldsFormat/System.Description",
+        value: "Markdown",
+      },
+      {
+        op: "add",
         path: "/fields/Microsoft.VSTS.Common.Priority",
         value: 2,
       },
@@ -805,6 +937,7 @@ describe("azure-devops task helpers", () => {
       {
         areaPath: "Project\\Area\\Platform",
         assignee: "ada@example.com",
+        description: "## Updated description",
         iterationPath: "Project\\Iteration\\Sprint 2",
         priority: "1",
         title: "Updated title",
@@ -817,6 +950,8 @@ describe("azure-devops task helpers", () => {
         { op: "test", path: "/rev", value: 7 },
         { op: "add", path: "/fields/System.Title", value: "Updated title" },
         { op: "add", path: "/fields/System.AssignedTo", value: "ada@example.com" },
+        { op: "add", path: "/fields/System.Description", value: "## Updated description" },
+        { op: "add", path: "/multilineFieldsFormat/System.Description", value: "Markdown" },
         { op: "add", path: "/fields/Microsoft.VSTS.Common.Priority", value: 1 },
         { op: "add", path: "/fields/System.AreaPath", value: "Project\\Area\\Platform" },
         { op: "add", path: "/fields/System.IterationPath", value: "Project\\Iteration\\Sprint 2" },

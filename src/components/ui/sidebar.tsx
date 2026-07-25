@@ -9,6 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Kbd, KbdGroup, ModKbd } from "@/components/ui/kbd"
 import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
@@ -259,21 +260,34 @@ function SidebarTrigger({
   const { toggleSidebar } = useSidebar()
 
   return (
-    <Button
-      data-sidebar="trigger"
-      data-slot="sidebar-trigger"
-      variant="ghost"
-      size="icon-sm"
-      className={cn(className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
-    >
-      <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            data-sidebar="trigger"
+            data-slot="sidebar-trigger"
+            variant="ghost"
+            size="icon-sm"
+            className={cn(className)}
+            onClick={(event) => {
+              onClick?.(event)
+              toggleSidebar()
+            }}
+            {...props}
+          />
+        }
+      >
+        <PanelLeftIcon />
+        <span className="sr-only">Toggle sidebar</span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">
+        <span>Toggle sidebar</span>
+        <KbdGroup>
+          <ModKbd />
+          <Kbd>{SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()}</Kbd>
+        </KbdGroup>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
