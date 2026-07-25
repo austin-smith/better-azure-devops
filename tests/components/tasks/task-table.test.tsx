@@ -57,6 +57,11 @@ describe("TaskTable", () => {
     pushMock.mockReset();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("persists the debounced search query to the URL", async () => {
     render(
       <TaskTable
@@ -88,6 +93,148 @@ describe("TaskTable", () => {
       expect(replaceMock).toHaveBeenCalledWith("/tasks?q=deploy&assignee=me");
     }, {
       timeout: 1000,
+    });
+  });
+
+  it("renders task load errors with the shared alert component", () => {
+    render(
+      <TaskTable
+        activeProjectCount={1}
+        error="Failed to load work items."
+        filterOptions={{
+          assignees: [],
+          priorities: [],
+          states: [],
+          types: [],
+        }}
+        filters={getDefaultTaskListFilters()}
+        items={[]}
+        projects={[{ defaultTeamImageUrl: null, id: "project-id", name: "Project" }]}
+        title="Work Items"
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Failed to load work items.",
+    );
+    expect(screen.getByRole("alert")).toHaveAttribute("data-slot", "alert");
+  });
+
+  it("uses compact labels for long active path filters", () => {
+    const areaPath = "Project\\Area\\Platform\\Backend";
+    const iterationPath = "Project\\Release\\May\\Sprint 3";
+
+    render(
+      <TaskTable
+        activeProjectCount={1}
+        error={null}
+        filterOptions={{
+          assignees: [],
+          priorities: [],
+          states: [],
+          types: [],
+        }}
+        filters={{
+          ...getDefaultTaskListFilters(),
+          areaPath,
+          iterationPath,
+        }}
+        items={[createTask()]}
+        projects={[{ defaultTeamImageUrl: null, id: "project-id", name: "Project" }]}
+        title="Work Items"
+      />,
+    );
+
+    expect(screen.getByText("Area: Project / ... / Platform / Backend"))
+      .toBeInTheDocument();
+    expect(screen.getByText("Iteration: Project / ... / May / Sprint 3"))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", {
+      name: `Remove area filter: ${areaPath}`,
+    })).toHaveAttribute("title", areaPath);
+    expect(screen.getByRole("button", {
+      name: `Remove iteration filter: ${iterationPath}`,
+    })).toHaveAttribute("title", iterationPath);
+  });
+
+  it("renders assignee lookup errors with the shared alert component", async () => {
+    vi.stubGlobal("ResizeObserver", class ResizeObserver {
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    });
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      JSON.stringify({ error: "Failed to load assignees." }),
+      {
+        headers: { "Content-Type": "application/json" },
+        status: 500,
+      },
+    )));
+
+    render(
+      <TaskTable
+        activeProjectCount={1}
+        error={null}
+        filterOptions={{
+          assignees: [],
+          priorities: [],
+          states: [],
+          types: [],
+        }}
+        filters={getDefaultTaskListFilters()}
+        items={[createTask()]}
+        projects={[{ defaultTeamImageUrl: null, id: "project-id", name: "Project" }]}
+        title="Work Items"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Assignee" }));
+    fireEvent.change(screen.getByPlaceholderText("Search assignee"), {
+      target: { value: "ada" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Failed to load assignees.",
+      );
+    });
+    expect(screen.getByRole("alert")).toHaveAttribute("data-slot", "alert");
+  });
+
+  it("labels assignee lookup loading states", async () => {
+    vi.stubGlobal("ResizeObserver", class ResizeObserver {
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    });
+    window.HTMLElement.prototype.scrollIntoView = vi.fn();
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => {})));
+
+    render(
+      <TaskTable
+        activeProjectCount={1}
+        error={null}
+        filterOptions={{
+          assignees: [],
+          priorities: [],
+          states: [],
+          types: [],
+        }}
+        filters={getDefaultTaskListFilters()}
+        items={[createTask()]}
+        projects={[{ defaultTeamImageUrl: null, id: "project-id", name: "Project" }]}
+        title="Work Items"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Assignee" }));
+    fireEvent.change(screen.getByPlaceholderText("Search assignee"), {
+      target: { value: "ada" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Loading assignees...")).toBeInTheDocument();
     });
   });
 });

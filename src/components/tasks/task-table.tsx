@@ -36,6 +36,10 @@ import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
+import {
+  Alert,
+  AlertDescription,
+} from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -453,13 +457,16 @@ function AssigneeFilter({
             {showList ? (
               <>
                 {isLoading ? (
-                  <div className="flex items-center justify-center py-3 text-muted-foreground">
+                  <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
                     <Loader2Icon className="size-4 animate-spin" />
+                    Loading assignees...
                   </div>
                 ) : null}
 
                 {lookupError ? (
-                  <div className="px-3 py-2 text-xs text-destructive">{lookupError}</div>
+                  <Alert className="mx-2 my-1" variant="destructive">
+                    <AlertDescription>{lookupError}</AlertDescription>
+                  </Alert>
                 ) : null}
 
                 {showEmpty ? <CommandEmpty>No assignees found.</CommandEmpty> : null}
@@ -618,13 +625,16 @@ function ClassificationPathFilter({
             </CommandGroup>
 
             {isLoading ? (
-              <div className="flex items-center justify-center py-3 text-muted-foreground">
+              <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
                 <Loader2Icon className="size-4 animate-spin" />
+                Loading {label.toLowerCase()} paths...
               </div>
             ) : null}
 
             {loadError ? (
-              <div className="px-3 py-2 text-xs text-destructive">{loadError}</div>
+              <Alert className="mx-2 my-1" variant="destructive">
+                <AlertDescription>{loadError}</AlertDescription>
+              </Alert>
             ) : null}
 
             {!isLoading && !loadError ? (
@@ -702,6 +712,12 @@ export function TaskTable({
   });
   const hasTypeFilter = filters.types.length > 0;
   const showEmptyState = !error && visibleItems.length === 0;
+  const areaPathLabel = filters.areaPath
+    ? getCompactTaskPathBreadcrumb(filters.areaPath)
+    : null;
+  const iterationPathLabel = filters.iterationPath
+    ? getCompactTaskPathBreadcrumb(filters.iterationPath)
+    : null;
 
   useEffect(() => {
     setSearchQuery(filters.query);
@@ -1005,15 +1021,18 @@ export function TaskTable({
               <XIcon data-icon="inline-end" />
             </Button>
           ) : null}
-          {filters.areaPath ? (
+          {filters.areaPath && areaPathLabel ? (
             <Button
+              aria-label={`Remove area filter: ${filters.areaPath}`}
+              className="max-w-full"
               disabled={isPending}
               onClick={() => navigate({ ...filters, areaPath: null })}
               size="sm"
+              title={filters.areaPath}
               type="button"
               variant="outline"
             >
-              Area: {filters.areaPath}
+              <span className="truncate">Area: {areaPathLabel}</span>
               <XIcon data-icon="inline-end" />
             </Button>
           ) : null}
@@ -1053,15 +1072,18 @@ export function TaskTable({
               <XIcon data-icon="inline-end" />
             </Button>
           ))}
-          {filters.iterationPath ? (
+          {filters.iterationPath && iterationPathLabel ? (
             <Button
+              aria-label={`Remove iteration filter: ${filters.iterationPath}`}
+              className="max-w-full"
               disabled={isPending}
               onClick={() => navigate({ ...filters, iterationPath: null })}
               size="sm"
+              title={filters.iterationPath}
               type="button"
               variant="outline"
             >
-              Iteration: {filters.iterationPath}
+              <span className="truncate">Iteration: {iterationPathLabel}</span>
               <XIcon data-icon="inline-end" />
             </Button>
           ) : null}
@@ -1079,9 +1101,9 @@ export function TaskTable({
         </div>
 
         {error ? (
-          <div className="rounded-lg border border-dashed p-4 text-sm text-destructive">
-            {error}
-          </div>
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         ) : null}
 
         <div className="min-h-0 flex-1 overflow-hidden rounded-xl border bg-background">

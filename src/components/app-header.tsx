@@ -10,10 +10,17 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Kbd, KbdGroup, ModKbd } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type AppHeaderItem = {
+  action?: ReactNode;
   href?: string;
   label: string;
 };
@@ -30,7 +37,16 @@ export function AppHeader({
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <SidebarTrigger className="-ml-1" />
+        <Tooltip>
+          <TooltipTrigger render={<SidebarTrigger className="-ml-1" />} />
+          <TooltipContent side="bottom">
+            <span>Toggle sidebar</span>
+            <KbdGroup>
+              <ModKbd />
+              <Kbd>B</Kbd>
+            </KbdGroup>
+          </TooltipContent>
+        </Tooltip>
         <Separator
           className="mr-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
           orientation="vertical"
@@ -44,8 +60,9 @@ export function AppHeader({
                 <Fragment key={`${item.label}-${index}`}>
                   <BreadcrumbItem className="min-w-0">
                     {isCurrentPage || !item.href ? (
-                      <BreadcrumbPage className="truncate">
-                        {item.label}
+                      <BreadcrumbPage className="flex min-w-0 items-center gap-1">
+                        <span className="truncate">{item.label}</span>
+                        {item.action}
                       </BreadcrumbPage>
                     ) : (
                       <BreadcrumbLink

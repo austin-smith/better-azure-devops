@@ -12,6 +12,10 @@ import {
   Loader2Icon,
   PlusIcon,
 } from "lucide-react";
+import {
+  Alert,
+  AlertDescription,
+} from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import {
@@ -30,6 +34,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -74,6 +83,13 @@ type NewWorkItemDialogProps = {
 
 const DEFAULT_WORK_ITEM_TYPES = getDefaultWorkItemTypes();
 const DEFAULT_PRIORITY = "2";
+const NEW_WORK_ITEM_FIELD_IDS = {
+  area: "new-work-item-area",
+  priority: "new-work-item-priority",
+  project: "new-work-item-project",
+  title: "new-work-item-title",
+  type: "new-work-item-type",
+} as const;
 
 function getInitialProjectId(projects: readonly NewWorkItemProjectOption[]) {
   return projects[0]?.id ?? "";
@@ -235,9 +251,11 @@ export function NewWorkItemDialog({
             <DialogTitle>New Work Item</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-3">
-            <label className="grid gap-1.5 text-sm font-medium">
-              <span>Project</span>
+          <FieldGroup className="gap-3">
+            <Field>
+              <FieldLabel htmlFor={NEW_WORK_ITEM_FIELD_IDS.project}>
+                Project
+              </FieldLabel>
               <Select
                 disabled={projects.length === 0}
                 onValueChange={(value) => {
@@ -247,7 +265,10 @@ export function NewWorkItemDialog({
                 }}
                 value={projectId}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger
+                  className="w-full"
+                  id={NEW_WORK_ITEM_FIELD_IDS.project}
+                >
                   <SelectValue>
                     {selectedProject?.name ?? "Select project"}
                   </SelectValue>
@@ -262,10 +283,12 @@ export function NewWorkItemDialog({
                   </SelectGroup>
                 </SelectContent>
               </Select>
-            </label>
+            </Field>
 
-            <label className="grid gap-1.5 text-sm font-medium">
-              <span>Area</span>
+            <Field>
+              <FieldLabel htmlFor={NEW_WORK_ITEM_FIELD_IDS.area}>
+                Area
+              </FieldLabel>
               <Popover
                 modal={false}
                 open={isAreaOpen}
@@ -275,7 +298,9 @@ export function NewWorkItemDialog({
                   disabled={!projectId}
                   render={(
                     <Button
+                      aria-label="Select area"
                       className="w-full justify-between"
+                      id={NEW_WORK_ITEM_FIELD_IDS.area}
                       type="button"
                       variant="outline"
                     />
@@ -283,7 +308,8 @@ export function NewWorkItemDialog({
                 >
                   {isLoadingAreas ? (
                     <span className="flex min-w-0 flex-1 items-center gap-2 font-normal text-muted-foreground">
-                      <Loader2Icon className="size-4 animate-spin" />
+                      <Loader2Icon className="animate-spin" data-icon="inline-start" />
+                      Loading areas...
                     </span>
                   ) : (
                     <>
@@ -292,7 +318,7 @@ export function NewWorkItemDialog({
                           ? getCompactTaskPathBreadcrumb(selectedArea?.value ?? areaPath)
                           : "Select area"}
                       </span>
-                      <ChevronDownIcon className="size-4" />
+                      <ChevronDownIcon data-icon="inline-end" />
                     </>
                   )}
                 </PopoverTrigger>
@@ -301,12 +327,15 @@ export function NewWorkItemDialog({
                     <CommandInput placeholder="Search areas" />
                     <CommandList className="max-h-72">
                       {isLoadingAreas ? (
-                        <div className="flex items-center justify-center py-3 text-muted-foreground">
+                        <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
                           <Loader2Icon className="size-4 animate-spin" />
+                          Loading areas...
                         </div>
                       ) : null}
                       {areaError ? (
-                        <div className="px-3 py-2 text-xs text-destructive">{areaError}</div>
+                        <Alert className="mx-2 my-1" variant="destructive">
+                          <AlertDescription>{areaError}</AlertDescription>
+                        </Alert>
                       ) : null}
                       {!isLoadingAreas && !areaError ? (
                         <>
@@ -340,11 +369,13 @@ export function NewWorkItemDialog({
                   </Command>
                 </PopoverContent>
               </Popover>
-            </label>
+            </Field>
 
             <div className="grid gap-3 sm:grid-cols-[1fr_7rem]">
-              <label className="grid gap-1.5 text-sm font-medium">
-                <span>Type</span>
+              <Field>
+                <FieldLabel htmlFor={NEW_WORK_ITEM_FIELD_IDS.type}>
+                  Type
+                </FieldLabel>
                 <Select
                   onValueChange={(value) => {
                     if (value) {
@@ -353,7 +384,10 @@ export function NewWorkItemDialog({
                   }}
                   value={type}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    className="w-full"
+                    id={NEW_WORK_ITEM_FIELD_IDS.type}
+                  >
                     <SelectValue>
                       <WorkItemTypeLabel type={type} />
                     </SelectValue>
@@ -368,10 +402,12 @@ export function NewWorkItemDialog({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-              </label>
+              </Field>
 
-              <label className="grid gap-1.5 text-sm font-medium">
-                <span>Priority</span>
+              <Field>
+                <FieldLabel htmlFor={NEW_WORK_ITEM_FIELD_IDS.priority}>
+                  Priority
+                </FieldLabel>
                 <Select
                   onValueChange={(value) => {
                     if (value) {
@@ -380,7 +416,10 @@ export function NewWorkItemDialog({
                   }}
                   value={priority}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    className="w-full"
+                    id={NEW_WORK_ITEM_FIELD_IDS.priority}
+                  >
                     <SelectValue>
                       <PriorityBadge priority={priority} />
                     </SelectValue>
@@ -395,26 +434,29 @@ export function NewWorkItemDialog({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-              </label>
+              </Field>
             </div>
 
-            <label className="grid gap-1.5 text-sm font-medium">
-              <span>Title</span>
+            <Field>
+              <FieldLabel htmlFor={NEW_WORK_ITEM_FIELD_IDS.title}>
+                Title
+              </FieldLabel>
               <Input
                 autoFocus
+                id={NEW_WORK_ITEM_FIELD_IDS.title}
                 maxLength={255}
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Work item title"
                 required
                 value={title}
               />
-            </label>
-          </div>
+            </Field>
+          </FieldGroup>
 
           {error ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-              {error}
-            </div>
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           ) : null}
 
           <DialogFooter>

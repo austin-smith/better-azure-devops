@@ -26,9 +26,13 @@ import {
 import { computeThemeFamilySwatches } from "@/components/themes/theme-provider";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, theme, setTheme } = useTheme();
   const { themeFamily, setThemeFamily } = useThemeFamily();
   const selectedTheme = normalizeThemeMode(theme);
+  const selectedThemeLabel =
+    THEME_MODE_OPTIONS.find((option) => option.value === selectedTheme)?.label ??
+      "System";
+  const triggerLabel = `Theme: ${selectedThemeLabel}`;
   const ThemeIcon = THEME_MODE_ICON_MAP[selectedTheme];
   const [themeFamilyOptions, setThemeFamilyOptions] = React.useState(
     () =>
@@ -42,19 +46,19 @@ export function ThemeToggle() {
 
   React.useEffect(() => {
     setThemeFamilyOptions(computeThemeFamilySwatches());
-  }, [selectedTheme]);
+  }, [resolvedTheme, selectedTheme]);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label="Toggle theme"
-        title="Toggle theme"
+        aria-label={triggerLabel}
+        title={triggerLabel}
         className={cn(
           buttonVariants({ variant: "ghost", size: "icon-sm" }),
         )}
       >
-        <ThemeIcon className="size-4" />
-        <span className="sr-only">Toggle theme</span>
+        <ThemeIcon data-icon="inline-start" />
+        <span className="sr-only">{triggerLabel}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-56">
         <DropdownMenuGroup>

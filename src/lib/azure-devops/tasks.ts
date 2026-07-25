@@ -10,7 +10,13 @@ import {
 } from "@/lib/tasks/filters";
 import { getDefaultWorkItemTypes } from "@/lib/tasks/work-item-type";
 import type { AzureDevOpsProject } from "@/lib/azure-devops/projects";
+import {
+  sanitizeAzureDevOpsHtml,
+  type AzureDevOpsMarkup,
+} from "@/lib/azure-devops/markup";
 import sanitizeHtml from "sanitize-html";
+
+export type { AzureDevOpsMarkup } from "@/lib/azure-devops/markup";
 
 export type AzureDevOpsTaskListItem = {
   areaPath: string;
@@ -30,11 +36,6 @@ export type AzureDevOpsTaskListItem = {
 };
 
 export type AzureDevOpsTask = AzureDevOpsTaskListItem;
-
-export type AzureDevOpsMarkup = {
-  content: string;
-  format: "html" | "markdown" | "unknown";
-};
 
 export type AzureDevOpsTaskComment = {
   authorAvatarUrl: string | null;
@@ -288,20 +289,6 @@ const TASK_LIST_FIELDS = [
   "System.WorkItemType",
   "Microsoft.VSTS.Common.Priority",
 ] as const;
-const SANITIZE_ALLOWED_TAGS = [
-  ...(sanitizeHtml.defaults.allowedTags ?? []),
-  "img",
-];
-const SANITIZE_ALLOWED_ATTRIBUTES = {
-  ...sanitizeHtml.defaults.allowedAttributes,
-  a: [
-    ...(sanitizeHtml.defaults.allowedAttributes.a ?? []),
-    "data-vss-mention",
-    "rel",
-    "target",
-  ],
-  img: ["alt", "src", "title"],
-};
 const WORK_ITEMS_BATCH_LIMIT = 200;
 const COMMENT_REACTION_ORDER: readonly CommentReactionType[] = [
   "like",
@@ -405,11 +392,11 @@ function extractRenderedMentionLabels(renderedText: string) {
   const mentions = new Map<string, string>();
 
   for (const match of renderedText.matchAll(
-    /<a\b[^>]*\bdata-vss-mention="[^"]*?,([^"]+)"[^>]*>(.*?)<\/a>/gi,
+    /<(a|span)\b[^>]*\bdata-vss-mention="[^"]*?,([^"]+)"[^>]*>(.*?)<\/\1>/gi,
   )) {
-    const mentionId = match[1]?.trim().toLowerCase();
+    const mentionId = match[2]?.trim().toLowerCase();
     const mentionLabel = decodeHtmlEntities(
-      sanitizeHtml(match[2] ?? "", {
+      sanitizeHtml(match[3] ?? "", {
         allowedAttributes: {},
         allowedTags: [],
       }).trim(),
@@ -511,58 +498,6 @@ function chunkIds(ids: number[], size: number) {
   return chunks;
 }
 
-function sanitizeAzureDevOpsHtml(value: unknown) {
-  if (typeof value !== "string" || !value.trim()) {
-    return "";
-  }
-
-  return sanitizeHtml(value, {
-    allowedAttributes: SANITIZE_ALLOWED_ATTRIBUTES,
-    allowedSchemes: ["http", "https", "mailto"],
-    allowedTags: SANITIZE_ALLOWED_TAGS,
-    transformTags: {
-      a: (tagName, attribs) => {
-        const href = typeof attribs.href === "string" ? attribs.href : "";
-        const nextAttribs = { ...attribs };
-
-        if (typeof nextAttribs["data-vss-mention"] === "string") {
-          delete nextAttribs.href;
-          delete nextAttribs.rel;
-          delete nextAttribs.target;
-
-          return {
-            attribs: nextAttribs,
-            tagName,
-          };
-        }
-
-        if (href.startsWith("http://") || href.startsWith("https://")) {
-          nextAttribs.rel = "noreferrer noopener";
-          nextAttribs.target = "_blank";
-        }
-
-        return {
-          attribs: nextAttribs,
-          tagName,
-        };
-      },
-      img: (tagName, attribs) => {
-        const source = typeof attribs.src === "string" ? attribs.src : "";
-        const nextAttribs = { ...attribs };
-
-        if (isAzureDevOpsAssetUrl(source)) {
-          nextAttribs.src = buildAzureDevOpsAssetProxyPath(source);
-        }
-
-        return {
-          attribs: nextAttribs,
-          tagName,
-        };
-      },
-    },
-  });
-}
-
 function parseAzureDevOpsMarkupFormat(value: unknown): AzureDevOpsMarkup["format"] {
   if (typeof value !== "string") {
     return "unknown";
@@ -593,7 +528,12 @@ function normalizeAzureDevOpsMarkup(
   switch (format) {
     case "html":
       return {
-        content: sanitizeAzureDevOpsHtml(value),
+        content: sanitizeAzureDevOpsHtml(value, {
+          transformImageSource: (source) =>
+            isAzureDevOpsAssetUrl(source)
+              ? buildAzureDevOpsAssetProxyPath(source)
+              : null,
+        }),
         format,
       };
     case "markdown":
@@ -1065,6 +1005,10 @@ function buildTaskUpdateDocument(
       op: "add",
       path: "/fields/System.Description",
       value: fields.description,
+    }, {
+      op: "add",
+      path: "/multilineFieldsFormat/System.Description",
+      value: "Markdown",
     });
   }
 
@@ -1121,6 +1065,10 @@ function buildTaskCreateDocument(fields: TaskCreateFields) {
       op: "add",
       path: "/fields/System.Description",
       value: fields.description,
+    }, {
+      op: "add",
+      path: "/multilineFieldsFormat/System.Description",
+      value: "Markdown",
     });
   }
 

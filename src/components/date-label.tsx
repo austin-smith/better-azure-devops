@@ -42,7 +42,7 @@ export function DateLabel({
   }, [display.isRelative, refreshIntervalMs]);
 
   return (
-    <span className={className} title={display.title}>
+    <span className={className} suppressHydrationWarning title={display.title}>
       {display.label}
     </span>
   );

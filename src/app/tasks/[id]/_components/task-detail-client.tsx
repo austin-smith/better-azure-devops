@@ -1,5 +1,6 @@
 "use client";
 
+import { ExternalLinkIcon } from "lucide-react";
 import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TaskDetailContent } from "./task-detail-content";
@@ -7,6 +8,12 @@ import { TaskDetailHeader } from "./task-detail-header";
 import { TaskDetailSidebar } from "./task-detail-sidebar";
 import { ThemeToggle } from "@/components/themes/theme-toggle";
 import { AppHeader } from "@/components/app-header";
+import { buttonVariants } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
   AzureDevOpsTaskDetail as TaskDetailData,
   AzureDevOpsTaskEditMetadata,
@@ -15,7 +22,7 @@ import {
   applyTaskDetailEditableValues,
   createTaskDetailEditableValues,
   getTaskDetailEditableChanges,
-  hasTaskDetailEditableChanges,
+  serializeEditableMarkdownForAzureDevOps,
   type TaskDetailEditableValues,
 } from "@/lib/tasks/task-detail-edit";
 
@@ -54,6 +61,7 @@ export function TaskDetail({
   const [isLoadingEditMetadata, setIsLoadingEditMetadata] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [draftResetKey, setDraftResetKey] = useState(0);
 
   useEffect(() => {
     setCurrentDetail(detail);
@@ -123,18 +131,22 @@ export function TaskDetail({
     };
   }, [detail, mode, taskId, taskProjectId]);
 
+  const initialEditableValues = currentDetail
+    ? createTaskDetailEditableValues(currentDetail)
+    : null;
+  const editableChanges = initialEditableValues && draftValues
+    ? getTaskDetailEditableChanges(initialEditableValues, draftValues)
+    : {};
   const displayDetail =
     currentDetail && draftValues
       ? applyTaskDetailEditableValues(currentDetail, draftValues)
       : currentDetail;
   const isDirty =
     currentDetail && draftValues
-      ? mode === "create" ||
-        hasTaskDetailEditableChanges(
-          createTaskDetailEditableValues(currentDetail),
-          draftValues,
-        )
+      ? mode === "create" || Object.keys(editableChanges).length > 0
       : false;
+  const descriptionHasUnsavedChanges =
+    mode !== "create" && Object.hasOwn(editableChanges, "description");
 
   function handleDraftChange(nextValues: TaskDetailEditableValues) {
     setDraftValues(nextValues);
@@ -153,6 +165,7 @@ export function TaskDetail({
 
     setDraftValues(createTaskDetailEditableValues(currentDetail));
     setSaveError(null);
+    setDraftResetKey((current) => current + 1);
   }
 
   async function saveDraft() {
@@ -170,12 +183,14 @@ export function TaskDetail({
       setSaveError(null);
 
       try {
+        const description = draftValues.description.trim()
+          ? serializeEditableMarkdownForAzureDevOps(draftValues.description)
+          : undefined;
+
         const response = await fetch("/api/tasks", {
           body: JSON.stringify({
             areaPath: draftValues.areaPath || undefined,
-            description: draftValues.description.trim()
-              ? draftValues.description
-              : undefined,
+            description,
             priority: draftValues.priority,
             projectId: currentDetail.projectId ?? createProjectId,
             title: draftValues.title,
@@ -273,10 +288,35 @@ export function TaskDetail({
     }
   }
 
+  const openInDevOpsAction = displayDetail?.url && mode !== "create" ? (
+    <Tooltip>
+      <TooltipTrigger
+        render={(
+          <a
+            aria-label="Open in DevOps"
+            className={buttonVariants({
+              className: "text-muted-foreground hover:text-foreground",
+              size: "icon-xs",
+              variant: "ghost",
+            })}
+            href={displayDetail.url}
+            rel="noreferrer"
+            target="_blank"
+          />
+        )}
+      >
+        <ExternalLinkIcon />
+      </TooltipTrigger>
+      <TooltipContent>Open in DevOps</TooltipContent>
+    </Tooltip>
+  ) : null;
   const headerItems = [
     { href: "/", label: "Home" },
     { href: taskListHref, label: taskListLabel },
-    { label: mode === "create" ? "New Work Item" : `Work Item #${taskId}` },
+    {
+      action: openInDevOpsAction,
+      label: mode === "create" ? "New Work Item" : `Work Item #${taskId}`,
+    },
   ];
 
   return (
@@ -286,8 +326,8 @@ export function TaskDetail({
         items={headerItems}
       />
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <TaskDetailHeader
             detail={displayDetail}
             isDirty={isDirty}
@@ -300,12 +340,15 @@ export function TaskDetail({
             taskId={taskId}
           />
 
-          <div className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
             <TaskDetailContent
               descriptionDraft={draftValues?.description ?? ""}
+              descriptionHasUnsavedChanges={descriptionHasUnsavedChanges}
               detail={displayDetail}
               detailError={detailError}
+              draftResetKey={draftResetKey}
               isSaving={isSaving}
+              mode={mode}
               onDescriptionChange={(description) => {
                 if (!draftValues) {
                   return;

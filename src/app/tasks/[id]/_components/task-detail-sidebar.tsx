@@ -13,6 +13,10 @@ import { ProjectImage } from "@/components/project-image";
 import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
 import { UserAvatar } from "@/components/user-avatar";
 import {
+  Alert,
+  AlertDescription,
+} from "@/components/ui/alert";
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -20,6 +24,10 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  Field,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -71,36 +79,55 @@ type SearchOptionResponseItem = {
   value: string | null;
 };
 
+const TASK_DETAIL_SIDEBAR_FIELD_IDS = {
+  area: "task-detail-area",
+  assignee: "task-detail-assignee",
+  iteration: "task-detail-iteration",
+  priority: "task-detail-priority",
+  title: "task-detail-title",
+} as const;
+
 function SidebarField({
   children,
+  controlId,
   label,
 }: {
   children: ReactNode;
+  controlId?: string;
   label: string;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="text-[11px] font-medium text-muted-foreground uppercase">
+    <Field className="gap-1.5">
+      <FieldLabel
+        className="text-[11px] leading-none font-medium text-muted-foreground uppercase"
+        htmlFor={controlId}
+      >
         {label}
-      </div>
+      </FieldLabel>
       <div className="text-sm text-foreground">{children}</div>
-    </div>
+    </Field>
   );
 }
 
 function SearchPopoverField({
+  accessibleName,
+  controlId,
   disabled,
   emptyMessage,
   endpoint,
+  loadingMessage,
   minQueryLength = 2,
   onSelect,
   placeholder,
   selectedContent,
   staticOptions = [],
 }: {
+  accessibleName: string;
+  controlId: string;
   disabled: boolean;
   emptyMessage: string;
   endpoint: string;
+  loadingMessage: string;
   minQueryLength?: number;
   onSelect: (option: SearchOption) => void;
   placeholder: string;
@@ -214,8 +241,10 @@ function SearchPopoverField({
       }}
     >
       <PopoverTrigger
+        aria-label={accessibleName}
         className="flex w-full min-w-0 items-center gap-2 rounded-lg border border-input bg-transparent px-2.5 py-2 text-left transition-colors hover:bg-muted/50 disabled:opacity-50"
         disabled={disabled}
+        id={controlId}
       >
         {selectedContent}
       </PopoverTrigger>
@@ -237,13 +266,16 @@ function SearchPopoverField({
           {showList ? (
             <CommandList className="max-h-56">
               {isLoading ? (
-                <div className="flex items-center justify-center py-3 text-muted-foreground">
+                <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
                   <Loader2Icon className="size-4 animate-spin" />
+                  {loadingMessage}
                 </div>
               ) : null}
 
               {lookupError ? (
-                <div className="px-3 py-2 text-xs text-destructive">{lookupError}</div>
+                <Alert className="mx-2 my-1" variant="destructive">
+                  <AlertDescription>{lookupError}</AlertDescription>
+                </Alert>
               ) : null}
 
               {showStaticOptions ? (
@@ -362,7 +394,7 @@ export function TaskDetailSidebar({
   ].filter((value, index, array) => array.indexOf(value) === index));
 
   return (
-    <aside className="w-72 shrink-0 overflow-y-auto border-l p-4">
+    <aside className="w-full shrink-0 border-t p-4 lg:w-72 lg:overflow-y-auto lg:border-t-0 lg:border-l">
       <div className="flex flex-col gap-4">
         {draftValues ? (
           <>
@@ -373,13 +405,19 @@ export function TaskDetailSidebar({
             ) : null}
 
             {saveError ? (
-              <div className="text-xs text-destructive">{saveError}</div>
+              <Alert variant="destructive">
+                <AlertDescription>{saveError}</AlertDescription>
+              </Alert>
             ) : null}
 
             {isCreateMode ? null : (
-              <SidebarField label="Title">
+              <SidebarField
+                controlId={TASK_DETAIL_SIDEBAR_FIELD_IDS.title}
+                label="Title"
+              >
                 <Input
                   disabled={isSaving}
+                  id={TASK_DETAIL_SIDEBAR_FIELD_IDS.title}
                   onChange={(event) =>
                     onDraftChange({
                       ...draftValues,
@@ -391,11 +429,17 @@ export function TaskDetailSidebar({
               </SidebarField>
             )}
 
-            <SidebarField label="Assignee">
+            <SidebarField
+              controlId={TASK_DETAIL_SIDEBAR_FIELD_IDS.assignee}
+              label="Assignee"
+            >
               <SearchPopoverField
+                accessibleName={`Assignee: ${draftValues.assignee.label}`}
+                controlId={TASK_DETAIL_SIDEBAR_FIELD_IDS.assignee}
                 disabled={isSaving}
                 emptyMessage="No assignees found."
                 endpoint="/api/assignees"
+                loadingMessage="Loading assignees..."
                 onSelect={(option) =>
                   onDraftChange({
                     ...draftValues,
@@ -431,7 +475,10 @@ export function TaskDetailSidebar({
               />
             </SidebarField>
 
-            <SidebarField label="Priority">
+            <SidebarField
+              controlId={TASK_DETAIL_SIDEBAR_FIELD_IDS.priority}
+              label="Priority"
+            >
               <Select
                 disabled={isSaving || isLoadingEditMetadata || priorityOptions.length === 0}
                 onValueChange={(priority) => {
@@ -446,7 +493,11 @@ export function TaskDetailSidebar({
                 }}
                 value={draftValues.priority}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger
+                  aria-label={`Priority: ${draftValues.priority || "Select priority"}`}
+                  className="w-full"
+                  id={TASK_DETAIL_SIDEBAR_FIELD_IDS.priority}
+                >
                   <SelectValue>
                     {draftValues.priority ? (
                       <PriorityBadge priority={draftValues.priority} />
@@ -466,15 +517,23 @@ export function TaskDetailSidebar({
                 </SelectContent>
               </Select>
               {editMetadataError ? (
-                <div className="mt-1 text-xs text-destructive">{editMetadataError}</div>
+                <Alert className="mt-2" variant="destructive">
+                  <AlertDescription>{editMetadataError}</AlertDescription>
+                </Alert>
               ) : null}
             </SidebarField>
 
-            <SidebarField label="Area">
+            <SidebarField
+              controlId={TASK_DETAIL_SIDEBAR_FIELD_IDS.area}
+              label="Area"
+            >
               <SearchPopoverField
+                accessibleName={`Area: ${draftValues.areaPath}`}
+                controlId={TASK_DETAIL_SIDEBAR_FIELD_IDS.area}
                 disabled={isSaving}
                 emptyMessage="No areas found."
                 endpoint={areaLookupEndpoint}
+                loadingMessage="Loading areas..."
                 minQueryLength={0}
                 onSelect={(option) =>
                   onDraftChange({
@@ -489,11 +548,17 @@ export function TaskDetailSidebar({
               />
             </SidebarField>
 
-            <SidebarField label="Iteration">
+            <SidebarField
+              controlId={TASK_DETAIL_SIDEBAR_FIELD_IDS.iteration}
+              label="Iteration"
+            >
               <SearchPopoverField
+                accessibleName={`Iteration: ${draftValues.iterationPath}`}
+                controlId={TASK_DETAIL_SIDEBAR_FIELD_IDS.iteration}
                 disabled={isSaving}
                 emptyMessage="No iterations found."
                 endpoint={iterationLookupEndpoint}
+                loadingMessage="Loading iterations..."
                 minQueryLength={0}
                 onSelect={(option) =>
                   onDraftChange({

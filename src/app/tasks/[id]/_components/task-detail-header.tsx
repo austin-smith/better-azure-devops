@@ -1,9 +1,9 @@
-import { ArrowUpRightIcon, Loader2Icon } from "lucide-react";
+import { Loader2Icon, RotateCcwIcon, SaveIcon } from "lucide-react";
 import { ProjectImage } from "@/components/project-image";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { WorkItemTypeLabel } from "@/components/tasks/work-item-type-label";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
 import { getTaskStateBadgeVariant } from "@/lib/tasks/state";
 
@@ -29,22 +29,13 @@ export function TaskDetailHeader({
   const isCreateMode = mode === "create";
 
   return (
-    <div className="flex items-start gap-4 border-b px-4 py-3 md:px-6">
+    <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-start md:px-6">
       <div className="min-w-0 flex-1">
-        <h2 className="text-[15px] font-semibold leading-normal text-foreground">
+        <h2 className="break-words text-[15px] font-semibold leading-normal text-foreground">
           {isCreateMode ? (
             <span className="font-mono font-normal text-muted-foreground">
               New work item*
             </span>
-          ) : detail?.url ? (
-            <a
-              className="font-mono font-normal text-muted-foreground hover:text-foreground"
-              href={detail.url}
-              rel="noreferrer"
-              target="_blank"
-            >
-              #{taskId}
-            </a>
           ) : (
             <span className="font-mono font-normal text-muted-foreground">#{taskId}</span>
           )}{" "}
@@ -80,13 +71,14 @@ export function TaskDetailHeader({
           ) : null}
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Button
           disabled={!isDirty || isSaving || !detail}
           onClick={onDiscard}
           size="sm"
           variant="outline"
         >
+          <RotateCcwIcon data-icon="inline-start" />
           Discard
         </Button>
         <Button
@@ -94,19 +86,13 @@ export function TaskDetailHeader({
           onClick={onSave}
           size="sm"
         >
-          {isSaving ? <Loader2Icon className="animate-spin" data-icon="inline-start" /> : null}
+          {isSaving ? (
+            <Loader2Icon className="animate-spin" data-icon="inline-start" />
+          ) : (
+            <SaveIcon data-icon="inline-start" />
+          )}
           Save
         </Button>
-        {detail?.url && !isCreateMode ? (
-          <a
-            className={buttonVariants({ size: "icon-xs", variant: "ghost" })}
-            href={detail.url}
-            rel="noreferrer"
-            target="_blank"
-          >
-            <ArrowUpRightIcon />
-          </a>
-        ) : null}
       </div>
     </div>
   );

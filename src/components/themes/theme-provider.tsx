@@ -46,6 +46,7 @@ type ThemeProviderProps = {
   defaultTheme?: ThemeModeValue;
   disableTransitionOnChange?: boolean;
   enableSystem?: boolean;
+  initialResolvedTheme?: "light" | "dark";
   initialTheme?: ThemeModeValue;
 };
 
@@ -253,13 +254,13 @@ export function ThemeProvider({
   children,
   defaultTheme = "system",
   disableTransitionOnChange = false,
+  initialResolvedTheme = "light",
   initialTheme,
 }: ThemeProviderProps) {
   const serverTheme = initialTheme ?? defaultTheme;
   const [theme, setThemeState] = React.useState<ThemeModeValue>(serverTheme);
   const [resolvedTheme, setResolvedTheme] = React.useState<"light" | "dark">(
-    () =>
-      typeof window === "undefined" ? "light" : resolveThemeMode(serverTheme),
+    initialResolvedTheme,
   );
 
   React.useEffect(() => {
