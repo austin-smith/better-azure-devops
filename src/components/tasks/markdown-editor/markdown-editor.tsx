@@ -451,12 +451,9 @@ function readMarkdownEditorPreferences() {
       mode?: unknown;
       wrapLines?: unknown;
     };
-    const parsedMode = parsedValue.mode === "write"
-      ? "editor"
-      : parsedValue.mode;
 
     return {
-      mode: isMarkdownEditorMode(parsedMode) ? parsedMode : "split",
+      mode: isMarkdownEditorMode(parsedValue.mode) ? parsedValue.mode : "split",
       wrapLines: typeof parsedValue.wrapLines === "boolean"
         ? parsedValue.wrapLines
         : true,

@@ -41,6 +41,191 @@ function escapeMarkdownTableCell(value: string) {
   return value.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
 }
 
+function unescapeMarkdownLinkDestination(value: string) {
+  return value
+    .replace(/^<([\s\S]*)>$/, "$1")
+    .replace(/\\([<>])/g, "$1");
+}
+
+function markdownLinkDestinationForAzureDevOps(value: string) {
+  const shouldWrap = /[()<>]/.test(value);
+
+  if (!shouldWrap) {
+    return value;
+  }
+
+  return `<${value.replace(/[<>]/g, (character) => `\\${character}`)}>`;
+}
+
+function decodeAzureDevOpsMentionId(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function unwrapAzureDevOpsAssetProxySource(value: string) {
+  try {
+    const url = new URL(unescapeMarkdownLinkDestination(value), "http://local");
+
+    if (url.origin !== "http://local" || url.pathname !== "/api/azure-devops/asset") {
+      return null;
+    }
+
+    return url.searchParams.get("src");
+  } catch {
+    return null;
+  }
+}
+
+function isEscaped(value: string, index: number) {
+  let slashCount = 0;
+
+  for (let position = index - 1; position >= 0 && value[position] === "\\"; position -= 1) {
+    slashCount += 1;
+  }
+
+  return slashCount % 2 === 1;
+}
+
+function findUnescapedCharacter(value: string, start: number, character: string) {
+  for (let index = start; index < value.length; index += 1) {
+    if (value[index] === character && !isEscaped(value, index)) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function findMarkdownLinkDestinationEnd(value: string, start: number) {
+  if (value[start] === "<" && !isEscaped(value, start)) {
+    const closingAngle = findUnescapedCharacter(value, start + 1, ">");
+
+    return closingAngle !== -1 ? closingAngle + 1 : -1;
+  }
+
+  let depth = 1;
+
+  for (let index = start; index < value.length; index += 1) {
+    if (isEscaped(value, index)) {
+      continue;
+    }
+
+    if (value[index] === "(") {
+      depth += 1;
+      continue;
+    }
+
+    if (value[index] === ")") {
+      depth -= 1;
+
+      if (depth === 0) {
+        return index;
+      }
+    }
+  }
+
+  return -1;
+}
+
+function transformMarkdownLinks(
+  value: string,
+  transform: (link: {
+    destination: string;
+    from: number;
+    label: string;
+    marker: "" | "!";
+    suffix: string;
+    to: number;
+  }) => string | null,
+) {
+  let result = "";
+  let position = 0;
+
+  while (position < value.length) {
+    const bracketStart = value.indexOf("[", position);
+
+    if (bracketStart === -1) {
+      result += value.slice(position);
+      break;
+    }
+
+    if (isEscaped(value, bracketStart)) {
+      result += value.slice(position, bracketStart + 1);
+      position = bracketStart + 1;
+      continue;
+    }
+
+    const marker =
+      bracketStart > 0 &&
+        value[bracketStart - 1] === "!" &&
+        !isEscaped(value, bracketStart - 1)
+        ? "!"
+        : "";
+    const linkStart = marker ? bracketStart - 1 : bracketStart;
+    const labelEnd = findUnescapedCharacter(value, bracketStart + 1, "]");
+
+    if (labelEnd === -1 || value[labelEnd + 1] !== "(") {
+      result += value.slice(position, bracketStart + 1);
+      position = bracketStart + 1;
+      continue;
+    }
+
+    const destinationStart = labelEnd + 2;
+    const destinationEnd = findMarkdownLinkDestinationEnd(value, destinationStart);
+
+    if (destinationEnd === -1) {
+      result += value.slice(position, bracketStart + 1);
+      position = bracketStart + 1;
+      continue;
+    }
+
+    const closeParen = value.indexOf(")", destinationEnd);
+
+    if (closeParen === -1) {
+      result += value.slice(position, bracketStart + 1);
+      position = bracketStart + 1;
+      continue;
+    }
+
+    const replacement = transform({
+      destination: value.slice(destinationStart, destinationEnd),
+      from: linkStart,
+      label: value.slice(bracketStart + 1, labelEnd),
+      marker,
+      suffix: value.slice(destinationEnd, closeParen),
+      to: closeParen + 1,
+    });
+
+    result += value.slice(position, linkStart);
+    result += replacement ?? value.slice(linkStart, closeParen + 1);
+    position = closeParen + 1;
+  }
+
+  return result;
+}
+
+function splitMarkdownLinkDestination(
+  destination: string,
+  suffix: string,
+) {
+  if (destination.startsWith("<")) {
+    return {
+      destination,
+      suffix,
+    };
+  }
+
+  const match = destination.match(/^(\S+)([\s\S]*)$/);
+
+  return {
+    destination: match?.[1] ?? destination,
+    suffix: `${match?.[2] ?? ""}${suffix}`,
+  };
+}
+
 function isCheckboxInput(node: Node): node is Element {
   return (
     node.nodeType === 1 &&
@@ -213,6 +398,30 @@ export function convertHtmlToEditableMarkdown(value: string) {
     .trim();
 }
 
+export function serializeEditableMarkdownForAzureDevOps(value: string) {
+  return transformMarkdownLinks(
+    normalizeEditableMarkup(value),
+    ({ destination, label, marker, suffix }) => {
+      const linkParts = splitMarkdownLinkDestination(destination, suffix);
+      const rawDestination = unescapeMarkdownLinkDestination(linkParts.destination);
+
+      if (!marker && rawDestination.startsWith("./ado-mention/")) {
+        return `@<${decodeAzureDevOpsMentionId(rawDestination.slice("./ado-mention/".length))}>`;
+      }
+
+      const originalAssetSource = unwrapAzureDevOpsAssetProxySource(
+        linkParts.destination,
+      );
+
+      if (!originalAssetSource) {
+        return null;
+      }
+
+      return `${marker}[${label}](${markdownLinkDestinationForAzureDevOps(originalAssetSource)}${linkParts.suffix})`;
+    },
+  );
+}
+
 function createEditableDescription(
   description: AzureDevOpsTaskDetail["description"],
 ) {
@@ -303,7 +512,7 @@ export function getTaskDetailEditableChanges(
   }
 
   if (draft.description !== initial.description) {
-    changes.description = draft.description;
+    changes.description = serializeEditableMarkdownForAzureDevOps(draft.description);
   }
 
   if (draft.iterationPath !== initial.iterationPath) {

@@ -3,6 +3,7 @@ import {
   createTaskDetailEditableValues,
   getTaskDetailEditableChanges,
   hasTaskDetailEditableChanges,
+  serializeEditableMarkdownForAzureDevOps,
 } from "@/lib/tasks/task-detail-edit";
 
 describe("task detail edit helpers", () => {
@@ -231,6 +232,42 @@ describe("task detail edit helpers", () => {
     ).toBe("[Ada \\[Team\\] Lovelace](./ado-mention/ada)");
   });
 
+  it("serializes editable Azure DevOps mention links back to markdown tokens", () => {
+    expect(
+      serializeEditableMarkdownForAzureDevOps(
+        [
+          "Ping [Ada Lovelace](./ado-mention/ada)",
+          "Escalate to [Team](./ado-mention/team%2Fproject%20member)",
+          "Keep [regular link](https://example.com).",
+        ].join("\n"),
+      ),
+    ).toBe([
+      "Ping @<ada>",
+      "Escalate to @<team/project member>",
+      "Keep [regular link](https://example.com).",
+    ].join("\n"));
+  });
+
+  it("serializes proxied Azure DevOps asset URLs back to original sources", () => {
+    const source =
+      "https://dev.azure.com/example/project/_apis/wit/attachments/file?id=1&fileName=diagram(v2).png";
+    const proxy = `/api/azure-devops/asset?src=${encodeURIComponent(source)}`;
+
+    expect(
+      serializeEditableMarkdownForAzureDevOps(
+        [
+          `![Diagram](${proxy})`,
+          `[Download](${proxy} "diagram")`,
+          "![External](https://example.com/image.png)",
+        ].join("\n"),
+      ),
+    ).toBe([
+      "![Diagram](<https://dev.azure.com/example/project/_apis/wit/attachments/file?id=1&fileName=diagram(v2).png>)",
+      "[Download](<https://dev.azure.com/example/project/_apis/wit/attachments/file?id=1&fileName=diagram(v2).png> \"diagram\")",
+      "![External](https://example.com/image.png)",
+    ].join("\n"));
+  });
+
   it("creates markdown task list drafts from HTML checkbox lists", () => {
     expect(
       createTaskDetailEditableValues({
@@ -319,6 +356,52 @@ describe("task detail edit helpers", () => {
     });
     expect(applyTaskDetailEditableValues(htmlDetail, draftValues).description).toEqual({
       content: "Initial **HTML**\n\nAdded note.",
+      format: "markdown",
+    });
+  });
+
+  it("saves edited HTML-backed mentions and proxied images as Azure DevOps markdown", () => {
+    const source =
+      "https://dev.azure.com/example/project/_apis/wit/attachments/file?id=1";
+    const proxy = `/api/azure-devops/asset?src=${encodeURIComponent(source)}`;
+    const htmlDetail = {
+      ...fullDetail,
+      description: {
+        content: [
+          '<p><span data-vss-mention="version,Ada">Ada Lovelace</span></p>',
+          `<p><img alt="Diagram" src="${proxy}"></p>`,
+        ].join(""),
+        format: "html" as const,
+      },
+    };
+    const initialValues = createTaskDetailEditableValues(htmlDetail);
+    const draftValues = {
+      ...initialValues,
+      description: `${initialValues.description}\n\nAdded note.`,
+    };
+
+    expect(initialValues.description).toBe([
+      "[Ada Lovelace](./ado-mention/ada)",
+      "",
+      `![Diagram](${proxy})`,
+    ].join("\n"));
+    expect(getTaskDetailEditableChanges(initialValues, draftValues)).toEqual({
+      description: [
+        "@<ada>",
+        "",
+        `![Diagram](${source})`,
+        "",
+        "Added note.",
+      ].join("\n"),
+    });
+    expect(applyTaskDetailEditableValues(htmlDetail, draftValues).description).toEqual({
+      content: [
+        "[Ada Lovelace](./ado-mention/ada)",
+        "",
+        `![Diagram](${proxy})`,
+        "",
+        "Added note.",
+      ].join("\n"),
       format: "markdown",
     });
   });

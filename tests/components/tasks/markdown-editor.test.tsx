@@ -1162,7 +1162,7 @@ describe("MarkdownEditor", () => {
     ).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("migrates the previous write mode preference to editor", async () => {
+  it("falls back to split mode for unknown persisted modes", async () => {
     window.localStorage.setItem(
       markdownEditorPreferencesKey,
       JSON.stringify({
@@ -1174,7 +1174,7 @@ describe("MarkdownEditor", () => {
     render(<MarkdownEditor onChange={vi.fn()} value="Persisted body" />);
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Edit" })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: "Split" })).toHaveAttribute(
         "aria-pressed",
         "true",
       );
@@ -1183,7 +1183,7 @@ describe("MarkdownEditor", () => {
       expect(JSON.parse(
         window.localStorage.getItem(markdownEditorPreferencesKey) ?? "{}",
       )).toEqual({
-        mode: "editor",
+        mode: "split",
         wrapLines: true,
       });
     });
