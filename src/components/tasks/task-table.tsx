@@ -3,9 +3,11 @@
 import Link from "next/link";
 import {
   type ComponentProps,
+  useCallback,
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -111,6 +113,7 @@ type TaskTableProps = {
   filterOptions: TaskFilterOptions;
   filters: TaskListFilters;
   items: Task[];
+  newWorkItemRequestKey?: string | null;
   projects: readonly NewWorkItemProjectOption[];
   title: string;
 };
@@ -686,10 +689,12 @@ export function TaskTable({
   filterOptions,
   filters,
   items,
+  newWorkItemRequestKey = null,
   projects,
   title,
 }: TaskTableProps) {
   const router = useRouter();
+  const handledNewWorkItemRequestKeyRef = useRef<string | null>(null);
   const [draftDetail, setDraftDetail] = useState<AzureDevOpsTaskDetail | null>(null);
   const [isPending, startTransition] = useTransition();
   const [searchQuery, setSearchQuery] = useState(filters.query);
@@ -718,6 +723,23 @@ export function TaskTable({
   const iterationPathLabel = filters.iterationPath
     ? getCompactTaskPathBreadcrumb(filters.iterationPath)
     : null;
+  const pendingNewWorkItemRequestKey =
+    handledNewWorkItemRequestKeyRef.current === newWorkItemRequestKey
+      ? null
+      : newWorkItemRequestKey;
+
+  const handleNewWorkItemRequest = useCallback((requestKey: string) => {
+    handledNewWorkItemRequestKeyRef.current = requestKey;
+
+    const url = new URL(window.location.href);
+
+    if (!url.searchParams.has("newWorkItem")) {
+      return;
+    }
+
+    url.searchParams.delete("newWorkItem");
+    router.replace(`${url.pathname}${url.search}`, { scroll: false });
+  }, [router]);
 
   useEffect(() => {
     setSearchQuery(filters.query);
@@ -815,6 +837,8 @@ export function TaskTable({
             <ThemeToggle />
             <NewWorkItemDialog
               disabled={isPending || activeProjectCount === 0}
+              openRequestKey={pendingNewWorkItemRequestKey}
+              onOpenRequestHandled={handleNewWorkItemRequest}
               onContinue={(draft) => setDraftDetail(createDraftDetail(draft))}
               projects={projects}
             />

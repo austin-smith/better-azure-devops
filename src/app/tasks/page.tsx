@@ -39,7 +39,12 @@ export async function generateMetadata({
 export default async function TaskListPage({
   searchParams,
 }: TaskListPageProps) {
-  const parsedFilters = parseTaskListFilters(await searchParams);
+  const resolvedSearchParams = await searchParams;
+  const parsedFilters = parseTaskListFilters(resolvedSearchParams);
+  const newWorkItemParam = resolvedSearchParams.newWorkItem;
+  const newWorkItemRequestKey = Array.isArray(newWorkItemParam)
+    ? (newWorkItemParam[0] ?? null)
+    : (newWorkItemParam ?? null);
   const title = getTaskListTitle(parsedFilters);
   let filters = parsedFilters;
   let error = hasAzureDevOpsConfig() ? null : MISSING_CONFIG_ERROR;
@@ -94,6 +99,7 @@ export default async function TaskListPage({
       filterOptions={filterOptions}
       filters={filters}
       items={items}
+      newWorkItemRequestKey={newWorkItemRequestKey}
       projects={selectedProjects}
       title={title}
       activeProjectCount={activeProjectCount}

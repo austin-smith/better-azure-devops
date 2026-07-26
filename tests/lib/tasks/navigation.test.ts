@@ -1,5 +1,6 @@
 import {
   getDefaultTaskListHref,
+  getProjectSelectionHref,
   getTaskDetailHref,
   getTaskListHref,
 } from "@/lib/tasks/navigation";
@@ -18,5 +19,12 @@ describe("task navigation", () => {
   it("returns the base task list path when no filters are set", () => {
     expect(getTaskListHref()).toBe("/tasks");
     expect(getDefaultTaskListHref()).toBe("/tasks");
+  });
+
+  it("removes project-scoped filters while preserving other query state", () => {
+    expect(getProjectSelectionHref(
+      "/tasks",
+      "areaPath=Project%5CArea&iterationPath=Project%5CSprint&project=one&state=Active",
+    )).toBe("/tasks?state=Active");
   });
 });

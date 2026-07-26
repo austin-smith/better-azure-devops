@@ -4,6 +4,7 @@ import { Geist_Mono, Source_Code_Pro } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { AppSidebar } from "@/components/app-sidebar";
+import { CommandCenterProvider } from "@/components/command-center/command-center";
 import { ThemeProvider } from "@/components/themes/theme-provider";
 import { ThemeShortcut } from "@/components/themes/theme-shortcut";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -107,22 +108,27 @@ export default async function RootLayout({
           initialResolvedTheme={serverResolvedThemeMode}
           initialTheme={serverThemeMode}
         >
-          <ThemeShortcut />
-          <TooltipProvider>
-            <SidebarProvider defaultOpen={defaultSidebarOpen}>
-              <AppSidebar
-                availableProjects={projectSelection?.availableProjects ?? []}
-                currentUser={currentUser}
-                orgLabel={orgLabel}
-                queueCount={overview?.error ? null : (overview?.queueCount ?? null)}
-                selectedProjectIds={projectSelection?.selectedProjectIds ?? []}
-                taskCount={overview?.error ? null : (overview?.openTaskCount ?? null)}
-              />
-              <main className="flex min-h-svh min-w-0 flex-1 flex-col bg-background">
-                {children}
-              </main>
-            </SidebarProvider>
-          </TooltipProvider>
+          <CommandCenterProvider
+            availableProjects={projectSelection?.availableProjects ?? []}
+            selectedProjectIds={projectSelection?.selectedProjectIds ?? []}
+          >
+            <ThemeShortcut />
+            <TooltipProvider>
+              <SidebarProvider defaultOpen={defaultSidebarOpen}>
+                <AppSidebar
+                  availableProjects={projectSelection?.availableProjects ?? []}
+                  currentUser={currentUser}
+                  orgLabel={orgLabel}
+                  queueCount={overview?.error ? null : (overview?.queueCount ?? null)}
+                  selectedProjectIds={projectSelection?.selectedProjectIds ?? []}
+                  taskCount={overview?.error ? null : (overview?.openTaskCount ?? null)}
+                />
+                <main className="flex min-h-svh min-w-0 flex-1 flex-col bg-background">
+                  {children}
+                </main>
+              </SidebarProvider>
+            </TooltipProvider>
+          </CommandCenterProvider>
         </ThemeProvider>
       </body>
     </html>

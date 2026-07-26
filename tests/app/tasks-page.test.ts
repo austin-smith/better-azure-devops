@@ -82,4 +82,19 @@ describe("/tasks page", () => {
     expect(result.props.activeProjectCount).toBe(0);
     expect(loadTaskListMock).not.toHaveBeenCalled();
   });
+
+  it("forwards command-center new work item requests to the task table", async () => {
+    hasAzureDevOpsConfigMock.mockReturnValue(false);
+
+    const { default: TaskListPage } = await import("@/app/tasks/page");
+    const result = await TaskListPage({
+      searchParams: Promise.resolve({
+        newWorkItem: "command-request",
+      }),
+    }) as ReactElement<{
+      newWorkItemRequestKey: string | null;
+    }>;
+
+    expect(result.props.newWorkItemRequestKey).toBe("command-request");
+  });
 });

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { CheckIcon, XIcon } from "lucide-react";
+import { ModifierKeyKbd } from "@/components/modifier-key-kbd";
 import { ThemeFamilySwatches } from "@/components/themes/theme-family-swatches";
 import { useTheme } from "@/components/themes/theme-provider";
 import {
@@ -11,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Kbd, KbdGroup, ModKbd } from "@/components/ui/kbd";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import {
   Select,
   SelectContent,
@@ -175,7 +176,7 @@ export function ThemeSwitcherModal({
             <span className="flex items-center justify-between gap-3">
               <span>Cycle modes</span>
               <KbdGroup>
-                <ModKbd />
+                <ModifierKeyKbd />
                 <Kbd>J</Kbd>
               </KbdGroup>
             </span>

@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { ModifierKeyKbd } from "@/components/modifier-key-kbd";
 import { ThemeFamilySwatches } from "@/components/themes/theme-family-swatches";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
-import { Kbd, KbdGroup, ModKbd } from "@/components/ui/kbd";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { useTheme } from "@/components/themes/theme-provider";
 import {
   DropdownMenu,
@@ -108,7 +109,7 @@ export function ThemeToggle() {
           <p className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground">
             <span>Theme Switcher</span>
             <KbdGroup className="ml-auto">
-              <ModKbd />
+              <ModifierKeyKbd />
               <Kbd>J</Kbd>
             </KbdGroup>
           </p>
