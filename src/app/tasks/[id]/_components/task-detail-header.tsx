@@ -31,7 +31,7 @@ export function TaskDetailHeader({
   return (
     <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-start md:px-6">
       <div className="min-w-0 flex-1">
-        <h2 className="break-words text-[15px] font-semibold leading-normal text-foreground">
+        <h2 className="break-words text-base font-semibold leading-normal text-foreground">
           {isCreateMode ? (
             <span className="font-mono font-normal text-muted-foreground">
               New work item*

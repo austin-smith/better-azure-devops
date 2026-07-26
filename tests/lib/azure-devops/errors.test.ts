@@ -1,6 +1,8 @@
 import {
+  AzureDevOpsDataError,
   AzureDevOpsError,
   createPublicAzureDevOpsError,
+  describeAzureDevOpsError,
   getAzureDevOpsErrorHttpStatus,
   getAzureDevOpsWorkItemCreateError,
   getPublicAzureDevOpsError,
@@ -109,5 +111,36 @@ describe("Azure DevOps errors", () => {
     expect(
       getAzureDevOpsWorkItemCreateError(validationError),
     ).toBe(validationError);
+  });
+
+  it("maps throttling metadata into a retryable repository descriptor", () => {
+    const error = new AzureDevOpsError("private rate limit details", {
+      code: "throttled",
+      correlationId: "correlation-id",
+      retryAfterSeconds: 12,
+      status: 429,
+    });
+
+    expect(describeAzureDevOpsError(error)).toEqual({
+      correlationId: "correlation-id",
+      kind: "throttled",
+      message: "Azure DevOps is throttling requests. Try again shortly.",
+      retryAfterSeconds: 12,
+      status: 429,
+    });
+  });
+
+  it("preserves explicit data-layer errors", () => {
+    const descriptor = {
+      correlationId: null,
+      kind: "unsupported" as const,
+      message: "TFVC is not supported.",
+      retryAfterSeconds: null,
+      status: null,
+    };
+
+    expect(
+      describeAzureDevOpsError(new AzureDevOpsDataError(descriptor)),
+    ).toEqual(descriptor);
   });
 });

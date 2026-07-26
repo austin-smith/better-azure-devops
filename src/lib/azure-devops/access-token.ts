@@ -4,7 +4,6 @@ import { AzureDevOpsError } from "@/lib/azure-devops/errors";
 
 const AZURE_DEVOPS_RESOURCE = "499b84ac-1321-427f-aa17-267ca6975798";
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
-const AZURE_CONFIG_DIR = path.join(process.cwd(), ".azure");
 const AZURE_CLI_ACCESS_TOKEN_ARGS = [
   "account",
   "get-access-token",
@@ -13,6 +12,12 @@ const AZURE_CLI_ACCESS_TOKEN_ARGS = [
   "-o",
   "json",
 ] as const;
+
+function getAzureConfigDir() {
+  const configuredPath = process.env.AZURE_CONFIG_DIR?.trim();
+
+  return configuredPath || path.join(process.cwd(), ".azure");
+}
 
 type AzureCliAccessTokenResponse = {
   accessToken?: string;
@@ -116,7 +121,7 @@ function execFileAsync(
 async function runAzureCli() {
   const env = {
     ...process.env,
-    AZURE_CONFIG_DIR,
+    AZURE_CONFIG_DIR: getAzureConfigDir(),
   };
 
   if (process.platform === "win32") {

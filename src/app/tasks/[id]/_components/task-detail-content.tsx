@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   GitBranchIcon,
   GitPullRequestIcon,
@@ -218,45 +219,69 @@ export function TaskDetailContent({
         />
         <div className="flex flex-col gap-2">
           {linkedPullRequests.length > 0 ? (
-            linkedPullRequests.map((pullRequest) => (
-              <a
-                key={pullRequest.id}
-                className="block rounded-lg border p-3 transition-colors hover:bg-muted/50"
-                href={pullRequest.url || undefined}
-                rel="noreferrer"
-                target="_blank"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-xs text-muted-foreground">
-                      {pullRequest.repositoryName} · #{pullRequest.id}
+            linkedPullRequests.map((pullRequest) => {
+              const repositoryHref =
+                pullRequest.projectId && pullRequest.repositoryId
+                  ? `/repos/${encodeURIComponent(pullRequest.projectId)}/${encodeURIComponent(pullRequest.repositoryId)}/pulls/${pullRequest.id}`
+                  : null;
+              const href = repositoryHref ?? pullRequest.url;
+              const content = (
+                <>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs text-muted-foreground">
+                        {pullRequest.repositoryName} · #{pullRequest.id}
+                      </div>
+                      <div className="mt-0.5 text-sm font-medium text-foreground">
+                        {pullRequest.title}
+                      </div>
                     </div>
-                    <div className="mt-0.5 text-sm font-medium text-foreground">
-                      {pullRequest.title}
-                    </div>
+                    <Badge variant={pullRequestVariant(pullRequest.state)}>
+                      {pullRequest.isDraft ? "Draft" : pullRequest.state}
+                    </Badge>
                   </div>
-                  <Badge variant={pullRequestVariant(pullRequest.state)}>
-                    {pullRequest.isDraft ? "Draft" : pullRequest.state}
-                  </Badge>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <GitBranchIcon className="size-3" />
-                    {pullRequest.sourceBranch || "source"} →{" "}
-                    {pullRequest.targetBranch || "target"}
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <UserAvatar
-                      avatarUrl={pullRequest.authorAvatarUrl}
-                      name={pullRequest.authorName}
-                      size="sm"
-                    />
-                    {pullRequest.authorName}
-                  </span>
-                  <DateLabel value={pullRequest.createdAt} />
-                </div>
-              </a>
-            ))
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1">
+                      <GitBranchIcon className="size-3" />
+                      {pullRequest.sourceBranch || "source"} →{" "}
+                      {pullRequest.targetBranch || "target"}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <UserAvatar
+                        avatarUrl={pullRequest.authorAvatarUrl}
+                        name={pullRequest.authorName}
+                        size="sm"
+                      />
+                      {pullRequest.authorName}
+                    </span>
+                    <DateLabel value={pullRequest.createdAt} />
+                  </div>
+                </>
+              );
+
+              if (!href) {
+                return (
+                  <div
+                    className="rounded-lg border p-3"
+                    key={pullRequest.id}
+                  >
+                    {content}
+                  </div>
+                );
+              }
+
+              return (
+                <Link
+                  key={pullRequest.id}
+                  className="block rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                  href={href}
+                  rel={repositoryHref ? undefined : "noreferrer"}
+                  target={repositoryHref ? undefined : "_blank"}
+                >
+                  {content}
+                </Link>
+              );
+            })
           ) : (
             <Empty className="py-10">
               <EmptyHeader>

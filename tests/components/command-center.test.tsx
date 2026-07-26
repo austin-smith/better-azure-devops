@@ -119,6 +119,33 @@ describe("CommandCenter", () => {
       .toBeInTheDocument();
   });
 
+  it("adds version-aware destinations for the current repository", async () => {
+    navigationState.pathname = "/repos/project-id/repository-id/blob/README.md";
+    navigationState.searchParams = new URLSearchParams({
+      version: "feature/repository-explorer",
+      versionType: "branch",
+    });
+
+    renderCommandCenter();
+    fireEvent.click(screen.getByRole("button", { name: "Open command center" }));
+
+    expect(
+      await screen.findByRole("option", {
+        name: /^Repository code\./,
+      }),
+    ).toHaveAttribute("aria-label", expect.stringContaining("Current"));
+
+    fireEvent.click(
+      screen.getByRole("option", {
+        name: /^Repository push activity\./,
+      }),
+    );
+
+    expect(pushMock).toHaveBeenCalledWith(
+      "/repos/project-id/repository-id/activity?version=feature%2Frepository-explorer&versionType=branch",
+    );
+  });
+
   it("leaves handled Cmd/Ctrl+K events with the focused control", () => {
     renderCommandCenter();
     const event = new KeyboardEvent("keydown", {

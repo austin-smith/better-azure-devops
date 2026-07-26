@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { Geist_Mono, Source_Code_Pro } from "next/font/google";
+import { DM_Sans, Geist_Mono, Source_Code_Pro } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -26,6 +26,12 @@ import {
 } from "@/lib/theme/constants";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { loadSidebarCounts } from "@/lib/tasks/load-sidebar-counts";
+
+const dmSansFont = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
 
 const sourceCodePro = Source_Code_Pro({
   subsets: ["latin"],
@@ -86,6 +92,7 @@ export default async function RootLayout({
       : "";
   const htmlClassName = [
     "h-full",
+    dmSansFont.variable,
     geistMonoFont.variable,
     sourceCodePro.variable,
     serverResolvedThemeMode === "dark" ? "dark" : "",
