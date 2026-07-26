@@ -185,17 +185,28 @@ export function createPublicAzureDevOpsError(
   };
 }
 
-export function getPublicWorkItemCreateError(
-  error: PublicAzureDevOpsError,
-): PublicAzureDevOpsError {
-  switch (error.code) {
-    case "network":
-    case "server":
-    case "unknown":
-      return createPublicAzureDevOpsError("create_status_unknown");
-    default:
+export function getAzureDevOpsWorkItemCreateError(error: unknown) {
+  if (error instanceof AzureDevOpsError) {
+    const isAmbiguous =
+      error.code === "network" ||
+      error.code === "server" ||
+      (error.code === "unknown" && error.status === null);
+
+    if (!isAmbiguous) {
       return error;
+    }
   }
+
+  return new AzureDevOpsError(
+    error instanceof Error
+      ? error.message
+      : "Azure DevOps work item creation status is unknown.",
+    {
+      cause: error,
+      code: "create_status_unknown",
+      status: error instanceof AzureDevOpsError ? error.status : null,
+    },
+  );
 }
 
 export function getAzureDevOpsErrorHttpStatus(error: unknown) {

@@ -9,6 +9,7 @@ import {
   getPublicAzureDevOpsError,
   type PublicAzureDevOpsError,
 } from "@/lib/azure-devops/errors";
+import { reportAzureDevOpsError } from "@/lib/azure-devops/report-error";
 
 type LoadTaskDetailResult = {
   detail: AzureDevOpsTaskDetail | null;
@@ -34,6 +35,8 @@ export const loadTaskDetail = cache(
         error: null,
       };
     } catch (error) {
+      reportAzureDevOpsError(error);
+
       return {
         detail: null,
         error: getPublicAzureDevOpsError(error),

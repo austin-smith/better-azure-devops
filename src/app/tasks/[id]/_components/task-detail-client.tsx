@@ -20,7 +20,6 @@ import type {
 } from "@/lib/azure-devops/tasks";
 import {
   createPublicAzureDevOpsError,
-  getPublicWorkItemCreateError,
   isAzureDevOpsErrorCode,
   type PublicAzureDevOpsError,
 } from "@/lib/azure-devops/errors";
@@ -228,16 +227,13 @@ export function TaskDetail({
             isAzureDevOpsErrorCode(payload.errorDetails.code)
               ? payload.errorDetails
               : null;
-          const createErrorDetails = errorDetails
-            ? getPublicWorkItemCreateError(errorDetails)
-            : null;
 
           setSaveError(
-            createErrorDetails?.message ??
+            errorDetails?.message ??
               payload?.error ??
               "Failed to create work item.",
           );
-          setSaveErrorDetails(createErrorDetails);
+          setSaveErrorDetails(errorDetails);
           return;
         }
 

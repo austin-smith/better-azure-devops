@@ -2,7 +2,10 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TaskDetail } from "@/app/tasks/[id]/_components/task-detail-client";
-import type { PublicAzureDevOpsError } from "@/lib/azure-devops/errors";
+import {
+  createPublicAzureDevOpsError,
+  type PublicAzureDevOpsError,
+} from "@/lib/azure-devops/errors";
 import type { AzureDevOpsTaskDetail } from "@/lib/azure-devops/tasks";
 
 const routerPushMock = vi.fn();
@@ -175,5 +178,42 @@ describe("TaskDetail", () => {
       screen.queryByRole("button", { name: "Try again" }),
     ).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
+  it("preserves retry actions for definite preflight failures", async () => {
+    const errorDetails = createPublicAzureDevOpsError("network");
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: errorDetails.message,
+          errorDetails,
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 502,
+        },
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <TaskDetail
+        createProjectId="project-id"
+        detail={detail}
+        detailError={null}
+        mode="create"
+        taskId={0}
+        taskListHref="/tasks"
+        taskListLabel="Tasks"
+        taskProjectId="project-id"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Try again" }),
+    ).toBeVisible();
   });
 });

@@ -7,6 +7,7 @@ import {
   getPublicAzureDevOpsError,
   type PublicAzureDevOpsError,
 } from "@/lib/azure-devops/errors";
+import { reportAzureDevOpsError } from "@/lib/azure-devops/report-error";
 import {
   applyTaskListFilters,
   areTaskListFiltersEqual,
@@ -96,6 +97,8 @@ export async function loadTaskList(
       ),
     };
   } catch (error) {
+    reportAzureDevOpsError(error);
+
     return {
       error: getPublicAzureDevOpsError(error),
       filterOptions: getEmptyTaskFilterOptions(),

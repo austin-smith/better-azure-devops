@@ -10,6 +10,7 @@ import {
   getPublicAzureDevOpsError,
   type PublicAzureDevOpsError,
 } from "@/lib/azure-devops/errors";
+import { reportAzureDevOpsError } from "@/lib/azure-devops/report-error";
 import type { AzureDevOpsTask } from "@/lib/azure-devops/tasks";
 import {
   normalizeTaskListFilters,
@@ -165,6 +166,8 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
       unassignedCount,
     };
   } catch (error) {
+    reportAzureDevOpsError(error);
+
     return createEmptyDashboardOverview(getPublicAzureDevOpsError(error));
   }
 }

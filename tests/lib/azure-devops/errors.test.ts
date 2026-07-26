@@ -2,8 +2,8 @@ import {
   AzureDevOpsError,
   createPublicAzureDevOpsError,
   getAzureDevOpsErrorHttpStatus,
+  getAzureDevOpsWorkItemCreateError,
   getPublicAzureDevOpsError,
-  getPublicWorkItemCreateError,
 } from "@/lib/azure-devops/errors";
 
 describe("Azure DevOps errors", () => {
@@ -58,23 +58,30 @@ describe("Azure DevOps errors", () => {
     });
   });
 
-  it("prevents blind retries when a create result is ambiguous", () => {
+  it("marks only ambiguous create outcomes as uncertain", () => {
+    const networkError = new AzureDevOpsError(
+      "The create response was lost.",
+      {
+        code: "network",
+      },
+    );
+    const validationError = new AzureDevOpsError(
+      "Azure DevOps rejected the document.",
+      {
+        code: "unknown",
+        status: 400,
+      },
+    );
+
     expect(
-      getPublicWorkItemCreateError(
-        createPublicAzureDevOpsError("network"),
-      ),
+      getAzureDevOpsWorkItemCreateError(networkError),
     ).toMatchObject({
-      actionLabel: null,
-      canRetry: false,
+      cause: networkError,
       code: "create_status_unknown",
+      status: null,
     });
     expect(
-      getPublicWorkItemCreateError(
-        createPublicAzureDevOpsError("authentication_required"),
-      ),
-    ).toMatchObject({
-      canRetry: true,
-      code: "authentication_required",
-    });
+      getAzureDevOpsWorkItemCreateError(validationError),
+    ).toBe(validationError);
   });
 });

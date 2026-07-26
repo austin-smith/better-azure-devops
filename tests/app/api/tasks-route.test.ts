@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { POST } from "@/app/api/tasks/route";
+import { AzureDevOpsError } from "@/lib/azure-devops/errors";
 
 const {
   createTaskMock,
@@ -36,6 +37,10 @@ describe("tasks route", () => {
     hasAzureDevOpsConfigMock.mockReset();
     loadAzureDevOpsProjectSelectionMock.mockReset();
     hasAzureDevOpsConfigMock.mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("rejects invalid create bodies", async () => {
@@ -116,6 +121,81 @@ describe("tasks route", () => {
         projectImageUrl: "https://dev.azure.com/example/project.png",
         projectName: "Project",
       },
+    );
+  });
+
+  it("preserves failures that happen before work-item creation", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    getAzureDevOpsAccessTokenMock.mockResolvedValue("token");
+    loadAzureDevOpsProjectSelectionMock.mockRejectedValue(
+      new AzureDevOpsError("Project lookup failed.", {
+        code: "network",
+      }),
+    );
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/tasks", {
+        body: JSON.stringify({
+          projectId: "project-id",
+          title: "Created task",
+          type: "Task",
+        }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toMatchObject({
+      errorDetails: {
+        code: "network",
+      },
+    });
+    expect(createTaskMock).not.toHaveBeenCalled();
+  });
+
+  it("marks a lost create response as an uncertain outcome", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    getAzureDevOpsAccessTokenMock.mockResolvedValue("token");
+    loadAzureDevOpsProjectSelectionMock.mockResolvedValue({
+      selectedProjects: [
+        {
+          defaultTeamImageUrl: null,
+          id: "project-id",
+          name: "Project",
+        },
+      ],
+    });
+    createTaskMock.mockRejectedValue(
+      new AzureDevOpsError("The create response was lost.", {
+        code: "network",
+      }),
+    );
+
+    const response = await POST(
+      new NextRequest("http://localhost/api/tasks", {
+        body: JSON.stringify({
+          projectId: "project-id",
+          title: "Created task",
+          type: "Task",
+        }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      errorDetails: {
+        canRetry: false,
+        code: "create_status_unknown",
+      },
+    });
+    expect(consoleError).toHaveBeenCalledWith(
+      "Azure DevOps request failed.",
+      expect.objectContaining({
+        code: "create_status_unknown",
+      }),
     );
   });
 

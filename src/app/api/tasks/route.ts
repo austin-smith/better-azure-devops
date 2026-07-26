@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
 import { createAzureDevOpsErrorResponse } from "@/lib/azure-devops/error-response";
-import { createMissingAzureDevOpsConfigError } from "@/lib/azure-devops/errors";
+import {
+  createMissingAzureDevOpsConfigError,
+  getAzureDevOpsWorkItemCreateError,
+} from "@/lib/azure-devops/errors";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import { createTask } from "@/lib/azure-devops/tasks";
 
@@ -97,24 +100,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const task = await createTask(
-      accessToken,
-      {
-        areaPath,
-        description,
-        priority,
-        projectName: project.name,
-        title,
-        type,
-      },
-      {
-        projectId: project.id,
-        projectImageUrl: project.defaultTeamImageUrl,
-        projectName: project.name,
-      },
-    );
+    try {
+      const task = await createTask(
+        accessToken,
+        {
+          areaPath,
+          description,
+          priority,
+          projectName: project.name,
+          title,
+          type,
+        },
+        {
+          projectId: project.id,
+          projectImageUrl: project.defaultTeamImageUrl,
+          projectName: project.name,
+        },
+      );
 
-    return NextResponse.json({ item: task }, { status: 201 });
+      return NextResponse.json({ item: task }, { status: 201 });
+    } catch (error) {
+      return createAzureDevOpsErrorResponse(
+        getAzureDevOpsWorkItemCreateError(error),
+      );
+    }
   } catch (error) {
     return createAzureDevOpsErrorResponse(error);
   }
