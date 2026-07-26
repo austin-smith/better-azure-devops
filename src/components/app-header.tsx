@@ -2,6 +2,8 @@
 
 import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
+import { CommandCenterTrigger } from "@/components/command-center/command-center-trigger";
+import { ModifierKeyKbd } from "@/components/modifier-key-kbd";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -10,7 +12,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Kbd, KbdGroup, ModKbd } from "@/components/ui/kbd";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
@@ -42,7 +44,7 @@ export function AppHeader({
           <TooltipContent side="bottom">
             <span>Toggle sidebar</span>
             <KbdGroup>
-              <ModKbd />
+              <ModifierKeyKbd />
               <Kbd>B</Kbd>
             </KbdGroup>
           </TooltipContent>
@@ -81,7 +83,10 @@ export function AppHeader({
         </Breadcrumb>
       </div>
 
-      {actions ? <div className="ml-auto flex items-center gap-2">{actions}</div> : null}
+      <div className="ml-auto flex items-center gap-2">
+        <CommandCenterTrigger />
+        {actions}
+      </div>
     </header>
   );
 }

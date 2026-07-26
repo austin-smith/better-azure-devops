@@ -137,4 +137,48 @@ describe("NewWorkItemDialog", () => {
       expect(screen.getAllByText("Loading areas...")).toHaveLength(2);
     });
   });
+
+  it("opens from a new external request key", async () => {
+    stubResizeObserver();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      JSON.stringify({
+        item: {
+          areas: [],
+          defaultAreaPath: null,
+        },
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      },
+    )));
+
+    const { rerender } = render(
+      <NewWorkItemDialog
+        onContinue={vi.fn()}
+        openRequestKey="request-one"
+        projects={[project]}
+      />,
+    );
+
+    expect(await screen.findByRole("dialog", { name: "New Work Item" }))
+      .toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "New Work Item" }))
+        .not.toBeInTheDocument();
+    });
+
+    rerender(
+      <NewWorkItemDialog
+        onContinue={vi.fn()}
+        openRequestKey="request-two"
+        projects={[project]}
+      />,
+    );
+
+    expect(await screen.findByRole("dialog", { name: "New Work Item" }))
+      .toBeInTheDocument();
+  });
 });

@@ -117,8 +117,91 @@ describe("azureDevOpsRequest", () => {
       azureDevOpsRequest("/_apis/test", {
         accessToken: "token",
       }),
-    ).rejects.toThrow(
-      "Azure DevOps request failed (412 Precondition Failed): invalid revision",
+    ).rejects.toMatchObject({
+      code: "revision_conflict",
+      message:
+        "Azure DevOps request failed (412 Precondition Failed): invalid revision",
+      status: 412,
+    });
+  });
+
+  it("captures Azure DevOps throttling retry guidance", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("slow down", {
+        headers: { "retry-after": "12" },
+        status: 429,
+        statusText: "Too Many Requests",
+      }),
     );
+
+    await expect(
+      azureDevOpsRequest("/_apis/test", {
+        accessToken: "token",
+      }),
+    ).rejects.toMatchObject({
+      code: "throttled",
+      retryAfterSeconds: 12,
+      status: 429,
+    });
+  });
+
+  it("preserves revision-conflict recovery for Azure DevOps 400 responses", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          message: "The work item revision does not match the latest revision.",
+        }),
+        {
+          status: 400,
+          statusText: "Bad Request",
+        },
+      ),
+    );
+
+    await expect(
+      azureDevOpsRequest("/_apis/test", {
+        accessToken: "token",
+        revisionConflictOnBadRequest: true,
+      }),
+    ).rejects.toMatchObject({
+      code: "revision_conflict",
+      status: 400,
+    });
+  });
+
+  it("does not treat revision text as a conflict outside work-item updates", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          message: "The System.Rev field is not valid for this request.",
+        }),
+        {
+          status: 400,
+          statusText: "Bad Request",
+        },
+      ),
+    );
+
+    await expect(
+      azureDevOpsRequest("/_apis/test", {
+        accessToken: "token",
+      }),
+    ).rejects.toMatchObject({
+      code: "unknown",
+      status: 400,
+    });
+  });
+
+  it("classifies fetch failures as network errors", async () => {
+    fetchMock.mockRejectedValue(new TypeError("fetch failed"));
+
+    await expect(
+      azureDevOpsRequest("/_apis/test", {
+        accessToken: "token",
+      }),
+    ).rejects.toMatchObject({
+      code: "network",
+      status: null,
+    });
   });
 });

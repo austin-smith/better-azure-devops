@@ -10,13 +10,10 @@ import { useId, useLayoutEffect, useRef, useState } from "react";
 import { TaskComments } from "./task-comments";
 import { TaskDetailSectionLabel } from "./task-detail-section-label";
 import { DateLabel } from "@/components/date-label";
+import { AzureDevOpsFailure } from "@/components/azure-devops-failure";
 import { MarkdownEditor } from "@/components/tasks/markdown-editor";
 import { TaskMarkup } from "@/components/tasks/task-markup";
 import { UserAvatar } from "@/components/user-avatar";
-import {
-  Alert,
-  AlertDescription,
-} from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,12 +27,13 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import type { AzureDevOpsTaskDetail as TaskDetailData } from "@/lib/azure-devops/tasks";
+import type { PublicAzureDevOpsError } from "@/lib/azure-devops/errors";
 
 type TaskDetailContentProps = {
   descriptionDraft: string;
   descriptionHasUnsavedChanges?: boolean;
   detail: TaskDetailData | null;
-  detailError: string | null;
+  detailError: PublicAzureDevOpsError | null;
   draftResetKey?: number;
   isSaving: boolean;
   mode: "create" | "edit";
@@ -172,9 +170,7 @@ export function TaskDetailContent({
   return (
     <div className="min-h-0 min-w-0 flex-1 p-4 md:p-6 lg:overflow-y-auto">
       {detailError ? (
-        <Alert className="mb-4" variant="destructive">
-          <AlertDescription>{detailError}</AlertDescription>
-        </Alert>
+        <AzureDevOpsFailure className="mb-4" error={detailError} />
       ) : null}
 
       {detail ? (

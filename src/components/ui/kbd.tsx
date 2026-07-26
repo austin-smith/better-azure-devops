@@ -1,4 +1,3 @@
-import { useModifierKey } from "@/hooks/use-modifier-key"
 import { cn } from "@/lib/utils"
 
 function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
@@ -24,10 +23,4 @@ function KbdGroup({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function ModKbd(props: React.ComponentProps<typeof Kbd>) {
-  const modifierKey = useModifierKey()
-
-  return <Kbd {...props}>{modifierKey}</Kbd>
-}
-
-export { Kbd, KbdGroup, ModKbd }
+export { Kbd, KbdGroup }

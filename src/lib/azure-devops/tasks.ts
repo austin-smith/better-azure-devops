@@ -702,6 +702,51 @@ function toTaskListItem(
   };
 }
 
+function toTaskDetail(
+  workItem: WorkItem,
+  context: TaskRequestContext,
+  comments: AzureDevOpsTaskComment[],
+  linkedPullRequests: AzureDevOpsLinkedPullRequest[],
+): AzureDevOpsTaskDetail {
+  const projectName =
+    readString(workItem.fields["System.TeamProject"]) ??
+    context.projectName ??
+    "Unknown project";
+  const projectsByName = new Map([
+    [
+      projectName.toLowerCase(),
+      {
+        defaultTeamImageUrl: context.projectImageUrl ?? null,
+        id: context.projectId ?? "",
+        name: projectName,
+      },
+    ],
+  ]);
+  const descriptionFormat = parseAzureDevOpsMarkupFormat(
+    workItem.multilineFieldsFormat?.["System.Description"],
+  );
+
+  return {
+    ...toTaskListItem(workItem, projectsByName, projectName),
+    areaPath: normalizeTaskPath(workItem.fields["System.AreaPath"]),
+    comments,
+    description: normalizeAzureDevOpsMarkup(
+      workItem.fields["System.Description"],
+      descriptionFormat,
+    ),
+    iterationPath: normalizeTaskPath(workItem.fields["System.IterationPath"]),
+    linkedPullRequests,
+    revision: Number(workItem.rev ?? 0),
+    reason: String(workItem.fields["System.Reason"] ?? ""),
+    tags: parseStringList(workItem.fields["System.Tags"]),
+    type: String(workItem.fields["System.WorkItemType"] ?? "Task"),
+    url:
+      extractLinkHref(workItem._links, "html") ??
+      extractLinkHref(workItem._links, "web") ??
+      "",
+  };
+}
+
 function compareClassificationPathOptions(
   left: AzureDevOpsClassificationPathOption,
   right: AzureDevOpsClassificationPathOption,
@@ -1287,25 +1332,10 @@ async function queryTaskIds(
     return [];
   }
 
-  const projectNames = selectedProjects.map((project) => project.name);
-  const normalizedAreaPath = filters.areaPath
-    ? normalizeClassificationFilterPath("areas", filters.areaPath)
-    : "";
-  const normalizedIterationPath = filters.iterationPath
-    ? normalizeClassificationFilterPath("iterations", filters.iterationPath)
-    : "";
-  const wiql = buildTaskWiql(selectedProjects, filters);
-
-  try {
-    return await executeTaskIdQuery(accessToken, wiql);
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Azure DevOps WIQL request failed.";
-
-    throw new Error(
-      `${message} [filters areaPath=${JSON.stringify(filters.areaPath)} normalizedAreaPath=${JSON.stringify(normalizedAreaPath)} iterationPath=${JSON.stringify(filters.iterationPath)} normalizedIterationPath=${JSON.stringify(normalizedIterationPath)} selectedProjects=${JSON.stringify(projectNames)}]`,
-    );
-  }
+  return executeTaskIdQuery(
+    accessToken,
+    buildTaskWiql(selectedProjects, filters),
+  );
 }
 
 export async function countTasks(
@@ -1378,47 +1408,13 @@ export async function getTaskDetails(
   );
   const projectName =
     readString(workItem.fields["System.TeamProject"]) ?? context.projectName ?? "Unknown project";
-  const projectsByName = new Map(
-    projectName
-      ? [[
-        projectName.toLowerCase(),
-        {
-          defaultTeamImageUrl: context.projectImageUrl ?? null,
-          id: context.projectId ?? "",
-          name: projectName,
-        },
-        ]]
-      : [],
-  );
 
   const [comments, linkedPullRequests] = await Promise.all([
     listTaskComments(accessToken, workItemId, projectName),
     listLinkedPullRequests(accessToken, workItem.relations),
   ]);
-  const descriptionFormat = parseAzureDevOpsMarkupFormat(
-    workItem.multilineFieldsFormat?.["System.Description"],
-  );
-  const description = normalizeAzureDevOpsMarkup(
-    workItem.fields["System.Description"],
-    descriptionFormat,
-  );
 
-  return {
-    ...toTaskListItem(workItem, projectsByName, projectName),
-    areaPath: normalizeTaskPath(workItem.fields["System.AreaPath"]),
-    comments,
-    description,
-    iterationPath: normalizeTaskPath(workItem.fields["System.IterationPath"]),
-    linkedPullRequests,
-    revision: Number(workItem.rev ?? 0),
-    reason: String(workItem.fields["System.Reason"] ?? ""),
-    tags: parseStringList(workItem.fields["System.Tags"]),
-    type: String(workItem.fields["System.WorkItemType"] ?? "Task"),
-    url:
-      extractLinkHref(workItem._links, "html") ??
-      extractLinkHref(workItem._links, "web") ??
-      "",
-  } satisfies AzureDevOpsTaskDetail;
+  return toTaskDetail(workItem, context, comments, linkedPullRequests);
 }
 
 export async function getTaskEditMetadata(
@@ -1556,7 +1552,7 @@ export async function createTask(
   }
 
   const workItem = await azureDevOpsRequest<WorkItem>(
-    `/_apis/wit/workitems/${encodeURIComponent(`$${workItemType}`)}`,
+    `/_apis/wit/workitems/${encodeURIComponent(`$${workItemType}`)}?$expand=relations`,
     {
       accessToken,
       body: JSON.stringify(buildTaskCreateDocument({
@@ -1578,10 +1574,15 @@ export async function createTask(
     throw new Error("Azure DevOps did not return a valid work item id.");
   }
 
-  return getTaskDetails(accessToken, workItemId, {
-    ...context,
-    projectName,
-  });
+  return toTaskDetail(
+    workItem,
+    {
+      ...context,
+      projectName,
+    },
+    [],
+    [],
+  );
 }
 
 export async function updateTaskAssignee(
@@ -1613,6 +1614,7 @@ export async function updateTask(
     contentType: "application/json-patch+json",
     method: "PATCH",
     projectName: context.projectName,
+    revisionConflictOnBadRequest: true,
   });
 
   return getTaskDetails(accessToken, workItemId, context);

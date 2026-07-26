@@ -5,10 +5,15 @@ import {
   getTaskDetails,
   type AzureDevOpsTaskDetail,
 } from "@/lib/azure-devops/tasks";
+import {
+  getPublicAzureDevOpsError,
+  type PublicAzureDevOpsError,
+} from "@/lib/azure-devops/errors";
+import { reportAzureDevOpsError } from "@/lib/azure-devops/report-error";
 
 type LoadTaskDetailResult = {
   detail: AzureDevOpsTaskDetail | null;
-  error: string | null;
+  error: PublicAzureDevOpsError | null;
 };
 
 export const loadTaskDetail = cache(
@@ -30,9 +35,11 @@ export const loadTaskDetail = cache(
         error: null,
       };
     } catch (error) {
+      reportAzureDevOpsError(error);
+
       return {
         detail: null,
-        error: error instanceof Error ? error.message : "Failed to load task details.",
+        error: getPublicAzureDevOpsError(error),
       };
     }
   },

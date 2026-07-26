@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
+import { createAzureDevOpsErrorResponse } from "@/lib/azure-devops/error-response";
+import {
+  createMissingAzureDevOpsConfigError,
+  getAzureDevOpsWorkItemCreateError,
+} from "@/lib/azure-devops/errors";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import { createTask } from "@/lib/azure-devops/tasks";
-
-const MISSING_CONFIG_ERROR =
-  "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.";
 
 function parseRequiredString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
@@ -31,13 +33,6 @@ function parseOptionalDescription(value: unknown) {
   return value.trim() ? value.replace(/\r\n?/g, "\n") : undefined;
 }
 
-function errorStatus(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  const match = message.match(/Azure DevOps request failed \((\d{3})/);
-
-  return match ? Number(match[1]) : null;
-}
-
 async function resolveProject(accessToken: string, projectId: string | null) {
   const selection = await loadAzureDevOpsProjectSelection(
     accessToken,
@@ -55,7 +50,9 @@ async function resolveProject(accessToken: string, projectId: string | null) {
 
 export async function POST(request: NextRequest) {
   if (!hasAzureDevOpsConfig()) {
-    return NextResponse.json({ error: MISSING_CONFIG_ERROR }, { status: 503 });
+    return createAzureDevOpsErrorResponse(
+      createMissingAzureDevOpsConfigError(),
+    );
   }
 
   let payload: unknown;
@@ -103,31 +100,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const task = await createTask(
-      accessToken,
-      {
-        areaPath,
-        description,
-        priority,
-        projectName: project.name,
-        title,
-        type,
-      },
-      {
-        projectId: project.id,
-        projectImageUrl: project.defaultTeamImageUrl,
-        projectName: project.name,
-      },
-    );
+    try {
+      const task = await createTask(
+        accessToken,
+        {
+          areaPath,
+          description,
+          priority,
+          projectName: project.name,
+          title,
+          type,
+        },
+        {
+          projectId: project.id,
+          projectImageUrl: project.defaultTeamImageUrl,
+          projectName: project.name,
+        },
+      );
 
-    return NextResponse.json({ item: task }, { status: 201 });
+      return NextResponse.json({ item: task }, { status: 201 });
+    } catch (error) {
+      return createAzureDevOpsErrorResponse(
+        getAzureDevOpsWorkItemCreateError(error),
+      );
+    }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to create work item.";
-
-    return NextResponse.json(
-      { error: message },
-      { status: errorStatus(error) ?? 500 },
-    );
+    return createAzureDevOpsErrorResponse(error);
   }
 }

@@ -853,11 +853,7 @@ describe("azure-devops task helpers", () => {
   it("creates work items with Azure DevOps JSON Patch fields", async () => {
     azureDevOpsRequestMock.mockImplementation(async (path: string) => {
       switch (path) {
-        case "/_apis/wit/workitems/%24User%20Story":
-          return {
-            id: 99,
-          };
-        case "/_apis/wit/workitems/99?$expand=relations":
+        case "/_apis/wit/workitems/%24User%20Story?$expand=relations":
           return {
             fields: {
               "Microsoft.VSTS.Common.Priority": 2,
@@ -872,10 +868,6 @@ describe("azure-devops task helpers", () => {
             },
             id: 99,
             rev: 1,
-          };
-        case "/_apis/wit/workItems/99/comments?$top=20&order=desc&$expand=all&api-version=7.1-preview.4":
-          return {
-            comments: [],
           };
         default:
           throw new Error(`Unexpected path: ${path}`);
@@ -909,7 +901,7 @@ describe("azure-devops task helpers", () => {
 
     expect(azureDevOpsRequestMock).toHaveBeenNthCalledWith(
       1,
-      "/_apis/wit/workitems/%24User%20Story",
+      "/_apis/wit/workitems/%24User%20Story?$expand=relations",
       expect.objectContaining({
         accessToken: "token",
         contentType: "application/json-patch+json",
@@ -917,6 +909,7 @@ describe("azure-devops task helpers", () => {
         projectName: "Project",
       }),
     );
+    expect(azureDevOpsRequestMock).toHaveBeenCalledOnce();
     expect(JSON.parse(String(azureDevOpsRequestMock.mock.calls[0]?.[1]?.body))).toEqual([
       {
         op: "add",

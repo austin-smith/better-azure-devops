@@ -41,7 +41,11 @@ export async function generateMetadata({
   }
 
   const taskProjectId = readTaskProjectId(await searchParams);
-  const { detail } = await loadTaskDetail(taskId, taskProjectId);
+  const { detail, error } = await loadTaskDetail(taskId, taskProjectId);
+
+  if (error?.code === "not_found") {
+    notFound();
+  }
 
   return {
     title: detail?.title
@@ -68,6 +72,10 @@ export default async function TaskDetailPage({
   }
 
   const { detail, error } = await loadTaskDetail(taskId, filters.taskProjectId);
+
+  if (error?.code === "not_found") {
+    notFound();
+  }
 
   return (
     <TaskDetail

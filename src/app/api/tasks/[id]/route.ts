@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
+import { createAzureDevOpsErrorResponse } from "@/lib/azure-devops/error-response";
+import { createMissingAzureDevOpsConfigError } from "@/lib/azure-devops/errors";
 import { getTaskDetails, updateTask } from "@/lib/azure-devops/tasks";
 
 function parseTaskId(value: string) {
@@ -87,24 +89,13 @@ async function resolveTaskContext(accessToken: string, projectId: string | null)
   };
 }
 
-function errorStatus(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-  const match = message.match(/Azure DevOps request failed \((\d{3})/);
-
-  return match ? Number(match[1]) : null;
-}
-
 export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   if (!hasAzureDevOpsConfig()) {
-    return NextResponse.json(
-      {
-        error:
-          "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.",
-      },
-      { status: 503 },
+    return createAzureDevOpsErrorResponse(
+      createMissingAzureDevOpsConfigError(),
     );
   }
 
@@ -125,10 +116,7 @@ export async function GET(
 
     return NextResponse.json({ item: task });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load task details.";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return createAzureDevOpsErrorResponse(error);
   }
 }
 
@@ -137,12 +125,8 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   if (!hasAzureDevOpsConfig()) {
-    return NextResponse.json(
-      {
-        error:
-          "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.",
-      },
-      { status: 503 },
+    return createAzureDevOpsErrorResponse(
+      createMissingAzureDevOpsConfigError(),
     );
   }
 
@@ -192,17 +176,6 @@ export async function PATCH(
 
     return NextResponse.json({ item: task });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to update task.";
-    const status = errorStatus(error);
-
-    if (status === 412 || (status === 400 && message.toLowerCase().includes("rev"))) {
-      return NextResponse.json(
-        { error: "This task changed in Azure DevOps. Refresh and try again." },
-        { status: 409 },
-      );
-    }
-
-    return NextResponse.json({ error: message }, { status: status ?? 500 });
+    return createAzureDevOpsErrorResponse(error);
   }
 }

@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { TaskTable } from "@/components/tasks/task-table";
+import { createPublicAzureDevOpsError } from "@/lib/azure-devops/errors";
 import { getDefaultTaskListFilters } from "@/lib/tasks/filters";
 import { createTask } from "../../fixtures/tasks";
 
@@ -32,7 +33,15 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("@/components/app-header", () => ({
-  AppHeader: () => null,
+  AppHeader: ({ actions }: { actions?: ReactNode }) => <>{actions}</>,
+}));
+
+vi.mock("@/app/tasks/[id]/_components/task-detail-client", () => ({
+  TaskDetail: ({ onCreateDiscard }: { onCreateDiscard?: () => void }) => (
+    <button onClick={onCreateDiscard} type="button">
+      Discard draft
+    </button>
+  ),
 }));
 
 vi.mock("@/components/date-label", () => ({
@@ -55,6 +64,7 @@ describe("TaskTable", () => {
   beforeEach(() => {
     replaceMock.mockReset();
     pushMock.mockReset();
+    window.history.replaceState({}, "", "/tasks");
   });
 
   afterEach(() => {
@@ -100,7 +110,10 @@ describe("TaskTable", () => {
     render(
       <TaskTable
         activeProjectCount={1}
-        error="Failed to load work items."
+        error={{
+          ...createPublicAzureDevOpsError("server"),
+          message: "Failed to load work items.",
+        }}
         filterOptions={{
           assignees: [],
           priorities: [],
@@ -200,6 +213,72 @@ describe("TaskTable", () => {
       );
     });
     expect(screen.getByRole("alert")).toHaveAttribute("data-slot", "alert");
+  });
+
+  it("consumes a command-center new-item request across draft remounts", async () => {
+    vi.stubGlobal("ResizeObserver", class ResizeObserver {
+      disconnect() {}
+      observe() {}
+      unobserve() {}
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(
+      JSON.stringify({
+        item: {
+          areas: [],
+          defaultAreaPath: null,
+        },
+      }),
+      {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      },
+    )));
+    window.history.replaceState(
+      {},
+      "",
+      "/tasks?newWorkItem=command-request&state=Active",
+    );
+
+    render(
+      <TaskTable
+        activeProjectCount={1}
+        error={null}
+        filterOptions={{
+          assignees: [],
+          priorities: [],
+          states: [],
+          types: [],
+        }}
+        filters={{
+          ...getDefaultTaskListFilters(),
+          states: ["Active"],
+        }}
+        items={[createTask()]}
+        newWorkItemRequestKey="command-request"
+        projects={[{ defaultTeamImageUrl: null, id: "project-id", name: "Project" }]}
+        title="Work Items"
+      />,
+    );
+
+    expect(await screen.findByRole("dialog", { name: "New Work Item" }))
+      .toBeInTheDocument();
+    expect(replaceMock).toHaveBeenCalledWith(
+      "/tasks?state=Active",
+      { scroll: false },
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Work item title"), {
+      target: { value: "Command-created work item" },
+    });
+    fireEvent.submit(screen.getByPlaceholderText("Work item title").closest("form")!);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Discard draft" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "New Work Item" }))
+        .not.toBeInTheDocument();
+    });
+    expect(replaceMock).toHaveBeenCalledTimes(1);
   });
 
   it("labels assignee lookup loading states", async () => {
