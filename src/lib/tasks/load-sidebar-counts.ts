@@ -2,6 +2,7 @@ import { cache } from "react";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
+import { reportAzureDevOpsError } from "@/lib/azure-devops/report-error";
 import { countTasks } from "@/lib/azure-devops/tasks";
 import { normalizeTaskListFilters } from "@/lib/tasks/filters";
 
@@ -54,6 +55,8 @@ export const loadSidebarCounts = cache(async (): Promise<SidebarCounts> => {
       queueCount,
     };
   } catch (error) {
+    reportAzureDevOpsError(error);
+
     return {
       error: error instanceof Error ? error.message : "Failed to load sidebar counts.",
       openTaskCount: 0,

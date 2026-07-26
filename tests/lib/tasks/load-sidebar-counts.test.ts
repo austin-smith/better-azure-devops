@@ -3,11 +3,13 @@ const {
   getAzureDevOpsAccessTokenMock,
   hasAzureDevOpsConfigMock,
   loadAzureDevOpsProjectSelectionMock,
+  reportAzureDevOpsErrorMock,
 } = vi.hoisted(() => ({
   countTasksMock: vi.fn(),
   getAzureDevOpsAccessTokenMock: vi.fn(),
   hasAzureDevOpsConfigMock: vi.fn(),
   loadAzureDevOpsProjectSelectionMock: vi.fn(),
+  reportAzureDevOpsErrorMock: vi.fn(),
 }));
 
 vi.mock("@/lib/azure-devops/access-token", () => ({
@@ -22,16 +24,22 @@ vi.mock("@/lib/azure-devops/project-selection", () => ({
   loadAzureDevOpsProjectSelection: loadAzureDevOpsProjectSelectionMock,
 }));
 
+vi.mock("@/lib/azure-devops/report-error", () => ({
+  reportAzureDevOpsError: reportAzureDevOpsErrorMock,
+}));
+
 vi.mock("@/lib/azure-devops/tasks", () => ({
   countTasks: countTasksMock,
 }));
 
 describe("loadSidebarCounts", () => {
   beforeEach(() => {
+    vi.resetModules();
     countTasksMock.mockReset();
     getAzureDevOpsAccessTokenMock.mockReset();
     hasAzureDevOpsConfigMock.mockReset();
     loadAzureDevOpsProjectSelectionMock.mockReset();
+    reportAzureDevOpsErrorMock.mockReset();
     hasAzureDevOpsConfigMock.mockReturnValue(true);
   });
 
@@ -70,5 +78,22 @@ describe("loadSidebarCounts", () => {
     expect(countTasksMock.mock.calls[1]?.[2]).toMatchObject({
       assignee: "me",
     });
+  });
+
+  it("reports failures before returning empty counts", async () => {
+    const error = new Error("Failed to acquire an access token.");
+    getAzureDevOpsAccessTokenMock.mockRejectedValue(error);
+
+    const { loadSidebarCounts } = await import(
+      "@/lib/tasks/load-sidebar-counts"
+    );
+
+    await expect(loadSidebarCounts()).resolves.toEqual({
+      error: error.message,
+      openTaskCount: 0,
+      queueCount: 0,
+    });
+    expect(reportAzureDevOpsErrorMock).toHaveBeenCalledOnce();
+    expect(reportAzureDevOpsErrorMock).toHaveBeenCalledWith(error);
   });
 });
