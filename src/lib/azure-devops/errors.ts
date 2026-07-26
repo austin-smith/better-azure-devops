@@ -16,12 +16,17 @@ export const AZURE_DEVOPS_ERROR_CODES = [
 export type AzureDevOpsErrorCode =
   (typeof AZURE_DEVOPS_ERROR_CODES)[number];
 
+export type PublicAzureDevOpsRecoveryCommand = {
+  label: string;
+  value: string;
+};
+
 export type PublicAzureDevOpsError = {
   actionLabel: string | null;
   canRetry: boolean;
   code: AzureDevOpsErrorCode;
-  command: string | null;
   message: string;
+  recoveryCommands: readonly PublicAzureDevOpsRecoveryCommand[];
   retryAfterSeconds: number | null;
   title: string;
 };
@@ -61,97 +66,111 @@ const PUBLIC_ERROR_CONTENT: Record<
   missing_config: {
     actionLabel: null,
     canRetry: false,
-    command: "AZURE_DEVOPS_ORG_URL=https://dev.azure.com/<organization>",
     message:
       "Set the organization URL in AZURE_DEVOPS_ORG_URL, then restart the app.",
+    recoveryCommands: [
+      {
+        label: "Environment",
+        value: "AZURE_DEVOPS_ORG_URL=https://dev.azure.com/<organization>",
+      },
+    ],
     title: "Connect an Azure DevOps organization",
   },
   project_selection_required: {
     actionLabel: null,
     canRetry: false,
-    command: null,
     message:
       "Choose at least one project from the sidebar project switcher to load work items.",
+    recoveryCommands: [],
     title: "Select an Azure DevOps project",
   },
   azure_cli_not_installed: {
     actionLabel: "Try again",
     canRetry: true,
-    command: null,
     message:
       "Install Azure CLI, sign in from this project directory, then try again.",
+    recoveryCommands: [],
     title: "Azure CLI is required",
   },
   authentication_required: {
     actionLabel: "Try again",
     canRetry: true,
-    command: "AZURE_CONFIG_DIR=.azure az login",
     message:
       "The local Azure CLI session is missing or expired. Sign in from this project directory, then retry.",
+    recoveryCommands: [
+      {
+        label: "macOS and Linux",
+        value: "AZURE_CONFIG_DIR=.azure az login",
+      },
+      {
+        label: "Windows PowerShell",
+        value: '$env:AZURE_CONFIG_DIR=".azure"; az login',
+      },
+    ],
     title: "Sign in to Azure",
   },
   permission_denied: {
     actionLabel: "Try again",
     canRetry: true,
-    command: null,
     message:
       "Your Azure account cannot access this organization, project, or work item. Ask an Azure DevOps administrator to grant access, then retry.",
+    recoveryCommands: [],
     title: "Azure DevOps access denied",
   },
   not_found: {
     actionLabel: null,
     canRetry: false,
-    command: null,
     message:
       "The requested Azure DevOps resource does not exist or is no longer available.",
+    recoveryCommands: [],
     title: "Azure DevOps resource not found",
   },
   revision_conflict: {
     actionLabel: "Reload latest version",
     canRetry: true,
-    command: null,
     message:
       "This task changed in Azure DevOps. Reload the latest version and try again.",
+    recoveryCommands: [],
     title: "This work item changed",
   },
   create_status_unknown: {
     actionLabel: null,
     canRetry: false,
-    command: null,
     message:
       "Azure DevOps may have created this work item even though the app did not receive confirmation. Check recent work items before submitting it again. Your draft is still available here.",
+    recoveryCommands: [],
     title: "Confirm the work item before retrying",
   },
   throttled: {
     actionLabel: "Try again",
     canRetry: true,
-    command: null,
     message:
       "Azure DevOps is limiting requests right now. Wait briefly, then try again.",
+    recoveryCommands: [],
     title: "Azure DevOps is busy",
   },
   network: {
     actionLabel: "Try again",
     canRetry: true,
-    command: null,
     message:
       "The app could not reach Azure DevOps. Check the network connection or VPN, then retry.",
+    recoveryCommands: [],
     title: "Cannot reach Azure DevOps",
   },
   server: {
     actionLabel: "Try again",
     canRetry: true,
-    command: null,
     message:
       "Azure DevOps returned a server error. The service may be temporarily unavailable.",
+    recoveryCommands: [],
     title: "Azure DevOps is unavailable",
   },
   unknown: {
     actionLabel: "Try again",
     canRetry: true,
-    command: null,
     message:
       "The request could not be completed. Retry, and check the server logs if the problem continues.",
+    recoveryCommands: [],
     title: "Azure DevOps request failed",
   },
 };

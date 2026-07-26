@@ -25,7 +25,7 @@ describe("AzureDevOpsFailure", () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
-  it("shows the Azure CLI recovery command for expired authentication", () => {
+  it("shows shell-specific Azure CLI recovery commands for expired authentication", () => {
     render(
       <AzureDevOpsFailure
         error={createPublicAzureDevOpsError("authentication_required")}
@@ -33,6 +33,11 @@ describe("AzureDevOpsFailure", () => {
       />,
     );
 
+    expect(screen.getByText("macOS and Linux")).toBeVisible();
     expect(screen.getByText("AZURE_CONFIG_DIR=.azure az login")).toBeVisible();
+    expect(screen.getByText("Windows PowerShell")).toBeVisible();
+    expect(
+      screen.getByText('$env:AZURE_CONFIG_DIR=".azure"; az login'),
+    ).toBeVisible();
   });
 });

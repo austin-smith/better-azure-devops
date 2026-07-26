@@ -54,7 +54,12 @@ describe("Azure DevOps errors", () => {
     expect(createPublicAzureDevOpsError("missing_config")).toMatchObject({
       canRetry: false,
       code: "missing_config",
-      command: "AZURE_DEVOPS_ORG_URL=https://dev.azure.com/<organization>",
+      recoveryCommands: [
+        {
+          label: "Environment",
+          value: "AZURE_DEVOPS_ORG_URL=https://dev.azure.com/<organization>",
+        },
+      ],
     });
   });
 

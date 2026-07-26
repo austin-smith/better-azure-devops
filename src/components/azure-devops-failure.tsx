@@ -34,10 +34,19 @@ export function AzureDevOpsFailure({
             ? null
             : ` Try again in about ${error.retryAfterSeconds} seconds.`}
         </p>
-        {error.command ? (
-          <code className="max-w-full overflow-x-auto rounded-md border bg-muted px-2 py-1 font-mono text-xs text-foreground">
-            {error.command}
-          </code>
+        {error.recoveryCommands.length > 0 ? (
+          <dl className="grid max-w-full gap-2">
+            {error.recoveryCommands.map((command) => (
+              <div className="grid min-w-0 gap-1" key={command.label}>
+                <dt className="text-xs font-medium">{command.label}</dt>
+                <dd>
+                  <code className="block max-w-full overflow-x-auto rounded-md border bg-muted px-2 py-1 font-mono text-xs text-foreground">
+                    {command.value}
+                  </code>
+                </dd>
+              </div>
+            ))}
+          </dl>
         ) : null}
         {error.canRetry && error.actionLabel ? (
           <Button onClick={retry} size="sm" type="button" variant="outline">
