@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeftIcon,
   ChevronRightIcon,
@@ -53,6 +53,7 @@ import { Button } from "@/components/ui/button";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/components/themes/theme-provider";
+import { parseTaskListUrlSearchParams } from "@/lib/tasks/filters";
 import { getProjectSelectionHref } from "@/lib/tasks/navigation";
 import { useThemeFamily } from "@/hooks/use-theme-family";
 
@@ -299,6 +300,7 @@ function CommandCenterDialog({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setTheme, theme } = useTheme();
   const { setThemeFamily, themeFamily } = useThemeFamily();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -437,6 +439,10 @@ function CommandCenterDialog({
       }),
     [setTheme, setThemeFamily, theme, themeFamily],
   );
+  const currentTaskFilters = useMemo(
+    () => parseTaskListUrlSearchParams(searchParams),
+    [searchParams],
+  );
   const filterGroups = useMemo(
     () => buildFilterCommandGroups(navigate),
     [navigate],
@@ -460,6 +466,7 @@ function CommandCenterDialog({
     () =>
       buildRootCommandGroups({
         currentPathname: pathname,
+        currentTaskFilters,
         hasActiveProjects: projectIds.length > 0,
         hasAvailableProjects: projects.length > 0,
         navigate,
@@ -467,6 +474,7 @@ function CommandCenterDialog({
         openView: selectView,
       }),
     [
+      currentTaskFilters,
       navigate,
       openNewWorkItem,
       pathname,

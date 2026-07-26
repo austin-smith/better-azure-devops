@@ -10,6 +10,7 @@ import {
   isTaskListFiltered,
   normalizeTaskListFilters,
   parseTaskListFilters,
+  parseTaskListUrlSearchParams,
 } from "@/lib/tasks/filters";
 import { createTask } from "../../fixtures/tasks";
 
@@ -60,6 +61,20 @@ describe("task filters", () => {
     expect(createTaskListSearchParams(filters).toString()).toBe(
       "areaPath=Project%5CArea%5CPlatform&q=deploy&assignee=Ada+Lovelace&iterationPath=Project%5CIteration%5CSprint+2&state=Active&state=Blocked&priority=1&priority=2&type=Bug&type=Feature",
     );
+  });
+
+  it("parses repeated URL search parameters without losing filter values", () => {
+    expect(parseTaskListUrlSearchParams(new URLSearchParams(
+      "assignee=%20me%20&state=Blocked&state=Active&type=feature&type=bug",
+    ))).toEqual({
+      areaPath: null,
+      assignee: "me",
+      iterationPath: null,
+      priorities: [],
+      query: "",
+      states: ["Active", "Blocked"],
+      types: ["Bug", "Feature"],
+    });
   });
 
   it("treats equivalent filters as equal after normalization", () => {

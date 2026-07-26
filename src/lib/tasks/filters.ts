@@ -211,6 +211,20 @@ export function parseTaskListFilters(
   });
 }
 
+export function parseTaskListUrlSearchParams(
+  searchParams: Pick<URLSearchParams, "get" | "getAll">,
+): TaskListFilters {
+  return normalizeTaskListFilters({
+    areaPath: searchParams.get("areaPath"),
+    assignee: searchParams.get("assignee"),
+    iterationPath: searchParams.get("iterationPath"),
+    priorities: searchParams.getAll("priority"),
+    query: searchParams.get("q") ?? "",
+    states: searchParams.getAll("state"),
+    types: searchParams.getAll("type"),
+  });
+}
+
 export function createTaskListSearchParams(
   filters: TaskListFilterInput = {},
 ) {

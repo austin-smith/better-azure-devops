@@ -12,6 +12,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  areTaskListFiltersEqual,
+  type TaskListFilterInput,
+} from "@/lib/tasks/filters";
+import {
   getDefaultTaskListHref,
   getTaskDetailHref,
   getTaskListHref,
@@ -52,6 +56,7 @@ export type CommandCenterGroup = {
 
 type BuildNavigationActionsOptions = {
   currentPathname: string;
+  currentTaskFilters: TaskListFilterInput;
   hasActiveProjects: boolean;
   navigate: (href: string) => void;
   openNewWorkItem: () => void;
@@ -99,10 +104,13 @@ const FILTER_DESTINATIONS = [
 
 function buildNavigationActions({
   currentPathname,
+  currentTaskFilters,
   hasActiveProjects,
   navigate,
   openNewWorkItem,
 }: BuildNavigationActionsOptions): CommandCenterAction[] {
+  const isTaskList = currentPathname === "/tasks";
+
   return [
     {
       checked: currentPathname === "/",
@@ -114,7 +122,7 @@ function buildNavigationActions({
       run: () => navigate("/"),
     },
     {
-      checked: currentPathname === "/tasks",
+      checked: isTaskList && areTaskListFiltersEqual(currentTaskFilters, {}),
       description: "Browse work across active projects",
       icon: LayoutListIcon,
       id: "work-items",
@@ -123,6 +131,9 @@ function buildNavigationActions({
       run: () => navigate(getDefaultTaskListHref()),
     },
     {
+      checked:
+        isTaskList &&
+        areTaskListFiltersEqual(currentTaskFilters, { assignee: "me" }),
       description: "Work items currently assigned to you",
       icon: UserCircle2Icon,
       id: "your-queue",

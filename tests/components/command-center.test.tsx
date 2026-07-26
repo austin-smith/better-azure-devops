@@ -10,6 +10,7 @@ import { ThemeProvider } from "@/components/themes/theme-provider";
 const { navigationState, pushMock, refreshMock, replaceMock } = vi.hoisted(() => ({
   navigationState: {
     pathname: "/",
+    searchParams: new URLSearchParams(),
   },
   pushMock: vi.fn(),
   refreshMock: vi.fn(),
@@ -18,6 +19,7 @@ const { navigationState, pushMock, refreshMock, replaceMock } = vi.hoisted(() =>
 
 vi.mock("next/navigation", () => ({
   usePathname: () => navigationState.pathname,
+  useSearchParams: () => navigationState.searchParams,
   useRouter: () => ({
     push: pushMock,
     refresh: refreshMock,
@@ -75,6 +77,7 @@ function renderCommandCenter({
 describe("CommandCenter", () => {
   beforeEach(() => {
     navigationState.pathname = "/";
+    navigationState.searchParams = new URLSearchParams();
     pushMock.mockReset();
     refreshMock.mockReset();
     replaceMock.mockReset();
@@ -172,6 +175,54 @@ describe("CommandCenter", () => {
       .not.toBeInTheDocument();
     expect(screen.getByRole("listbox"))
       .toHaveClass("h-[min(60svh,24rem)]");
+  });
+
+  it.each([
+    {
+      allWorkItemsCurrent: true,
+      label: "the unfiltered work-item list",
+      search: "",
+      yourQueueCurrent: false,
+    },
+    {
+      allWorkItemsCurrent: false,
+      label: "your queue",
+      search: "assignee=me",
+      yourQueueCurrent: true,
+    },
+    {
+      allWorkItemsCurrent: false,
+      label: "another filtered work-item list",
+      search: "state=Active",
+      yourQueueCurrent: false,
+    },
+  ])("marks only $label as current", async ({
+    allWorkItemsCurrent,
+    search,
+    yourQueueCurrent,
+  }) => {
+    navigationState.pathname = "/tasks";
+    navigationState.searchParams = new URLSearchParams(search);
+    window.history.replaceState(
+      {},
+      "",
+      search ? `/tasks?${search}` : "/tasks",
+    );
+
+    renderCommandCenter();
+    fireEvent.click(screen.getByRole("button", { name: "Open command center" }));
+
+    const allWorkItems = await screen.findByRole("option", {
+      name: /^All work items\./,
+    });
+    const yourQueue = screen.getByRole("option", {
+      name: /^Your Queue\./,
+    });
+
+    expect(allWorkItems.getAttribute("aria-label")?.endsWith(". Current"))
+      .toBe(allWorkItemsCurrent);
+    expect(yourQueue.getAttribute("aria-label")?.endsWith(". Current"))
+      .toBe(yourQueueCurrent);
   });
 
   it("enters the highlighted drill-in with ArrowRight", async () => {
