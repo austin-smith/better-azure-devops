@@ -3,6 +3,7 @@ import {
   createPublicAzureDevOpsError,
   getAzureDevOpsErrorHttpStatus,
   getPublicAzureDevOpsError,
+  getPublicWorkItemCreateError,
 } from "@/lib/azure-devops/errors";
 
 describe("Azure DevOps errors", () => {
@@ -11,6 +12,11 @@ describe("Azure DevOps errors", () => {
     ["permission_denied", 403, "Azure DevOps access denied"],
     ["not_found", 404, "Azure DevOps resource not found"],
     ["revision_conflict", 409, "This work item changed"],
+    [
+      "create_status_unknown",
+      500,
+      "Confirm the work item before retrying",
+    ],
     ["throttled", 429, "Azure DevOps is busy"],
     ["network", 502, "Cannot reach Azure DevOps"],
     ["server", 503, "Azure DevOps is unavailable"],
@@ -49,6 +55,26 @@ describe("Azure DevOps errors", () => {
       canRetry: false,
       code: "missing_config",
       command: "AZURE_DEVOPS_ORG_URL=https://dev.azure.com/<organization>",
+    });
+  });
+
+  it("prevents blind retries when a create result is ambiguous", () => {
+    expect(
+      getPublicWorkItemCreateError(
+        createPublicAzureDevOpsError("network"),
+      ),
+    ).toMatchObject({
+      actionLabel: null,
+      canRetry: false,
+      code: "create_status_unknown",
+    });
+    expect(
+      getPublicWorkItemCreateError(
+        createPublicAzureDevOpsError("authentication_required"),
+      ),
+    ).toMatchObject({
+      canRetry: true,
+      code: "authentication_required",
     });
   });
 });

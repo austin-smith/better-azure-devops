@@ -20,6 +20,7 @@ import type {
 } from "@/lib/azure-devops/tasks";
 import {
   createPublicAzureDevOpsError,
+  getPublicWorkItemCreateError,
   isAzureDevOpsErrorCode,
   type PublicAzureDevOpsError,
 } from "@/lib/azure-devops/errors";
@@ -221,18 +222,31 @@ export function TaskDetail({
             }
           | undefined;
 
-        if (!response.ok || !payload?.item) {
+        if (!response.ok) {
           const errorDetails =
             payload?.errorDetails &&
             isAzureDevOpsErrorCode(payload.errorDetails.code)
               ? payload.errorDetails
               : null;
+          const createErrorDetails = errorDetails
+            ? getPublicWorkItemCreateError(errorDetails)
+            : null;
 
           setSaveError(
-            payload?.error ??
-              errorDetails?.message ??
+            createErrorDetails?.message ??
+              payload?.error ??
               "Failed to create work item.",
           );
+          setSaveErrorDetails(createErrorDetails);
+          return;
+        }
+
+        if (!payload?.item) {
+          const errorDetails = createPublicAzureDevOpsError(
+            "create_status_unknown",
+          );
+
+          setSaveError(errorDetails.message);
           setSaveErrorDetails(errorDetails);
           return;
         }
@@ -246,11 +260,11 @@ export function TaskDetail({
           );
           router.refresh();
         });
-      } catch (error) {
-        const errorDetails = createPublicAzureDevOpsError("network");
-        setSaveError(
-          error instanceof Error ? error.message : errorDetails.message,
+      } catch {
+        const errorDetails = createPublicAzureDevOpsError(
+          "create_status_unknown",
         );
+        setSaveError(errorDetails.message);
         setSaveErrorDetails(errorDetails);
       } finally {
         setIsSaving(false);
@@ -416,6 +430,13 @@ export function TaskDetail({
               mode={mode}
               onDraftChange={handleDraftChange}
               onRetrySave={() => {
+                if (
+                  mode === "create" &&
+                  saveErrorDetails?.code === "create_status_unknown"
+                ) {
+                  return;
+                }
+
                 if (saveErrorDetails?.code === "revision_conflict") {
                   startTransition(() => {
                     router.refresh();

@@ -2,6 +2,7 @@
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TaskDetail } from "@/app/tasks/[id]/_components/task-detail-client";
+import type { PublicAzureDevOpsError } from "@/lib/azure-devops/errors";
 import type { AzureDevOpsTaskDetail } from "@/lib/azure-devops/tasks";
 
 const routerPushMock = vi.fn();
@@ -27,7 +28,23 @@ vi.mock("@/app/tasks/[id]/_components/task-detail-content", () => ({
 }));
 
 vi.mock("@/app/tasks/[id]/_components/task-detail-sidebar", () => ({
-  TaskDetailSidebar: () => null,
+  TaskDetailSidebar: ({
+    onRetrySave,
+    saveErrorDetails,
+  }: {
+    onRetrySave: () => void;
+    saveErrorDetails: PublicAzureDevOpsError | null;
+  }) =>
+    saveErrorDetails ? (
+      <div>
+        <span>{saveErrorDetails.title}</span>
+        {saveErrorDetails.canRetry && saveErrorDetails.actionLabel ? (
+          <button onClick={onRetrySave} type="button">
+            {saveErrorDetails.actionLabel}
+          </button>
+        ) : null}
+      </div>
+    ) : null,
 }));
 
 vi.mock("@/components/project-image", () => ({
@@ -127,5 +144,36 @@ describe("TaskDetail", () => {
       "",
       `![Diagram](${source})`,
     ].join("\n"));
+  });
+
+  it("does not offer a blind retry when create confirmation is lost", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(
+      new TypeError("Failed to fetch"),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <TaskDetail
+        createProjectId="project-id"
+        detail={detail}
+        detailError={null}
+        mode="create"
+        taskId={0}
+        taskListHref="/tasks"
+        taskListLabel="Tasks"
+        taskProjectId="project-id"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(
+      await screen.findByText("Confirm the work item before retrying"),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Try again" }),
+    ).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 });

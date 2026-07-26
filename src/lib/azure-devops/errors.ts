@@ -6,6 +6,7 @@ export const AZURE_DEVOPS_ERROR_CODES = [
   "permission_denied",
   "not_found",
   "revision_conflict",
+  "create_status_unknown",
   "throttled",
   "network",
   "server",
@@ -113,6 +114,14 @@ const PUBLIC_ERROR_CONTENT: Record<
       "This task changed in Azure DevOps. Reload the latest version and try again.",
     title: "This work item changed",
   },
+  create_status_unknown: {
+    actionLabel: null,
+    canRetry: false,
+    command: null,
+    message:
+      "Azure DevOps may have created this work item even though the app did not receive confirmation. Check recent work items before submitting it again. Your draft is still available here.",
+    title: "Confirm the work item before retrying",
+  },
   throttled: {
     actionLabel: "Try again",
     canRetry: true,
@@ -176,6 +185,19 @@ export function createPublicAzureDevOpsError(
   };
 }
 
+export function getPublicWorkItemCreateError(
+  error: PublicAzureDevOpsError,
+): PublicAzureDevOpsError {
+  switch (error.code) {
+    case "network":
+    case "server":
+    case "unknown":
+      return createPublicAzureDevOpsError("create_status_unknown");
+    default:
+      return error;
+  }
+}
+
 export function getAzureDevOpsErrorHttpStatus(error: unknown) {
   if (error instanceof AzureDevOpsError && error.status) {
     if (error.code === "revision_conflict") {
@@ -203,6 +225,8 @@ export function getAzureDevOpsErrorHttpStatus(error: unknown) {
       return 404;
     case "revision_conflict":
       return 409;
+    case "create_status_unknown":
+      return 500;
     case "throttled":
       return 429;
     case "network":
