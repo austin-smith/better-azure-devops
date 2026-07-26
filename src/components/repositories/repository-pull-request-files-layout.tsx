@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
+import { useGroupRef } from "react-resizable-panels";
 import { Button } from "@/components/ui/button";
 import {
   ResizableHandle,
@@ -20,6 +21,11 @@ const MIN_TREE_PERCENTAGE = 12;
 const MAX_TREE_PERCENTAGE = 50;
 
 type FilesLayout = { diffs: number; tree: number };
+
+const DEFAULT_LAYOUT: FilesLayout = {
+  diffs: 100 - DEFAULT_TREE_PERCENTAGE,
+  tree: DEFAULT_TREE_PERCENTAGE,
+};
 
 function normalizeLayout(layout: Record<string, number>): FilesLayout | null {
   const tree = layout.tree;
@@ -87,14 +93,30 @@ export function RepositoryPullRequestFilesLayout({
   tree: ReactNode;
 }) {
   const [isTreeVisible, setIsTreeVisible] = useState(true);
-  // Read once on mount so the server and client agree on the first render.
-  const [layout] = useState<FilesLayout>(
-    () =>
-      readStoredLayout() ?? {
-        diffs: 100 - DEFAULT_TREE_PERCENTAGE,
-        tree: DEFAULT_TREE_PERCENTAGE,
-      },
-  );
+  const groupRef = useGroupRef();
+
+  /**
+   * The stored width is deliberately not read while rendering. This component
+   * is server rendered, where there is no `localStorage`, so reading it during
+   * the first client render would hydrate a returning reader's saved width
+   * against server markup built from the default and mismatch every time. The
+   * default renders on both sides and the saved width is applied immediately
+   * afterwards, which costs one frame and cannot disagree.
+   *
+   * Hiding the tree unmounts the group, so this reapplies on every reveal
+   * rather than only on mount.
+   */
+  useEffect(() => {
+    if (!isTreeVisible) {
+      return;
+    }
+
+    const stored = readStoredLayout();
+
+    if (stored) {
+      groupRef.current?.setLayout(stored);
+    }
+  }, [groupRef, isTreeVisible]);
 
   const diffColumn = (
     <div className="flex min-w-0 flex-col gap-3">
@@ -141,14 +163,15 @@ export function RepositoryPullRequestFilesLayout({
        own height, and the diff panel keeps the wrapper scrolling that wide
        code relies on. */
     <ResizablePanelGroup
-      defaultLayout={layout}
+      defaultLayout={DEFAULT_LAYOUT}
+      groupRef={groupRef}
       onLayoutChanged={writeStoredLayout}
       orientation="horizontal"
       style={{ overflow: "visible" }}
     >
       <ResizablePanel
         className="min-w-0"
-        defaultSize={`${layout.tree}%`}
+        defaultSize={`${DEFAULT_LAYOUT.tree}%`}
         id="tree"
         maxSize={`${MAX_TREE_PERCENTAGE}%`}
         minSize={`${MIN_TREE_PERCENTAGE}%`}
@@ -168,7 +191,7 @@ export function RepositoryPullRequestFilesLayout({
       />
       <ResizablePanel
         className="min-w-0"
-        defaultSize={`${layout.diffs}%`}
+        defaultSize={`${DEFAULT_LAYOUT.diffs}%`}
         id="diffs"
       >
         {diffColumn}
