@@ -81,6 +81,8 @@ Open [http://localhost:3002](http://localhost:3002).
 
 `latest` is the current stable release. `canary` tracks the newest successful build from `main`.
 
+### Docker Run
+
 Create volumes for Azure credentials and app data:
 
 ```bash
@@ -109,6 +111,38 @@ docker run -d \
   --mount type=volume,source=better-ado-azure-config,target=/app/.azure \
   --mount type=volume,source=better-ado-data,target=/data \
   ghcr.io/austin-smith/better-azure-devops:latest
+```
+
+### Docker Compose
+
+```yaml
+services:
+  better-ado:
+    image: ghcr.io/austin-smith/better-azure-devops:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3002"
+    environment:
+      AZURE_DEVOPS_ORG_URL: https://dev.azure.com/your-org
+    volumes:
+      - azure-config:/app/.azure
+      - data:/data
+
+volumes:
+  azure-config:
+  data:
+```
+
+Sign in:
+
+```bash
+docker compose run --rm --entrypoint az better-ado login --use-device-code
+```
+
+Run the app:
+
+```bash
+docker compose up -d
 ```
 
 Open [http://localhost:3002](http://localhost:3002).
