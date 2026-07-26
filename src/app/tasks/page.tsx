@@ -4,13 +4,12 @@ import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import type { AzureDevOpsProject } from "@/lib/azure-devops/projects";
 import type { AzureDevOpsTask } from "@/lib/azure-devops/tasks";
-import {
-  hasAzureDevOpsConfig,
-} from "@/lib/azure-devops/config";
+import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
 import {
   createPublicAzureDevOpsError,
   getPublicAzureDevOpsError,
 } from "@/lib/azure-devops/errors";
+import { reportAzureDevOpsError } from "@/lib/azure-devops/report-error";
 import { getDefaultWorkItemTypes } from "@/lib/tasks/work-item-type";
 import {
   getTaskListTitle,
@@ -85,6 +84,7 @@ export default async function TaskListPage({
         items = result.items;
       }
     } catch (loadError) {
+      reportAzureDevOpsError(loadError);
       error = getPublicAzureDevOpsError(loadError);
     }
   }

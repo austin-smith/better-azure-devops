@@ -43,6 +43,10 @@ describe("/tasks page", () => {
     hasAzureDevOpsConfigMock.mockReturnValue(true);
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders an inline error when loading the Azure DevOps access token fails", async () => {
     const { AzureDevOpsError } = await import("@/lib/azure-devops/errors");
 
@@ -71,6 +75,7 @@ describe("/tasks page", () => {
   });
 
   it("renders an inline error when project selection loading fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     getAzureDevOpsAccessTokenMock.mockResolvedValue("token");
     loadAzureDevOpsProjectSelectionMock.mockRejectedValue(
       new Error("Failed to load selected projects."),
@@ -92,5 +97,12 @@ describe("/tasks page", () => {
     expect(result.props.items).toEqual([]);
     expect(result.props.activeProjectCount).toBe(0);
     expect(loadTaskListMock).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      "Azure DevOps request failed.",
+      expect.objectContaining({
+        code: "unknown",
+        message: "Failed to load selected projects.",
+      }),
+    );
   });
 });
