@@ -1,17 +1,16 @@
-name: CI
+name: Publish Docker image
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
+    tags:
+      - "v*"
 
 permissions:
   contents: read
 
 concurrency:
-  group: validate-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: docker-release
+  cancel-in-progress: false
 
 env:
   DOCKER_METADATA_SHORT_SHA_LENGTH: 12
@@ -25,6 +24,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Check release tag
+        run: node scripts/check-release-tag.mjs "${GITHUB_REF_NAME}"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
@@ -50,7 +52,7 @@ jobs:
       - name: Build
         run: pnpm build
 
-  container:
+  test-container:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -80,19 +82,17 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
 
-      - name: Check Dockerfile
-        if: matrix.platform == 'linux/amd64'
-        run: docker build --check .
-
       - name: Build container
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
-          cache-from: type=gha,scope=container-ci-${{ matrix.slug }}
-          cache-to: type=gha,mode=max,scope=container-ci-${{ matrix.slug }}
+          cache-from: |
+            type=gha,scope=release-${{ matrix.slug }}
+            type=gha,scope=canary-publish
+          cache-to: type=gha,mode=max,scope=release-${{ matrix.slug }}
           context: .
           load: true
           platforms: ${{ matrix.platform }}
-          tags: better-azure-devops:ci-${{ matrix.slug }}
+          tags: better-azure-devops:release-${{ matrix.slug }}
 
       - name: Scan container
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -100,21 +100,23 @@ jobs:
           exit-code: "1"
           format: table
           ignore-unfixed: true
-          image-ref: better-azure-devops:ci-${{ matrix.slug }}
+          image-ref: better-azure-devops:release-${{ matrix.slug }}
           scanners: vuln,secret
           severity: CRITICAL
 
       - name: Smoke test container
         run: >-
           node scripts/smoke-test-image.mjs
-          better-azure-devops:ci-${{ matrix.slug }}
+          better-azure-devops:release-${{ matrix.slug }}
           ${{ matrix.platform }}
 
-  publish-canary:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: container
+  publish:
+    needs:
+      - validate
+      - test-container
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    environment: release
 
     permissions:
       artifact-metadata: write
@@ -148,18 +150,20 @@ jobs:
           flavor: |
             latest=false
           tags: |
-            type=raw,value=canary
-            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
 
-      - name: Build and publish canary
+      - name: Build and publish container
         id: publish
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           cache-from: |
-            type=gha,scope=container-ci-amd64
-            type=gha,scope=container-ci-arm64
+            type=gha,scope=release-amd64
+            type=gha,scope=release-arm64
             type=gha,scope=canary-publish
-          cache-to: type=gha,mode=max,scope=canary-publish
+          cache-to: type=gha,mode=max,scope=release-publish
           context: .
           labels: ${{ steps.metadata.outputs.labels }}
           platforms: linux/amd64,linux/arm64
@@ -168,9 +172,41 @@ jobs:
           sbom: true
           tags: ${{ steps.metadata.outputs.tags }}
 
-      - name: Attest published canary
+      - name: Attest published container
         uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
         with:
           push-to-registry: true
           subject-digest: ${{ steps.publish.outputs.digest }}
           subject-name: ${{ env.IMAGE_NAME }}
+
+  github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" > /dev/null 2>&1; then
+            echo "GitHub Release ${RELEASE_TAG} already exists."
+            exit 0
+          fi
+
+          release_flags=()
+          if [[ "${RELEASE_TAG}" == *-* ]]; then
+            release_flags+=(--prerelease --latest=false)
+          fi
+
+          gh release create "${RELEASE_TAG}" \
+            --generate-notes \
+            --notes "Container image: ${IMAGE_NAME}:${RELEASE_TAG#v}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${RELEASE_TAG}" \
+            --verify-tag \
+            "${release_flags[@]}"
