@@ -36,6 +36,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
+import { AzureDevOpsFailure } from "@/components/azure-devops-failure";
 import {
   Alert,
   AlertDescription,
@@ -90,6 +91,7 @@ import type {
   AzureDevOpsTask as Task,
   AzureDevOpsTaskDetail,
 } from "@/lib/azure-devops/tasks";
+import type { PublicAzureDevOpsError } from "@/lib/azure-devops/errors";
 import { TaskDetail } from "@/app/tasks/[id]/_components/task-detail-client";
 import {
   getTaskListHref,
@@ -107,7 +109,7 @@ import { getTaskStateBadgeVariant } from "@/lib/tasks/state";
 
 type TaskTableProps = {
   activeProjectCount: number;
-  error: string | null;
+  error: PublicAzureDevOpsError | null;
   filterOptions: TaskFilterOptions;
   filters: TaskListFilters;
   items: Task[];
@@ -1101,9 +1103,7 @@ export function TaskTable({
         </div>
 
         {error ? (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <AzureDevOpsFailure error={error} />
         ) : null}
 
         <div className="min-h-0 flex-1 overflow-hidden rounded-xl border bg-background">

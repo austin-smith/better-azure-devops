@@ -5,6 +5,11 @@ import {
   getAzureDevOpsConfig,
   hasAzureDevOpsConfig,
 } from "@/lib/azure-devops/config";
+import {
+  createPublicAzureDevOpsError,
+  getPublicAzureDevOpsError,
+  type PublicAzureDevOpsError,
+} from "@/lib/azure-devops/errors";
 import type { AzureDevOpsTask } from "@/lib/azure-devops/tasks";
 import {
   normalizeTaskListFilters,
@@ -12,10 +17,6 @@ import {
 import { loadTaskList } from "@/lib/tasks/load-task-list";
 import { isBlockedTask, isStaleTask, isUnassignedTask } from "@/lib/tasks/state";
 
-const MISSING_CONFIG_ERROR =
-  "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.";
-const EMPTY_PROJECT_SELECTION_ERROR =
-  "Select at least one Azure DevOps project.";
 const RECENT_CHANGE_WINDOW_HOURS = 24;
 const STALE_AFTER_DAYS = 7;
 const MAX_QUEUE_ITEMS = 5;
@@ -29,7 +30,7 @@ type StateDistributionItem = {
 export type DashboardOverview = {
   attentionCount: number;
   blockedCount: number;
-  error: string | null;
+  error: PublicAzureDevOpsError | null;
   openTaskCount: number;
   projectCount: number;
   queueCount: number;
@@ -62,49 +63,44 @@ function sortStateDistribution(
     }));
 }
 
+function createEmptyDashboardOverview(
+  error: PublicAzureDevOpsError,
+): DashboardOverview {
+  return {
+    attentionCount: 0,
+    blockedCount: 0,
+    error,
+    openTaskCount: 0,
+    projectCount: 0,
+    queueCount: 0,
+    queueItems: [],
+    recentChangeCount: 0,
+    recentChangeWindowHours: RECENT_CHANGE_WINDOW_HOURS,
+    recentLatestItem: null,
+    staleCount: 0,
+    staleAfterDays: STALE_AFTER_DAYS,
+    stateDistribution: [],
+    unassignedCount: 0,
+  };
+}
+
 export async function loadDashboardOverview(): Promise<DashboardOverview> {
   try {
     const config = hasAzureDevOpsConfig() ? getAzureDevOpsConfig() : null;
 
     if (!config) {
-      return {
-        attentionCount: 0,
-        blockedCount: 0,
-        error: MISSING_CONFIG_ERROR,
-        openTaskCount: 0,
-        projectCount: 0,
-        queueCount: 0,
-        queueItems: [],
-        recentChangeCount: 0,
-        recentChangeWindowHours: RECENT_CHANGE_WINDOW_HOURS,
-        recentLatestItem: null,
-        staleCount: 0,
-        staleAfterDays: STALE_AFTER_DAYS,
-        stateDistribution: [],
-        unassignedCount: 0,
-      };
+      return createEmptyDashboardOverview(
+        createPublicAzureDevOpsError("missing_config"),
+      );
     }
 
     const accessToken = await getAzureDevOpsAccessToken();
     const selection = await loadAzureDevOpsProjectSelection(accessToken);
 
     if (selection.selectedProjects.length === 0) {
-      return {
-        attentionCount: 0,
-        blockedCount: 0,
-        error: EMPTY_PROJECT_SELECTION_ERROR,
-        openTaskCount: 0,
-        projectCount: 0,
-        queueCount: 0,
-        queueItems: [],
-        recentChangeCount: 0,
-        recentChangeWindowHours: RECENT_CHANGE_WINDOW_HOURS,
-        recentLatestItem: null,
-        staleCount: 0,
-        staleAfterDays: STALE_AFTER_DAYS,
-        stateDistribution: [],
-        unassignedCount: 0,
-      };
+      return createEmptyDashboardOverview(
+        createPublicAzureDevOpsError("project_selection_required"),
+      );
     }
 
     const [allTasksResult, queueResult] = await Promise.all([
@@ -169,21 +165,6 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
       unassignedCount,
     };
   } catch (error) {
-    return {
-      attentionCount: 0,
-      blockedCount: 0,
-      error: error instanceof Error ? error.message : "Failed to load dashboard overview.",
-      openTaskCount: 0,
-      projectCount: 0,
-      queueCount: 0,
-      queueItems: [],
-      recentChangeCount: 0,
-      recentChangeWindowHours: RECENT_CHANGE_WINDOW_HOURS,
-      recentLatestItem: null,
-      staleCount: 0,
-      staleAfterDays: STALE_AFTER_DAYS,
-      stateDistribution: [],
-      unassignedCount: 0,
-    };
+    return createEmptyDashboardOverview(getPublicAzureDevOpsError(error));
   }
 }

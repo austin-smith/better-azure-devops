@@ -8,6 +8,7 @@ import {
   UserCircle2Icon,
 } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { AzureDevOpsFailure } from "@/components/azure-devops-failure";
 import { DateLabel } from "@/components/date-label";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { ThemeToggle } from "@/components/themes/theme-toggle";
@@ -103,11 +104,7 @@ export function DashboardOverview({ overview }: DashboardOverviewProps) {
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 md:p-5">
           {overview.error ? (
-            <Card className="border-destructive/30 bg-destructive/5">
-              <CardContent className="py-1 text-sm text-destructive">
-                {overview.error}
-              </CardContent>
-            </Card>
+            <AzureDevOpsFailure error={overview.error} />
           ) : null}
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

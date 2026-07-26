@@ -123,9 +123,27 @@ describe("getAzureDevOpsAccessToken", () => {
 
     const { getAzureDevOpsAccessToken } = await import("@/lib/azure-devops/access-token");
 
-    await expect(getAzureDevOpsAccessToken()).rejects.toThrow(
-      "Azure CLI is not installed. Install it, then run `az login` with `AZURE_CONFIG_DIR` set to `.azure`.",
-    );
+    await expect(getAzureDevOpsAccessToken()).rejects.toMatchObject({
+      code: "azure_cli_not_installed",
+      message:
+        "Azure CLI is not installed. Install it, then run `az login` with `AZURE_CONFIG_DIR` set to `.azure`.",
+    });
     expect(execFileMock).toHaveBeenCalledOnce();
+  });
+
+  it("does not report malformed Azure CLI output as expired authentication", async () => {
+    setPlatform("linux");
+    execFileMock.mockImplementation(
+      ((file, args, options, callback) => {
+        callback?.(null, "not json", "");
+        return {} as never;
+      }) as typeof execFile,
+    );
+
+    const { getAzureDevOpsAccessToken } = await import("@/lib/azure-devops/access-token");
+
+    await expect(getAzureDevOpsAccessToken()).rejects.toMatchObject({
+      code: "unknown",
+    });
   });
 });

@@ -7,6 +7,10 @@ import type { AzureDevOpsTask } from "@/lib/azure-devops/tasks";
 import {
   hasAzureDevOpsConfig,
 } from "@/lib/azure-devops/config";
+import {
+  createPublicAzureDevOpsError,
+  getPublicAzureDevOpsError,
+} from "@/lib/azure-devops/errors";
 import { getDefaultWorkItemTypes } from "@/lib/tasks/work-item-type";
 import {
   getTaskListTitle,
@@ -16,11 +20,6 @@ import {
   type TaskListSearchParams,
 } from "@/lib/tasks/filters";
 import { loadTaskList } from "@/lib/tasks/load-task-list";
-
-const MISSING_CONFIG_ERROR =
-  "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.";
-const EMPTY_PROJECTS_ERROR =
-  "Select at least one Azure DevOps project to load work items.";
 
 type TaskListPageProps = {
   searchParams: Promise<TaskListSearchParams>;
@@ -42,7 +41,9 @@ export default async function TaskListPage({
   const parsedFilters = parseTaskListFilters(await searchParams);
   const title = getTaskListTitle(parsedFilters);
   let filters = parsedFilters;
-  let error = hasAzureDevOpsConfig() ? null : MISSING_CONFIG_ERROR;
+  let error = hasAzureDevOpsConfig()
+    ? null
+    : createPublicAzureDevOpsError("missing_config");
   let filterOptions: TaskFilterOptions = {
     assignees: [],
     priorities: [],
@@ -70,7 +71,7 @@ export default async function TaskListPage({
       }));
 
       if (selection.selectedProjects.length === 0) {
-        error = EMPTY_PROJECTS_ERROR;
+        error = createPublicAzureDevOpsError("project_selection_required");
       } else {
         const result = await loadTaskList(
           accessToken,
@@ -84,7 +85,7 @@ export default async function TaskListPage({
         items = result.items;
       }
     } catch (loadError) {
-      error = loadError instanceof Error ? loadError.message : "Failed to load work items.";
+      error = getPublicAzureDevOpsError(loadError);
     }
   }
 

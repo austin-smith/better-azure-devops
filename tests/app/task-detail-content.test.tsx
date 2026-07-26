@@ -2,6 +2,7 @@
 
 import { fireEvent, render, screen } from "@testing-library/react";
 import { TaskDetailContent } from "@/app/tasks/[id]/_components/task-detail-content";
+import { createPublicAzureDevOpsError } from "@/lib/azure-devops/errors";
 import type { AzureDevOpsTaskDetail } from "@/lib/azure-devops/tasks";
 
 vi.mock("@/components/date-label", () => ({
@@ -97,7 +98,10 @@ describe("TaskDetailContent", () => {
       <TaskDetailContent
         descriptionDraft="Initial **markdown**"
         detail={baseDetail}
-        detailError="Failed to load task details."
+        detailError={{
+          ...createPublicAzureDevOpsError("server"),
+          message: "Failed to load task details.",
+        }}
         isSaving={false}
         mode="edit"
         onDescriptionChange={vi.fn()}

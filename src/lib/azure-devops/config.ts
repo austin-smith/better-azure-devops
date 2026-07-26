@@ -1,3 +1,5 @@
+import { createMissingAzureDevOpsConfigError } from "@/lib/azure-devops/errors";
+
 function readEnv(name: string) {
   return process.env[name]?.trim() ?? "";
 }
@@ -20,7 +22,7 @@ export function getAzureDevOpsConfig() {
   const orgUrl = readEnv("AZURE_DEVOPS_ORG_URL").replace(/\/$/, "");
 
   if (!orgUrl) {
-    throw new Error("Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.");
+    throw createMissingAzureDevOpsConfigError();
   }
 
   return {

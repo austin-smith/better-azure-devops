@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import type { PublicAzureDevOpsError } from "@/lib/azure-devops/errors";
 
 const {
   getAzureDevOpsAccessTokenMock,
@@ -43,8 +44,12 @@ describe("/tasks page", () => {
   });
 
   it("renders an inline error when loading the Azure DevOps access token fails", async () => {
+    const { AzureDevOpsError } = await import("@/lib/azure-devops/errors");
+
     getAzureDevOpsAccessTokenMock.mockRejectedValue(
-      new Error("Azure CLI is not signed in."),
+      new AzureDevOpsError("Azure CLI is not signed in.", {
+        code: "authentication_required",
+      }),
     );
 
     const { default: TaskListPage } = await import("@/app/tasks/page");
@@ -52,11 +57,14 @@ describe("/tasks page", () => {
       searchParams: Promise.resolve({}),
     }) as ReactElement<{
       activeProjectCount: number;
-      error: string | null;
+      error: PublicAzureDevOpsError | null;
       items: unknown[];
     }>;
 
-    expect(result.props.error).toBe("Azure CLI is not signed in.");
+    expect(result.props.error).toMatchObject({
+      code: "authentication_required",
+      title: "Sign in to Azure",
+    });
     expect(result.props.items).toEqual([]);
     expect(result.props.activeProjectCount).toBe(0);
     expect(loadAzureDevOpsProjectSelectionMock).not.toHaveBeenCalled();
@@ -73,11 +81,14 @@ describe("/tasks page", () => {
       searchParams: Promise.resolve({}),
     }) as ReactElement<{
       activeProjectCount: number;
-      error: string | null;
+      error: PublicAzureDevOpsError | null;
       items: unknown[];
     }>;
 
-    expect(result.props.error).toBe("Failed to load selected projects.");
+    expect(result.props.error).toMatchObject({
+      code: "unknown",
+      title: "Azure DevOps request failed",
+    });
     expect(result.props.items).toEqual([]);
     expect(result.props.activeProjectCount).toBe(0);
     expect(loadTaskListMock).not.toHaveBeenCalled();

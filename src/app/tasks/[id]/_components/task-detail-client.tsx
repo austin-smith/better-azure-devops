@@ -19,6 +19,11 @@ import type {
   AzureDevOpsTaskEditMetadata,
 } from "@/lib/azure-devops/tasks";
 import {
+  createPublicAzureDevOpsError,
+  isAzureDevOpsErrorCode,
+  type PublicAzureDevOpsError,
+} from "@/lib/azure-devops/errors";
+import {
   applyTaskDetailEditableValues,
   createTaskDetailEditableValues,
   getTaskDetailEditableChanges,
@@ -29,7 +34,7 @@ import {
 type TaskDetailProps = {
   createProjectId?: string | null;
   detail: TaskDetailData | null;
-  detailError: string | null;
+  detailError: PublicAzureDevOpsError | null;
   mode?: "create" | "edit";
   onCreateDiscard?: () => void;
   taskId: number;
@@ -61,12 +66,15 @@ export function TaskDetail({
   const [isLoadingEditMetadata, setIsLoadingEditMetadata] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveErrorDetails, setSaveErrorDetails] =
+    useState<PublicAzureDevOpsError | null>(null);
   const [draftResetKey, setDraftResetKey] = useState(0);
 
   useEffect(() => {
     setCurrentDetail(detail);
     setDraftValues(detail ? createTaskDetailEditableValues(detail) : null);
     setSaveError(null);
+    setSaveErrorDetails(null);
   }, [detail]);
 
   useEffect(() => {
@@ -151,6 +159,7 @@ export function TaskDetail({
   function handleDraftChange(nextValues: TaskDetailEditableValues) {
     setDraftValues(nextValues);
     setSaveError(null);
+    setSaveErrorDetails(null);
   }
 
   function resetDraft() {
@@ -165,6 +174,7 @@ export function TaskDetail({
 
     setDraftValues(createTaskDetailEditableValues(currentDetail));
     setSaveError(null);
+    setSaveErrorDetails(null);
     setDraftResetKey((current) => current + 1);
   }
 
@@ -176,11 +186,13 @@ export function TaskDetail({
     if (mode === "create") {
       if (!draftValues.title.trim()) {
         setSaveError("Title is required.");
+        setSaveErrorDetails(null);
         return;
       }
 
       setIsSaving(true);
       setSaveError(null);
+      setSaveErrorDetails(null);
 
       try {
         const description = draftValues.description.trim()
@@ -204,12 +216,25 @@ export function TaskDetail({
         const payload = (await response.json()) as
           | {
               error?: string;
+              errorDetails?: PublicAzureDevOpsError;
               item?: TaskDetailData;
             }
           | undefined;
 
         if (!response.ok || !payload?.item) {
-          throw new Error(payload?.error ?? "Failed to create work item.");
+          const errorDetails =
+            payload?.errorDetails &&
+            isAzureDevOpsErrorCode(payload.errorDetails.code)
+              ? payload.errorDetails
+              : null;
+
+          setSaveError(
+            payload?.error ??
+              errorDetails?.message ??
+              "Failed to create work item.",
+          );
+          setSaveErrorDetails(errorDetails);
+          return;
         }
 
         const createdTask = payload.item;
@@ -222,9 +247,11 @@ export function TaskDetail({
           router.refresh();
         });
       } catch (error) {
+        const errorDetails = createPublicAzureDevOpsError("network");
         setSaveError(
-          error instanceof Error ? error.message : "Failed to create work item.",
+          error instanceof Error ? error.message : errorDetails.message,
         );
+        setSaveErrorDetails(errorDetails);
       } finally {
         setIsSaving(false);
       }
@@ -243,6 +270,7 @@ export function TaskDetail({
 
     setIsSaving(true);
     setSaveError(null);
+    setSaveErrorDetails(null);
 
     try {
       const params = new URLSearchParams();
@@ -268,12 +296,25 @@ export function TaskDetail({
       const payload = (await response.json()) as
         | {
             error?: string;
+            errorDetails?: PublicAzureDevOpsError;
             item?: TaskDetailData;
           }
         | undefined;
 
       if (!response.ok || !payload?.item) {
-        throw new Error(payload?.error ?? "Failed to update task.");
+        const errorDetails =
+          payload?.errorDetails &&
+          isAzureDevOpsErrorCode(payload.errorDetails.code)
+            ? payload.errorDetails
+            : null;
+
+        setSaveError(
+          payload?.error ??
+            errorDetails?.message ??
+            "Failed to update task.",
+        );
+        setSaveErrorDetails(errorDetails);
+        return;
       }
 
       setCurrentDetail(payload.item);
@@ -282,7 +323,11 @@ export function TaskDetail({
         router.refresh();
       });
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "Failed to update task.");
+      const errorDetails = createPublicAzureDevOpsError("network");
+      setSaveError(
+        error instanceof Error ? error.message : errorDetails.message,
+      );
+      setSaveErrorDetails(errorDetails);
     } finally {
       setIsSaving(false);
     }
@@ -370,8 +415,19 @@ export function TaskDetail({
               isSaving={isSaving}
               mode={mode}
               onDraftChange={handleDraftChange}
+              onRetrySave={() => {
+                if (saveErrorDetails?.code === "revision_conflict") {
+                  startTransition(() => {
+                    router.refresh();
+                  });
+                  return;
+                }
+
+                void saveDraft();
+              }}
               taskProjectId={taskProjectId}
               saveError={saveError}
+              saveErrorDetails={saveErrorDetails}
             />
           </div>
         </div>

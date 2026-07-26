@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { GET, PATCH } from "@/app/api/tasks/[id]/route";
+import { AzureDevOpsError } from "@/lib/azure-devops/errors";
 
 const {
   getAzureDevOpsAccessTokenMock,
@@ -73,7 +74,13 @@ describe("task detail route", () => {
   it("maps Azure DevOps revision conflicts to 409", async () => {
     getAzureDevOpsAccessTokenMock.mockResolvedValue("token");
     updateTaskMock.mockRejectedValue(
-      new Error("Azure DevOps request failed (412 Precondition Failed): rev mismatch"),
+      new AzureDevOpsError(
+        "Azure DevOps request failed (412 Precondition Failed): rev mismatch",
+        {
+          code: "revision_conflict",
+          status: 412,
+        },
+      ),
     );
 
     const response = await PATCH(
@@ -86,8 +93,11 @@ describe("task detail route", () => {
     );
 
     expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual({
-      error: "This task changed in Azure DevOps. Refresh and try again.",
+    await expect(response.json()).resolves.toMatchObject({
+      errorDetails: {
+        actionLabel: "Reload latest version",
+        code: "revision_conflict",
+      },
     });
   });
 

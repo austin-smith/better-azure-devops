@@ -3,6 +3,10 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TaskDetailSidebar } from "@/app/tasks/[id]/_components/task-detail-sidebar";
 import type { AzureDevOpsTaskDetail } from "@/lib/azure-devops/tasks";
+import {
+  createPublicAzureDevOpsError,
+  type PublicAzureDevOpsError,
+} from "@/lib/azure-devops/errors";
 import { createTaskDetailEditableValues } from "@/lib/tasks/task-detail-edit";
 
 vi.mock("@/components/date-label", () => ({
@@ -42,7 +46,9 @@ const detail = {
 
 function renderSidebar(options: {
   editMetadataError?: string | null;
+  onRetrySave?: () => void;
   saveError?: string | null;
+  saveErrorDetails?: PublicAzureDevOpsError | null;
 } = {}) {
   return render(
     <TaskDetailSidebar
@@ -54,7 +60,9 @@ function renderSidebar(options: {
       isLoadingEditMetadata={false}
       isSaving={false}
       onDraftChange={vi.fn()}
+      onRetrySave={options.onRetrySave ?? vi.fn()}
       saveError={options.saveError ?? null}
+      saveErrorDetails={options.saveErrorDetails ?? null}
       taskProjectId="project-id"
     />,
   );
@@ -71,6 +79,18 @@ describe("TaskDetailSidebar", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("Failed to update task.");
     expect(screen.getByRole("alert")).toHaveAttribute("data-slot", "alert");
+  });
+
+  it("retries structured save failures without reloading the draft", () => {
+    const onRetrySave = vi.fn();
+
+    renderSidebar({
+      onRetrySave,
+      saveErrorDetails: createPublicAzureDevOpsError("network"),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRetrySave).toHaveBeenCalledOnce();
   });
 
   it("renders edit metadata errors with the shared alert component", () => {

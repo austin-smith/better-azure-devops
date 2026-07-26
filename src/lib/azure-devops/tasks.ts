@@ -1254,25 +1254,14 @@ ${priorityFilter}
   AND [System.State] <> 'Removed'
 ORDER BY [System.ChangedDate] DESC`;
 
-  let result: WiqlResponse;
-
-  try {
-    result = await azureDevOpsRequest<WiqlResponse>(
-      "/_apis/wit/wiql",
-      {
-        accessToken,
-        method: "POST",
-        body: JSON.stringify({ query: wiql }),
-      },
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Azure DevOps WIQL request failed.";
-
-    throw new Error(
-      `${message} [filters areaPath=${JSON.stringify(filters.areaPath)} normalizedAreaPath=${JSON.stringify(normalizedAreaPath)} iterationPath=${JSON.stringify(filters.iterationPath)} normalizedIterationPath=${JSON.stringify(normalizedIterationPath)} selectedProjects=${JSON.stringify(projectNames)}]`,
-    );
-  }
+  const result = await azureDevOpsRequest<WiqlResponse>(
+    "/_apis/wit/wiql",
+    {
+      accessToken,
+      method: "POST",
+      body: JSON.stringify({ query: wiql }),
+    },
+  );
 
   if (result.workItems.length === 0) {
     return [];
@@ -1535,6 +1524,7 @@ export async function updateTask(
     contentType: "application/json-patch+json",
     method: "PATCH",
     projectName: context.projectName,
+    revisionConflictOnBadRequest: true,
   });
 
   return getTaskDetails(accessToken, workItemId, context);
