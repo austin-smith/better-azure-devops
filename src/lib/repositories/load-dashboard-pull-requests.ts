@@ -116,39 +116,33 @@ export async function loadDashboardPullRequests(): Promise<DashboardPullRequests
     }
 
     /**
-     * Reviews are matched here rather than by Azure DevOps because
-     * `searchCriteria.reviewerId` matches only the reviewer named on the pull
-     * request, and a team assignment names the team. Asking per team instead
-     * would be a request for every group the person belongs to, of which there
-     * are typically far more than there are teams they review for.
+     * One request per project answers both sections. Reviews cannot be matched
+     * by Azure DevOps at all: `searchCriteria.reviewerId` matches only the
+     * reviewer named on the pull request, and a team assignment names the team,
+     * so a review reaching someone through a team is never returned. Asking per
+     * group instead would be a request for every group the person belongs to,
+     * far more than the teams they review for.
+     *
+     * Once every open pull request in the project is here, the ones the person
+     * authored are in it too, and asking for those separately would be a second
+     * request for a subset of what the first already returned.
      */
     const groupIds = await getAzureDevOpsIdentityGroupIds(
       accessToken,
       identityId,
     );
-    const results = await Promise.all(
-      selection.selectedProjects.flatMap((project) => [
-        listAllProjectPullRequests(accessToken, project.id, {
-          creatorId: identityId,
-        }).then((items) => ({ items, kind: "created" as const })),
-        listAllProjectPullRequests(accessToken, project.id, {}).then((items) => ({
-          items,
-          kind: "review" as const,
-        })),
-      ]),
-    );
-    const createdByMe = results
-      .filter((result) => result.kind === "created")
-      .flatMap((result) => result.items);
-    const reviewing = results
-      .filter((result) => result.kind === "review")
-      .flatMap((result) => result.items);
+    const pullRequests = (
+      await Promise.all(
+        selection.selectedProjects.map((project) =>
+          listAllProjectPullRequests(accessToken, project.id, {}),
+        ),
+      )
+    ).flat();
+    const identity = identityId.toLowerCase();
 
     return {
-      // A vote of zero is the only state that still needs an answer; anything
-      // else has already been acted on.
       awaitingReview: sortByNewest(
-        reviewing.filter((pullRequest) =>
+        pullRequests.filter((pullRequest) =>
           isReviewerAwaitingReview(
             pullRequest.reviewers,
             identityId,
@@ -156,7 +150,11 @@ export async function loadDashboardPullRequests(): Promise<DashboardPullRequests
           ),
         ),
       ),
-      createdByMe: sortByNewest(createdByMe),
+      createdByMe: sortByNewest(
+        pullRequests.filter(
+          (pullRequest) => pullRequest.createdBy?.id?.toLowerCase() === identity,
+        ),
+      ),
       isAvailable: true,
     };
   } catch {

@@ -63,10 +63,12 @@ function createReviewer(
 }
 
 function createPullRequest({
+  authorId,
   creationDate,
   id,
   vote = 0,
 }: {
+  authorId?: string;
   creationDate: string;
   id: number;
   vote?: AzureGitPullRequestReviewer["vote"];
@@ -75,7 +77,14 @@ function createPullRequest({
     artifactId: null,
     closedDate: null,
     commits: [],
-    createdBy: null,
+    createdBy: authorId
+      ? {
+          displayName: "Author",
+          id: authorId,
+          imageUrl: null,
+          isContainer: false,
+        }
+      : null,
     creationDate,
     description: null,
     isDraft: false,
@@ -204,57 +213,46 @@ describe("loadDashboardPullRequests", () => {
     });
   });
 
-  it("loads every page before deriving dashboard totals and review work", async () => {
-    const createdFirst = createPullRequest({
+  it("derives both sections from one paged query per project", async () => {
+    const mineFirst = createPullRequest({
+      authorId: "reviewer",
       creationDate: "2026-07-25T00:00:00Z",
       id: 1,
+      vote: 10,
     });
-    const createdLater = createPullRequest({
+    const mineLater = createPullRequest({
+      authorId: "reviewer",
       creationDate: "2026-07-26T00:00:00Z",
       id: 2,
+      vote: 10,
     });
     const alreadyReviewed = createPullRequest({
+      authorId: "colleague",
       creationDate: "2026-07-25T00:00:00Z",
       id: 3,
       vote: 10,
     });
     const awaitingOnLaterPage = createPullRequest({
+      authorId: "colleague",
       creationDate: "2026-07-26T00:00:00Z",
       id: 4,
     });
-    type QueryOptions = {
-      creatorId?: string;
-      cursor?: string | null;
-      reviewerId?: string;
-      top?: number;
-    };
 
     listProjectPullRequestsMock.mockImplementation(
       (
         _accessToken: string,
         _projectId: string,
-        options: QueryOptions,
-      ) => {
-        if (options.creatorId) {
-          return Promise.resolve(
-            options.cursor
-              ? { items: [createdLater], nextCursor: null }
-              : { items: [createdFirst], nextCursor: "100" },
-          );
-        }
-
-        return Promise.resolve(
+        options: { cursor?: string | null; top?: number },
+      ) =>
+        Promise.resolve(
           options.cursor
-            ? { items: [awaitingOnLaterPage], nextCursor: null }
-            : { items: [alreadyReviewed], nextCursor: "100" },
-        );
-      },
+            ? { items: [mineLater, awaitingOnLaterPage], nextCursor: null }
+            : { items: [mineFirst, alreadyReviewed], nextCursor: "100" },
+        ),
     );
 
     await expect(loadDashboardPullRequests()).resolves.toMatchObject({
-      awaitingReview: [
-        expect.objectContaining({ pullRequestId: 4 }),
-      ],
+      awaitingReview: [expect.objectContaining({ pullRequestId: 4 })],
       createdByMe: [
         expect.objectContaining({ pullRequestId: 2 }),
         expect.objectContaining({ pullRequestId: 1 }),
@@ -262,11 +260,40 @@ describe("loadDashboardPullRequests", () => {
       isAvailable: true,
     });
 
-    expect(listProjectPullRequestsMock).toHaveBeenCalledTimes(4);
+    // Two calls are the two pages. Authored pull requests are already in the
+    // same response, so asking for them separately would be a third and fourth.
+    expect(listProjectPullRequestsMock).toHaveBeenCalledTimes(2);
+    expect(listProjectPullRequestsMock).not.toHaveBeenCalledWith(
+      "token",
+      "project",
+      expect.objectContaining({ creatorId: expect.anything() }),
+    );
     expect(listProjectPullRequestsMock).toHaveBeenCalledWith(
       "token",
       "project",
       expect.objectContaining({ cursor: "100", top: 100 }),
     );
+  });
+
+  it("keeps a review reaching the user only through a team", async () => {
+    getAzureDevOpsIdentityGroupIdsMock.mockResolvedValue(["team"]);
+
+    const teamAssigned = createPullRequest({
+      authorId: "colleague",
+      creationDate: "2026-07-26T00:00:00Z",
+      id: 5,
+    });
+
+    teamAssigned.reviewers = [
+      createReviewer({ id: "team", isContainer: true, vote: 0 }),
+    ];
+    listProjectPullRequestsMock.mockResolvedValue({
+      items: [teamAssigned],
+      nextCursor: null,
+    });
+
+    await expect(loadDashboardPullRequests()).resolves.toMatchObject({
+      awaitingReview: [expect.objectContaining({ pullRequestId: 5 })],
+    });
   });
 });
