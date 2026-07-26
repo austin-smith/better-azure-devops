@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { DM_Sans, Geist_Mono, Source_Code_Pro } from "next/font/google";
 import Script from "next/script";
+import packageJson from "../../package.json";
 import "./globals.css";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CommandCenterProvider } from "@/components/command-center/command-center";
@@ -123,6 +124,7 @@ export default async function RootLayout({
             <TooltipProvider>
               <SidebarProvider defaultOpen={defaultSidebarOpen}>
                 <AppSidebar
+                  appVersion={packageJson.version}
                   availableProjects={projectSelection?.availableProjects ?? []}
                   currentUser={currentUser}
                   orgLabel={orgLabel}

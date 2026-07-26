@@ -48,6 +48,7 @@ import type { AzureDevOpsProject } from "@/lib/azure-devops/projects";
 type ProjectOption = Pick<AzureDevOpsProject, "defaultTeamImageUrl" | "id" | "name">;
 
 type AppSidebarProps = {
+  appVersion: string;
   currentUser: {
     avatarUrl: string | null;
     email: string | null;
@@ -408,6 +409,7 @@ function ActiveProjectsControl({
 }
 
 export function AppSidebar({
+  appVersion,
   availableProjects,
   currentUser,
   queueCount,
@@ -431,7 +433,12 @@ export function AppSidebar({
                 src="/logo.png"
                 width={16}
               />
-              <span className="truncate font-medium">{orgLabel}</span>
+              <span className="min-w-0 flex-1 truncate font-medium">
+                {orgLabel}
+              </span>
+              <span className="ml-auto shrink-0 font-mono text-[10px] tabular-nums text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden">
+                v{appVersion}
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
