@@ -111,6 +111,7 @@ type TaskTableProps = {
   filterOptions: TaskFilterOptions;
   filters: TaskListFilters;
   items: Task[];
+  newWorkItemRequestKey?: string | null;
   projects: readonly NewWorkItemProjectOption[];
   title: string;
 };
@@ -686,6 +687,7 @@ export function TaskTable({
   filterOptions,
   filters,
   items,
+  newWorkItemRequestKey = null,
   projects,
   title,
 }: TaskTableProps) {
@@ -815,6 +817,7 @@ export function TaskTable({
             <ThemeToggle />
             <NewWorkItemDialog
               disabled={isPending || activeProjectCount === 0}
+              openRequestKey={newWorkItemRequestKey}
               onContinue={(draft) => setDraftDetail(createDraftDetail(draft))}
               projects={projects}
             />

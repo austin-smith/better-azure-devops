@@ -4,6 +4,7 @@ import {
   type FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -77,6 +78,7 @@ export type NewWorkItemDraft = {
 
 type NewWorkItemDialogProps = {
   disabled?: boolean;
+  openRequestKey?: string | null;
   onContinue: (draft: NewWorkItemDraft) => void;
   projects: readonly NewWorkItemProjectOption[];
 };
@@ -97,6 +99,7 @@ function getInitialProjectId(projects: readonly NewWorkItemProjectOption[]) {
 
 export function NewWorkItemDialog({
   disabled = false,
+  openRequestKey = null,
   onContinue,
   projects,
 }: NewWorkItemDialogProps) {
@@ -112,12 +115,26 @@ export function NewWorkItemDialog({
   const [projectId, setProjectId] = useState(() => getInitialProjectId(projects));
   const [title, setTitle] = useState("");
   const [type, setType] = useState(DEFAULT_WORK_ITEM_TYPES[0] ?? "Task");
+  const handledOpenRequestKeyRef = useRef<string | null>(null);
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === projectId) ?? null,
     [projectId, projects],
   );
   const isCreateDisabled = disabled || projects.length === 0;
   const selectedArea = areaOptions.find((option) => option.value === areaPath) ?? null;
+
+  useEffect(() => {
+    if (
+      !openRequestKey ||
+      openRequestKey === handledOpenRequestKeyRef.current ||
+      isCreateDisabled
+    ) {
+      return;
+    }
+
+    handledOpenRequestKeyRef.current = openRequestKey;
+    setIsOpen(true);
+  }, [isCreateDisabled, openRequestKey]);
 
   useEffect(() => {
     if (projectId && projects.some((project) => project.id === projectId)) {

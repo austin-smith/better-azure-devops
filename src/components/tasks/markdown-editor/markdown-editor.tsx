@@ -46,6 +46,7 @@ import {
 import {
   markdownEditorBaseExtensions,
 } from "./extensions";
+import { ModifierKeyKbd } from "@/components/modifier-key-kbd";
 import { TaskMarkup } from "@/components/tasks/task-markup";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,7 +54,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Kbd, KbdGroup, ModKbd } from "@/components/ui/kbd";
+import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -213,7 +214,7 @@ function ShortcutHint({ shortcut }: { shortcut: ToolbarAction["shortcut"] }) {
 
   return (
     <KbdGroup>
-      <ModKbd />
+      <ModifierKeyKbd />
       <Kbd>K</Kbd>
     </KbdGroup>
   );
