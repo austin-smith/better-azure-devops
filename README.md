@@ -14,7 +14,7 @@
 
 ## About
 
-Better Azure DevOps is a small web client for viewing and interacting with Azure DevOps work items.
+Better Azure DevOps is a small web client for Azure DevOps. Manage work items, browse repositories and code, read commit history, and review pull requests.
 
 ## Setup
 
