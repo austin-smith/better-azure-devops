@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/sidebar";
 import {
   getDefaultTaskListHref,
+  getProjectSelectionHref,
   getTaskListHref,
 } from "@/lib/tasks/navigation";
 import type { AzureDevOpsProject } from "@/lib/azure-devops/projects";
@@ -236,16 +237,6 @@ function ActiveProjectsControl({
     setSelectedProjectIds(nextSelectedProjectIds);
   }, [initialSelectedProjectIds]);
 
-  function buildNextHref() {
-    const nextSearchParams = new URLSearchParams(searchParams.toString());
-    nextSearchParams.delete("areaPath");
-    nextSearchParams.delete("iterationPath");
-    nextSearchParams.delete("project");
-
-    const query = nextSearchParams.toString();
-    return query ? `${pathname}?${query}` : pathname;
-  }
-
   async function flushProjectSelection() {
     if (isSavingProjectsRef.current) {
       return;
@@ -312,7 +303,9 @@ function ActiveProjectsControl({
 
     if (shouldRefresh) {
       startTransition(() => {
-        router.replace(buildNextHref());
+        router.replace(
+          getProjectSelectionHref(pathname, searchParams.toString()),
+        );
         router.refresh();
       });
     }

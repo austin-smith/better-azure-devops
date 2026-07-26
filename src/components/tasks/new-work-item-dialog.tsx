@@ -79,6 +79,7 @@ export type NewWorkItemDraft = {
 type NewWorkItemDialogProps = {
   disabled?: boolean;
   openRequestKey?: string | null;
+  onOpenRequestHandled?: (requestKey: string) => void;
   onContinue: (draft: NewWorkItemDraft) => void;
   projects: readonly NewWorkItemProjectOption[];
 };
@@ -100,6 +101,7 @@ function getInitialProjectId(projects: readonly NewWorkItemProjectOption[]) {
 export function NewWorkItemDialog({
   disabled = false,
   openRequestKey = null,
+  onOpenRequestHandled,
   onContinue,
   projects,
 }: NewWorkItemDialogProps) {
@@ -134,7 +136,8 @@ export function NewWorkItemDialog({
 
     handledOpenRequestKeyRef.current = openRequestKey;
     setIsOpen(true);
-  }, [isCreateDisabled, openRequestKey]);
+    onOpenRequestHandled?.(openRequestKey);
+  }, [isCreateDisabled, onOpenRequestHandled, openRequestKey]);
 
   useEffect(() => {
     if (projectId && projects.some((project) => project.id === projectId)) {

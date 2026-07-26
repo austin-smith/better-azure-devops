@@ -42,3 +42,17 @@ export function getTaskListHref(filters: TaskListFilterInput = {}) {
 export function getDefaultTaskListHref() {
   return getTaskListHref();
 }
+
+export function getProjectSelectionHref(
+  pathname: string,
+  searchParams: string,
+) {
+  const nextSearchParams = new URLSearchParams(searchParams);
+
+  nextSearchParams.delete("areaPath");
+  nextSearchParams.delete("iterationPath");
+  nextSearchParams.delete("project");
+
+  const query = nextSearchParams.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}

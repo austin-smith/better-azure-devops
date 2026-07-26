@@ -7,16 +7,21 @@ import {
 import { CommandCenterTrigger } from "@/components/command-center/command-center-trigger";
 import { ThemeProvider } from "@/components/themes/theme-provider";
 
-const { pushMock, refreshMock } = vi.hoisted(() => ({
+const { navigationState, pushMock, refreshMock, replaceMock } = vi.hoisted(() => ({
+  navigationState: {
+    pathname: "/",
+  },
   pushMock: vi.fn(),
   refreshMock: vi.fn(),
+  replaceMock: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/",
+  usePathname: () => navigationState.pathname,
   useRouter: () => ({
     push: pushMock,
     refresh: refreshMock,
+    replace: replaceMock,
   }),
 }));
 
@@ -69,8 +74,10 @@ function renderCommandCenter({
 
 describe("CommandCenter", () => {
   beforeEach(() => {
+    navigationState.pathname = "/";
     pushMock.mockReset();
     refreshMock.mockReset();
+    replaceMock.mockReset();
     stubBrowserObservers();
     window.history.replaceState({}, "", "/");
   });
@@ -107,6 +114,22 @@ describe("CommandCenter", () => {
     fireEvent.keyDown(document, { key: "k", ctrlKey: true });
     expect(await screen.findByRole("dialog", { name: "Command center" }))
       .toBeInTheDocument();
+  });
+
+  it("leaves handled Cmd/Ctrl+K events with the focused control", () => {
+    renderCommandCenter();
+    const event = new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      key: "k",
+      metaKey: true,
+    });
+
+    event.preventDefault();
+    document.dispatchEvent(event);
+
+    expect(screen.queryByRole("dialog", { name: "Command center" }))
+      .not.toBeInTheDocument();
   });
 
   it("filters grouped actions as the user searches", async () => {
@@ -373,7 +396,13 @@ describe("CommandCenter", () => {
     expect(pushMock).toHaveBeenCalledWith("/tasks?newWorkItem=123456");
   });
 
-  it("updates active projects without closing the command center", async () => {
+  it("updates active projects and clears project-scoped task filters", async () => {
+    navigationState.pathname = "/tasks";
+    window.history.replaceState(
+      {},
+      "",
+      "/tasks?areaPath=Project%5CArea&iterationPath=Project%5CSprint&project=project-one&state=Active",
+    );
     const fetchMock = vi.fn(async () => new Response(
       JSON.stringify({
         availableProjects: [
@@ -410,6 +439,7 @@ describe("CommandCenter", () => {
         }),
       );
     });
+    expect(replaceMock).toHaveBeenCalledWith("/tasks?state=Active");
     expect(refreshMock).toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "Command center" }))
       .toBeInTheDocument();

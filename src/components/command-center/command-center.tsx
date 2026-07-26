@@ -53,6 +53,7 @@ import { Button } from "@/components/ui/button";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/components/themes/theme-provider";
+import { getProjectSelectionHref } from "@/lib/tasks/navigation";
 import { useThemeFamily } from "@/hooks/use-theme-family";
 
 type CommandCenterContextValue = {
@@ -402,6 +403,17 @@ function CommandCenterDialog({
 
       setProjects(selection.availableProjects);
       setProjectIds(selection.selectedProjectIds);
+      const currentUrl = new URL(window.location.href);
+      const currentHref = `${currentUrl.pathname}${currentUrl.search}`;
+      const nextHref = getProjectSelectionHref(
+        currentUrl.pathname,
+        currentUrl.search,
+      );
+
+      if (nextHref !== currentHref) {
+        router.replace(nextHref);
+      }
+
       router.refresh();
     } catch (error) {
       setProjectIds(previousProjectIds);
@@ -697,6 +709,7 @@ export function CommandCenterProvider({
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (
+        event.defaultPrevented ||
         event.repeat ||
         event.altKey ||
         !(event.metaKey || event.ctrlKey) ||
