@@ -99,6 +99,21 @@ describe("azure-devops asset helpers", () => {
     expect(isProxyableAzureDevOpsAssetUrl("./screenshot.png")).toBe(false);
   });
 
+  it("leaves images on another organization's host loading directly", async () => {
+    const { isProxyableAzureDevOpsAssetUrl } = await import(
+      "@/lib/azure-devops/assets"
+    );
+
+    // Rewriting these sends them to a proxy that refuses hosts outside this
+    // organization, turning an image that renders into one that does not.
+    expect(
+      isProxyableAzureDevOpsAssetUrl("https://other.visualstudio.com/a.png"),
+    ).toBe(false);
+    expect(
+      isProxyableAzureDevOpsAssetUrl("https://dev.azure.com/other/_apis/a.png"),
+    ).toBe(true);
+  });
+
   it("rejects non-https and disallowed hosts", async () => {
     const { isAzureDevOpsAssetUrl, resolveAzureDevOpsAssetUrl } = await import(
       "@/lib/azure-devops/assets"

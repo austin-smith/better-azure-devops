@@ -20,8 +20,19 @@ export function buildAzureDevOpsAssetProxyPath(source: string) {
   return `/api/azure-devops/asset?src=${encodeURIComponent(source)}`;
 }
 
-const AZURE_DEVOPS_ASSET_HOST_PATTERN =
-  /(^|\.)(dev\.azure\.com|visualstudio\.com)$/i;
+/**
+ * Only the shared `dev.azure.com` hosts, which the proxy accepts whatever
+ * organization is configured.
+ *
+ * A `visualstudio.com` host is somebody's organization, and which one cannot be
+ * told apart from the host alone. Claiming all of them sends another
+ * organization's image to a proxy that will refuse it, breaking an image that
+ * would otherwise have loaded; claiming none leaves an attachment on the
+ * configured organization's own legacy host unproxied, which is how it behaved
+ * before the proxy existed. The second is the safer failure, so those hosts are
+ * left exactly as authored.
+ */
+const AZURE_DEVOPS_ASSET_HOST_PATTERN = /(^|\.)dev\.azure\.com$/i;
 
 /**
  * An attachment written without a host, resolved against the organization by
