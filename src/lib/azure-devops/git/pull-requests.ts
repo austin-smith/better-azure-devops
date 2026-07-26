@@ -4,6 +4,7 @@ import {
   parsePageCursor,
 } from "@/lib/azure-devops/git/api-path";
 import {
+  isRecord,
   parsePolicyEvaluationList,
   parsePullRequest,
   parsePullRequestChangeList,
@@ -12,6 +13,7 @@ import {
   parsePullRequestStatusList,
   parsePullRequestThread,
   parsePullRequestThreadList,
+  readArray,
 } from "@/lib/azure-devops/git/parsers";
 import { createMalformedResponseError } from "@/lib/azure-devops/errors";
 import type {
@@ -60,14 +62,18 @@ export async function listProjectPullRequests(
   accessToken: string,
   projectId: string,
   options: {
+    cursor?: string | null;
     creatorId?: string;
     reviewerId?: string;
     status?: PullRequestStatus;
     top?: number;
   } = {},
 ) {
+  const skip = parsePageCursor(options.cursor);
+  const top = Math.min(Math.max(options.top ?? 25, 1), 100);
   const searchParams = new URLSearchParams({
-    "$top": String(Math.min(Math.max(options.top ?? 25, 1), 100)),
+    "$skip": String(skip),
+    "$top": String(top),
     "searchCriteria.status": options.status ?? "active",
   });
 
@@ -83,8 +89,16 @@ export async function listProjectPullRequests(
     `/${encodeURIComponent(projectId)}/_apis/git/pullrequests?${searchParams}`,
     { accessToken },
   );
+  const items = parsePullRequestList(response);
+  const rawItemCount = isRecord(response)
+    ? readArray(response.value).length
+    : 0;
 
-  return parsePullRequestList(response);
+  return {
+    items,
+    nextCursor:
+      rawItemCount === top ? String(skip + rawItemCount) : null,
+  };
 }
 
 export async function getRepositoryPullRequest(

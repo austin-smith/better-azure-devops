@@ -1,5 +1,6 @@
 import {
   createPullRequestThread,
+  listProjectPullRequests,
   listPullRequestIterationChanges,
   listPullRequestPolicyEvaluations,
   listPullRequestThreads,
@@ -63,6 +64,44 @@ describe("Azure Git pull request reviews", () => {
     expect(azureDevOpsRequestMock).toHaveBeenNthCalledWith(
       2,
       "/project%20id/_apis/git/repositories/repo%20id/pullrequests/42/iterations/3/changes?%24compareTo=0&%24skip=25&%24top=25",
+      { accessToken: "token" },
+    );
+  });
+
+  it("paginates project pull requests by the raw response page size", async () => {
+    azureDevOpsRequestMock.mockResolvedValue({
+      value: [
+        {
+          pullRequestId: 1,
+          repository: {
+            id: "repository",
+            name: "App",
+            project: {
+              id: "project",
+              name: "Platform",
+            },
+          },
+          title: "Valid pull request",
+        },
+        {
+          pullRequestId: 2,
+        },
+      ],
+    });
+
+    await expect(
+      listProjectPullRequests("token", "project id", {
+        cursor: "4",
+        reviewerId: "reviewer id",
+        top: 2,
+      }),
+    ).resolves.toMatchObject({
+      items: [expect.objectContaining({ pullRequestId: 1 })],
+      nextCursor: "6",
+    });
+
+    expect(azureDevOpsRequestMock).toHaveBeenCalledWith(
+      "/project%20id/_apis/git/pullrequests?%24skip=4&%24top=2&searchCriteria.status=active&searchCriteria.reviewerId=reviewer+id",
       { accessToken: "token" },
     );
   });

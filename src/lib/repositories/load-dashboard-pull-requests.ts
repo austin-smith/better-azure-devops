@@ -8,7 +8,7 @@ import type {
 } from "@/lib/azure-devops/git/types";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 
-const MAX_PULL_REQUESTS_PER_PROJECT = 25;
+const PULL_REQUEST_PAGE_SIZE = 100;
 
 export type DashboardPullRequests = {
   /** Reviewer on these and has not voted yet. */
@@ -27,6 +27,31 @@ function sortByNewest(pullRequests: AzureGitPullRequest[]) {
   return [...pullRequests].sort((left, right) =>
     (right.creationDate ?? "").localeCompare(left.creationDate ?? ""),
   );
+}
+
+async function listAllProjectPullRequests(
+  accessToken: string,
+  projectId: string,
+  options: {
+    creatorId?: string;
+    reviewerId?: string;
+  },
+) {
+  const items: AzureGitPullRequest[] = [];
+  let cursor: string | null = null;
+
+  do {
+    const page = await listProjectPullRequests(accessToken, projectId, {
+      ...options,
+      cursor,
+      top: PULL_REQUEST_PAGE_SIZE,
+    });
+
+    items.push(...page.items);
+    cursor = page.nextCursor;
+  } while (cursor);
+
+  return items;
 }
 
 export function isReviewerAwaitingReview(
@@ -64,13 +89,11 @@ export async function loadDashboardPullRequests(): Promise<DashboardPullRequests
 
     const results = await Promise.all(
       selection.selectedProjects.flatMap((project) => [
-        listProjectPullRequests(accessToken, project.id, {
+        listAllProjectPullRequests(accessToken, project.id, {
           creatorId: identityId,
-          top: MAX_PULL_REQUESTS_PER_PROJECT,
         }).then((items) => ({ items, kind: "created" as const })),
-        listProjectPullRequests(accessToken, project.id, {
+        listAllProjectPullRequests(accessToken, project.id, {
           reviewerId: identityId,
-          top: MAX_PULL_REQUESTS_PER_PROJECT,
         }).then((items) => ({ items, kind: "review" as const })),
       ]),
     );
