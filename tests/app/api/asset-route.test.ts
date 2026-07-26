@@ -16,9 +16,16 @@ vi.mock("@/lib/azure-devops/access-token", () => ({
   getAzureDevOpsAccessToken: getAzureDevOpsAccessTokenMock,
 }));
 
-vi.mock("@/lib/azure-devops/assets", () => ({
-  resolveAzureDevOpsAssetUrl: resolveAzureDevOpsAssetUrlMock,
-}));
+vi.mock("@/lib/azure-devops/assets", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/azure-devops/assets")
+  >("@/lib/azure-devops/assets");
+
+  return {
+    AzureDevOpsAssetError: actual.AzureDevOpsAssetError,
+    resolveAzureDevOpsAssetUrl: resolveAzureDevOpsAssetUrlMock,
+  };
+});
 
 vi.mock("@/lib/azure-devops/config", () => ({
   hasAzureDevOpsConfig: hasAzureDevOpsConfigMock,
@@ -36,6 +43,43 @@ describe("GET /api/azure-devops/asset", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it("answers a source it will not fetch with a bad request", async () => {
+    const { AzureDevOpsAssetError } = await import(
+      "@/lib/azure-devops/assets"
+    );
+
+    resolveAzureDevOpsAssetUrlMock.mockImplementation(() => {
+      throw new AzureDevOpsAssetError(
+        "Azure DevOps asset URL host is not allowed.",
+      );
+    });
+
+    const response = await GET(
+      new NextRequest(
+        "http://localhost/api/azure-devops/asset?src=https%3A%2F%2Fother.visualstudio.com%2Fa.png",
+      ),
+    );
+
+    // Not a 500: the request was answerable and the answer is no.
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Azure DevOps asset URL host is not allowed.",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still reports an unexpected failure as a fault", async () => {
+    resolveAzureDevOpsAssetUrlMock.mockImplementation(() => {
+      throw new Error("boom");
+    });
+
+    const response = await GET(
+      new NextRequest("http://localhost/api/azure-devops/asset?src=x"),
+    );
+
+    expect(response.status).toBe(500);
   });
 
   it("validates config and required params", async () => {
