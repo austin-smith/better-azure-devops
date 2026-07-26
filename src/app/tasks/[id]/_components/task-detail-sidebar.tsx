@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { Loader2Icon } from "lucide-react";
+import { AzureDevOpsFailure } from "@/components/azure-devops-failure";
 import { DateLabel } from "@/components/date-label";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { ProjectImage } from "@/components/project-image";
@@ -47,6 +48,7 @@ import type {
   AzureDevOpsTaskDetail as TaskDetailData,
   AzureDevOpsTaskEditMetadata,
 } from "@/lib/azure-devops/tasks";
+import type { PublicAzureDevOpsError } from "@/lib/azure-devops/errors";
 import type { TaskDetailEditableValues } from "@/lib/tasks/task-detail-edit";
 
 type TaskDetailSidebarProps = {
@@ -59,7 +61,9 @@ type TaskDetailSidebarProps = {
   isSaving: boolean;
   mode?: "create" | "edit";
   onDraftChange: (values: TaskDetailEditableValues) => void;
+  onRetrySave: () => void;
   saveError: string | null;
+  saveErrorDetails: PublicAzureDevOpsError | null;
   taskProjectId: string | null;
 };
 
@@ -377,7 +381,9 @@ export function TaskDetailSidebar({
   isSaving,
   mode = "edit",
   onDraftChange,
+  onRetrySave,
   saveError,
+  saveErrorDetails,
   taskProjectId,
 }: TaskDetailSidebarProps) {
   const isCreateMode = mode === "create";
@@ -404,7 +410,12 @@ export function TaskDetailSidebar({
               </div>
             ) : null}
 
-            {saveError ? (
+            {saveErrorDetails ? (
+              <AzureDevOpsFailure
+                error={saveErrorDetails}
+                onRetry={onRetrySave}
+              />
+            ) : saveError ? (
               <Alert variant="destructive">
                 <AlertDescription>{saveError}</AlertDescription>
               </Alert>

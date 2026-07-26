@@ -533,6 +533,35 @@ export function hasTaskDetailEditableChanges(
   return Object.keys(getTaskDetailEditableChanges(initialValues, draftValues)).length > 0;
 }
 
+export function rebaseTaskDetailEditableValues(
+  initialValues: TaskDetailEditableValues,
+  draftValues: TaskDetailEditableValues,
+  latestValues: TaskDetailEditableValues,
+): TaskDetailEditableValues {
+  const changes = getTaskDetailEditableChanges(initialValues, draftValues);
+
+  return normalizeTaskDetailEditableValues({
+    areaPath: Object.hasOwn(changes, "areaPath")
+      ? draftValues.areaPath
+      : latestValues.areaPath,
+    assignee: Object.hasOwn(changes, "assignee")
+      ? draftValues.assignee
+      : latestValues.assignee,
+    description: Object.hasOwn(changes, "description")
+      ? draftValues.description
+      : latestValues.description,
+    iterationPath: Object.hasOwn(changes, "iterationPath")
+      ? draftValues.iterationPath
+      : latestValues.iterationPath,
+    priority: Object.hasOwn(changes, "priority")
+      ? draftValues.priority
+      : latestValues.priority,
+    title: Object.hasOwn(changes, "title")
+      ? draftValues.title
+      : latestValues.title,
+  });
+}
+
 export function applyTaskDetailEditableValues(
   detail: AzureDevOpsTaskDetail,
   values: TaskDetailEditableValues,

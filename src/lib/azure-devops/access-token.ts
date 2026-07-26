@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
+import { AzureDevOpsError } from "@/lib/azure-devops/errors";
 
 const AZURE_DEVOPS_RESOURCE = "499b84ac-1321-427f-aa17-267ca6975798";
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
@@ -55,21 +56,43 @@ function parseExpiresAt(payload: AzureCliAccessTokenResponse) {
   return Date.now() + 5 * 60_000;
 }
 
-function formatAzureCliError(error: unknown) {
+function classifyAzureCliError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
+  const errorCode =
+    error && typeof error === "object" && "code" in error
+      ? error.code
+      : undefined;
 
   if (
-    message.includes("ENOENT") ||
+    errorCode === "ENOENT" ||
     message.includes("is not recognized as an internal or external command")
   ) {
-    return "Azure CLI is not installed. Install it, then run `az login` with `AZURE_CONFIG_DIR` set to `.azure`.";
+    return new AzureDevOpsError(
+      "Azure CLI is not installed. Install it, then run `az login` with `AZURE_CONFIG_DIR` set to `.azure`.",
+      {
+        cause: error,
+        code: "azure_cli_not_installed",
+      },
+    );
   }
 
-  if (message.includes("az login")) {
-    return "Azure CLI is not signed in. Run `az login` with `AZURE_CONFIG_DIR` set to `.azure`, then reload.";
+  if (/az login|login required|not logged in/i.test(message)) {
+    return new AzureDevOpsError(
+      "Azure CLI is not signed in. Run `az login` with `AZURE_CONFIG_DIR` set to `.azure`, then reload.",
+      {
+        cause: error,
+        code: "authentication_required",
+      },
+    );
   }
 
-  return `Failed to get an Azure DevOps access token from Azure CLI: ${message}`;
+  return new AzureDevOpsError(
+    `Failed to get an Azure DevOps access token from Azure CLI: ${message}`,
+    {
+      cause: error,
+      code: "unknown",
+    },
+  );
 }
 
 function execFileAsync(
@@ -136,6 +159,10 @@ export async function getAzureDevOpsAccessToken() {
 
     return payload.accessToken;
   } catch (error) {
-    throw new Error(formatAzureCliError(error));
+    if (error instanceof AzureDevOpsError) {
+      throw error;
+    }
+
+    throw classifyAzureCliError(error);
   }
 }

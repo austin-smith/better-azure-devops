@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { TaskTable } from "@/components/tasks/task-table";
+import { createPublicAzureDevOpsError } from "@/lib/azure-devops/errors";
 import { getDefaultTaskListFilters } from "@/lib/tasks/filters";
 import { createTask } from "../../fixtures/tasks";
 
@@ -109,7 +110,10 @@ describe("TaskTable", () => {
     render(
       <TaskTable
         activeProjectCount={1}
-        error="Failed to load work items."
+        error={{
+          ...createPublicAzureDevOpsError("server"),
+          message: "Failed to load work items.",
+        }}
         filterOptions={{
           assignees: [],
           priorities: [],

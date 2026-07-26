@@ -36,8 +36,11 @@ describe("GET /api/assignees", () => {
     const response = await GET(new NextRequest("http://localhost/api/assignees?q=ada"));
 
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      error: "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.",
+    await expect(response.json()).resolves.toMatchObject({
+      errorDetails: {
+        code: "missing_config",
+        title: "Connect an Azure DevOps organization",
+      },
     });
   });
 
@@ -73,6 +76,10 @@ describe("GET /api/assignees", () => {
     const response = await GET(new NextRequest("http://localhost/api/assignees?q=ada"));
 
     expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ error: "boom" });
+    await expect(response.json()).resolves.toMatchObject({
+      errorDetails: {
+        code: "unknown",
+      },
+    });
   });
 });

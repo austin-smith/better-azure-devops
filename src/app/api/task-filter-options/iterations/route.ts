@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
+import { createAzureDevOpsErrorResponse } from "@/lib/azure-devops/error-response";
+import { createMissingAzureDevOpsConfigError } from "@/lib/azure-devops/errors";
 import { listIterationPathOptions } from "@/lib/azure-devops/tasks";
-
-const MISSING_CONFIG_ERROR =
-  "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.";
 
 export async function GET(request: NextRequest) {
   if (!hasAzureDevOpsConfig()) {
-    return NextResponse.json({ error: MISSING_CONFIG_ERROR }, { status: 503 });
+    return createAzureDevOpsErrorResponse(
+      createMissingAzureDevOpsConfigError(),
+    );
   }
 
   try {
@@ -27,9 +28,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load iteration paths.";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return createAzureDevOpsErrorResponse(error);
   }
 }

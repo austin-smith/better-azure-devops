@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
+import { createAzureDevOpsErrorResponse } from "@/lib/azure-devops/error-response";
+import { createMissingAzureDevOpsConfigError } from "@/lib/azure-devops/errors";
 import { listAssignableUsers } from "@/lib/azure-devops/tasks";
 
 export async function GET(request: NextRequest) {
   if (!hasAzureDevOpsConfig()) {
-    return NextResponse.json(
-      {
-        error:
-          "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.",
-      },
-      { status: 503 },
+    return createAzureDevOpsErrorResponse(
+      createMissingAzureDevOpsConfigError(),
     );
   }
 
@@ -26,9 +24,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load assignees.";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return createAzureDevOpsErrorResponse(error);
   }
 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
+import { createAzureDevOpsErrorResponse } from "@/lib/azure-devops/error-response";
+import { createMissingAzureDevOpsConfigError } from "@/lib/azure-devops/errors";
 import { getTaskEditMetadata } from "@/lib/azure-devops/tasks";
 
 function parseTaskId(value: string) {
@@ -29,12 +31,8 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   if (!hasAzureDevOpsConfig()) {
-    return NextResponse.json(
-      {
-        error:
-          "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.",
-      },
-      { status: 503 },
+    return createAzureDevOpsErrorResponse(
+      createMissingAzureDevOpsConfigError(),
     );
   }
 
@@ -55,11 +53,6 @@ export async function GET(
 
     return NextResponse.json({ item: metadata });
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to load task edit metadata.";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return createAzureDevOpsErrorResponse(error);
   }
 }

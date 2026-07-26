@@ -5,9 +5,8 @@ import {
   saveAzureDevOpsProjectSelection,
 } from "@/lib/azure-devops/project-selection";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
-
-const MISSING_CONFIG_ERROR =
-  "Azure DevOps config is missing. Set AZURE_DEVOPS_ORG_URL.";
+import { createAzureDevOpsErrorResponse } from "@/lib/azure-devops/error-response";
+import { createMissingAzureDevOpsConfigError } from "@/lib/azure-devops/errors";
 
 function parseProjectIds(value: unknown) {
   if (!Array.isArray(value)) {
@@ -23,7 +22,9 @@ function parseProjectIds(value: unknown) {
 
 export async function GET() {
   if (!hasAzureDevOpsConfig()) {
-    return NextResponse.json({ error: MISSING_CONFIG_ERROR }, { status: 503 });
+    return createAzureDevOpsErrorResponse(
+      createMissingAzureDevOpsConfigError(),
+    );
   }
 
   try {
@@ -35,16 +36,15 @@ export async function GET() {
       selectedProjectIds: selection.selectedProjectIds,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load selected projects.";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return createAzureDevOpsErrorResponse(error);
   }
 }
 
 export async function PATCH(request: NextRequest) {
   if (!hasAzureDevOpsConfig()) {
-    return NextResponse.json({ error: MISSING_CONFIG_ERROR }, { status: 503 });
+    return createAzureDevOpsErrorResponse(
+      createMissingAzureDevOpsConfigError(),
+    );
   }
 
   let payload: unknown;
@@ -77,9 +77,6 @@ export async function PATCH(request: NextRequest) {
       selectedProjectIds: selection.selectedProjectIds,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to save selected projects.";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+    return createAzureDevOpsErrorResponse(error);
   }
 }

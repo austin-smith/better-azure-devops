@@ -4,6 +4,11 @@ import {
 } from "@/lib/azure-devops/tasks";
 import type { AzureDevOpsProject } from "@/lib/azure-devops/projects";
 import {
+  getPublicAzureDevOpsError,
+  type PublicAzureDevOpsError,
+} from "@/lib/azure-devops/errors";
+import { reportAzureDevOpsError } from "@/lib/azure-devops/report-error";
+import {
   applyTaskListFilters,
   areTaskListFiltersEqual,
   getDefaultTaskListFilters,
@@ -14,7 +19,7 @@ import {
 } from "@/lib/tasks/filters";
 
 type LoadTaskListResult = {
-  error: string | null;
+  error: PublicAzureDevOpsError | null;
   filterOptions: TaskFilterOptions;
   items: AzureDevOpsTask[];
 };
@@ -92,8 +97,10 @@ export async function loadTaskList(
       ),
     };
   } catch (error) {
+    reportAzureDevOpsError(error);
+
     return {
-      error: error instanceof Error ? error.message : "Failed to load work items.",
+      error: getPublicAzureDevOpsError(error),
       filterOptions: getEmptyTaskFilterOptions(),
       items: [],
     };
