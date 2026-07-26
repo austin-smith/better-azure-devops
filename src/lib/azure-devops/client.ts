@@ -4,8 +4,13 @@ type AzureDevOpsRequestOptions = {
   accessToken: string;
   baseUrl?: string;
   body?: BodyInit;
+  cache?: RequestCache;
   contentType?: string;
   method?: "GET" | "PATCH" | "POST";
+  next?: {
+    revalidate?: number;
+    tags?: string[];
+  };
   projectName?: string | null;
 };
 
@@ -36,7 +41,8 @@ export async function azureDevOpsRequest<T>(
         : {}),
     },
     body: options.body,
-    cache: "no-store",
+    cache: options.cache ?? "no-store",
+    next: options.next,
   });
 
   if (!response.ok) {

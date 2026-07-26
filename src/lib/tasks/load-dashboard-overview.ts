@@ -5,7 +5,10 @@ import {
   getAzureDevOpsConfig,
   hasAzureDevOpsConfig,
 } from "@/lib/azure-devops/config";
-import type { AzureDevOpsTask } from "@/lib/azure-devops/tasks";
+import {
+  countTasks,
+  type AzureDevOpsTask,
+} from "@/lib/azure-devops/tasks";
 import {
   normalizeTaskListFilters,
 } from "@/lib/tasks/filters";
@@ -107,18 +110,30 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
       };
     }
 
-    const [allTasksResult, queueResult] = await Promise.all([
+    const queueFilters = normalizeTaskListFilters({
+      assignee: "me",
+    });
+    const [allTasksResult, queueCountResult, queueResult] = await Promise.all([
       loadTaskList(
         accessToken,
         selection.selectedProjects,
         normalizeTaskListFilters(),
       ),
+      countTasks(accessToken, selection.selectedProjects, queueFilters).then(
+        (count) => ({ count, error: null }),
+        (error: unknown) => ({
+          count: 0,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to count assigned work items.",
+        }),
+      ),
       loadTaskList(
         accessToken,
         selection.selectedProjects,
-        normalizeTaskListFilters({
-          assignee: "me",
-        }),
+        queueFilters,
+        { maxItems: MAX_QUEUE_ITEMS },
       ),
     ]);
     const now = new Date();
@@ -155,11 +170,12 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
     return {
       attentionCount: attentionTaskIds.size,
       blockedCount,
-      error: allTasksResult.error ?? queueResult.error,
+      error:
+        allTasksResult.error ?? queueResult.error ?? queueCountResult.error,
       openTaskCount,
       projectCount: selection.selectedProjects.length,
-      queueCount: queueResult.items.length,
-      queueItems: queueResult.items.slice(0, MAX_QUEUE_ITEMS),
+      queueCount: queueCountResult.count,
+      queueItems: queueResult.items,
       recentChangeCount,
       recentChangeWindowHours: RECENT_CHANGE_WINDOW_HOURS,
       recentLatestItem: allTasksResult.items[0] ?? null,

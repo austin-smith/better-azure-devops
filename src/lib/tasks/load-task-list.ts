@@ -21,6 +21,7 @@ type LoadTaskListResult = {
 
 type LoadTaskListOptions = {
   includeFilterOptions?: boolean;
+  maxItems?: number;
 };
 
 function getServerScopedFilters(filters: TaskListFilters): TaskListFilters {
@@ -75,7 +76,14 @@ export async function loadTaskList(
       };
     }
 
-    const items = await listTasks(accessToken, selectedProjects, serverScopedFilters);
+    const items = await listTasks(
+      accessToken,
+      selectedProjects,
+      serverScopedFilters,
+      {
+        maxItems: options.maxItems,
+      },
+    );
 
     return {
       error: null,

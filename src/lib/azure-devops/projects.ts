@@ -1,4 +1,8 @@
 import { azureDevOpsRequest } from "@/lib/azure-devops/client";
+import {
+  AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
+  getAzureDevOpsMetadataCacheTags,
+} from "@/lib/azure-devops/cache-scope";
 
 export type AzureDevOpsProject = {
   defaultTeamImageUrl: string | null;
@@ -32,7 +36,14 @@ function compareProjects(left: AzureDevOpsProject, right: AzureDevOpsProject) {
 export async function listProjects(accessToken: string) {
   const response = await azureDevOpsRequest<ProjectsResponse>(
     "/_apis/projects?$top=1000&stateFilter=wellFormed&getDefaultTeamImageUrl=true",
-    { accessToken },
+    {
+      accessToken,
+      cache: "force-cache",
+      next: {
+        revalidate: AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
+        tags: getAzureDevOpsMetadataCacheTags(accessToken, "projects"),
+      },
+    },
   );
 
   return (response.value ?? [])

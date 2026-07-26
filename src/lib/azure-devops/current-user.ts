@@ -1,4 +1,8 @@
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
+import {
+  AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
+  getAzureDevOpsMetadataCacheTags,
+} from "@/lib/azure-devops/cache-scope";
 import { azureDevOpsRequest } from "@/lib/azure-devops/client";
 import { listAssignableUsers } from "@/lib/azure-devops/tasks";
 
@@ -25,6 +29,11 @@ export async function loadCurrentAzureDevOpsUser() {
       {
         accessToken,
         baseUrl: "https://app.vssps.visualstudio.com",
+        cache: "force-cache",
+        next: {
+          revalidate: AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
+          tags: getAzureDevOpsMetadataCacheTags(accessToken, "current-user"),
+        },
       },
     );
 

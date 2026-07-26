@@ -23,8 +23,8 @@ import {
   normalizeThemeMode,
   resolveServerThemeMode,
 } from "@/lib/theme/constants";
-import { loadDashboardOverview } from "@/lib/tasks/load-dashboard-overview";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
+import { loadSidebarCounts } from "@/lib/tasks/load-sidebar-counts";
 
 const sourceCodePro = Source_Code_Pro({
   subsets: ["latin"],
@@ -49,9 +49,9 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const config = hasAzureDevOpsConfig() ? getAzureDevOpsConfig() : null;
-  const [overview, currentUser, projectSelection] = config
+  const [sidebarCounts, currentUser, projectSelection] = config
     ? await Promise.all([
-        loadDashboardOverview(),
+        loadSidebarCounts(),
         loadCurrentAzureDevOpsUser(),
         (async () => {
           try {
@@ -114,9 +114,15 @@ export default async function RootLayout({
                 availableProjects={projectSelection?.availableProjects ?? []}
                 currentUser={currentUser}
                 orgLabel={orgLabel}
-                queueCount={overview?.error ? null : (overview?.queueCount ?? null)}
+                queueCount={
+                  sidebarCounts?.error ? null : (sidebarCounts?.queueCount ?? null)
+                }
                 selectedProjectIds={projectSelection?.selectedProjectIds ?? []}
-                taskCount={overview?.error ? null : (overview?.openTaskCount ?? null)}
+                taskCount={
+                  sidebarCounts?.error
+                    ? null
+                    : (sidebarCounts?.openTaskCount ?? null)
+                }
               />
               <main className="flex min-h-svh min-w-0 flex-1 flex-col bg-background">
                 {children}

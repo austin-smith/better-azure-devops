@@ -111,6 +111,41 @@ describe("getAzureDevOpsAccessToken", () => {
     expect(execFileMock).toHaveBeenCalledTimes(1);
   });
 
+  it("shares an in-flight Azure CLI request", async () => {
+    setPlatform("linux");
+    let completeRequest:
+      | ((error: null, stdout: string, stderr: string) => void)
+      | undefined;
+    execFileMock.mockImplementation(
+      ((file, args, options, callback) => {
+        completeRequest = callback as typeof completeRequest;
+        return {} as never;
+      }) as typeof execFile,
+    );
+
+    const { getAzureDevOpsAccessToken } = await import(
+      "@/lib/azure-devops/access-token"
+    );
+    const firstRequest = getAzureDevOpsAccessToken();
+    const secondRequest = getAzureDevOpsAccessToken();
+
+    expect(execFileMock).toHaveBeenCalledOnce();
+
+    completeRequest?.(
+      null,
+      JSON.stringify({
+        accessToken: "shared-token",
+        expires_on: Math.floor(Date.now() / 1000) + 3600,
+      }),
+      "",
+    );
+
+    await expect(Promise.all([firstRequest, secondRequest])).resolves.toEqual([
+      "shared-token",
+      "shared-token",
+    ]);
+  });
+
   it("reports when Azure CLI is unavailable on Windows", async () => {
     setPlatform("win32");
     process.env.ComSpec = "C:\\Windows\\System32\\cmd.exe";
