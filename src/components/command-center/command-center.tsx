@@ -495,10 +495,10 @@ function CommandCenterDialog({
   const rootGroups = useMemo(
     () =>
       buildRootCommandGroups({
+        availableProjects: projects,
         currentPathname: pathname,
         currentTaskFilters,
         hasActiveProjects: projectIds.length > 0,
-        hasAvailableProjects: projects.length > 0,
         navigate,
         openNewWorkItem,
         openView: selectView,
@@ -509,7 +509,7 @@ function CommandCenterDialog({
       openNewWorkItem,
       pathname,
       projectIds.length,
-      projects.length,
+      projects,
       selectView,
     ],
   );

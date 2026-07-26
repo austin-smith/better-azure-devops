@@ -63,7 +63,7 @@ type BuildNavigationActionsOptions = {
 };
 
 type BuildRootCommandGroupsOptions = BuildNavigationActionsOptions & {
-  hasAvailableProjects: boolean;
+  availableProjects: readonly CommandCenterProject[];
   openView: (view: Exclude<CommandCenterView, "root">) => void;
 };
 
@@ -204,11 +204,11 @@ export function buildDirectWorkItemAction(
 }
 
 function buildSecondaryViewActions({
-  hasAvailableProjects,
+  availableProjects,
   openView,
 }: Pick<
   BuildRootCommandGroupsOptions,
-  "hasAvailableProjects" | "openView"
+  "availableProjects" | "openView"
 >): CommandCenterAction[] {
   return [
     {
@@ -228,14 +228,21 @@ function buildSecondaryViewActions({
       nested: true,
       run: () => openView("filters"),
     },
-    ...(hasAvailableProjects
+    ...(availableProjects.length > 0
       ? [
           {
             description: "Choose the Azure DevOps projects in your workspace",
             icon: FolderKanbanIcon,
             id: "switch-projects",
             keepOpen: true,
-            keywords: ["active", "project", "selection", "switch", "workspace"],
+            keywords: [
+              "active",
+              "project",
+              "selection",
+              "switch",
+              "workspace",
+              ...availableProjects.map((project) => project.name),
+            ],
             label: "Switch active projects",
             nested: true,
             run: () => openView("projects"),

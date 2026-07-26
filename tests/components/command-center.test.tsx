@@ -185,6 +185,24 @@ describe("CommandCenter", () => {
       .toBeInTheDocument();
   });
 
+  it("finds the project drill-in by an available project name", async () => {
+    renderCommandCenter();
+    fireEvent.click(screen.getByRole("button", { name: "Open command center" }));
+
+    const search = await screen.findByRole("combobox", {
+      name: "Search commands",
+    });
+    fireEvent.change(search, { target: { value: "Project One" } });
+
+    const projects = await screen.findByRole("option", {
+      name: /Switch active projects/,
+    });
+    fireEvent.click(projects);
+
+    expect(await screen.findByRole("option", { name: /^Project One\./ }))
+      .toBeInTheDocument();
+  });
+
   it("keeps the root compact and opens secondary command modes", async () => {
     renderCommandCenter();
     fireEvent.click(screen.getByRole("button", { name: "Open command center" }));
