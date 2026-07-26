@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
-import { resolveAzureDevOpsAssetUrl } from "@/lib/azure-devops/assets";
+import {
+  AzureDevOpsAssetError,
+  resolveAzureDevOpsAssetUrl,
+} from "@/lib/azure-devops/assets";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
 
 export async function GET(request: NextRequest) {
@@ -59,6 +62,10 @@ export async function GET(request: NextRequest) {
     const message =
       error instanceof Error ? error.message : "Failed to load asset from Azure DevOps.";
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    // A source this organization will not fetch is a bad request, not a fault.
+    return NextResponse.json(
+      { error: message },
+      { status: error instanceof AzureDevOpsAssetError ? 400 : 500 },
+    );
   }
 }

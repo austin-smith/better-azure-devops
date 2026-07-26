@@ -492,7 +492,14 @@ describe("azure-devops task helpers", () => {
             creationDate: "2025-01-05T14:00:00.000Z",
             isDraft: true,
             pullRequestId: 501,
-            repository: { name: "platform" },
+            repository: {
+              id: "repository-id",
+              name: "platform",
+              project: {
+                id: "project-id",
+                name: "Platform",
+              },
+            },
             sourceRefName: "refs/heads/feature/task",
             status: "active",
             targetRefName: "refs/heads/main",
@@ -536,6 +543,8 @@ describe("azure-devops task helpers", () => {
         expect.objectContaining({
           id: 501,
           isDraft: true,
+          projectId: "project-id",
+          repositoryId: "repository-id",
           repositoryName: "platform",
           sourceBranch: "feature/task",
           targetBranch: "main",

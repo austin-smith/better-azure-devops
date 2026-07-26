@@ -103,7 +103,7 @@ function SidebarField({
   return (
     <Field className="gap-1.5">
       <FieldLabel
-        className="text-[11px] leading-none font-medium text-muted-foreground uppercase"
+        className="text-xs leading-none font-medium text-muted-foreground uppercase"
         htmlFor={controlId}
       >
         {label}

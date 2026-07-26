@@ -497,6 +497,7 @@ function CommandCenterDialog({
       buildRootCommandGroups({
         availableProjects: projects,
         currentPathname: pathname,
+        currentSearchParams: searchParams,
         currentTaskFilters,
         hasActiveProjects: projectIds.length > 0,
         navigate,
@@ -510,6 +511,7 @@ function CommandCenterDialog({
       pathname,
       projectIds.length,
       projects,
+      searchParams,
       selectView,
     ],
   );

@@ -1,13 +1,19 @@
 import {
   BugIcon,
   CircleDotIcon,
+  Clock3Icon,
+  Code2Icon,
   FolderKanbanIcon,
+  FolderGit2Icon,
+  GitPullRequestArrowIcon,
   HashIcon,
   HouseIcon,
   LayoutListIcon,
   ListFilterIcon,
   PaletteIcon,
   PlusIcon,
+  SearchIcon,
+  UploadIcon,
   UserCircle2Icon,
   type LucideIcon,
 } from "lucide-react";
@@ -56,6 +62,9 @@ export type CommandCenterGroup = {
 
 type BuildNavigationActionsOptions = {
   currentPathname: string;
+  currentSearchParams: {
+    get: (name: string) => string | null;
+  };
   currentTaskFilters: TaskListFilterInput;
   hasActiveProjects: boolean;
   navigate: (href: string) => void;
@@ -155,6 +164,105 @@ function buildNavigationActions({
   ];
 }
 
+function buildRepositoryCommandGroup({
+  currentPathname,
+  currentSearchParams,
+  navigate,
+}: Pick<
+  BuildNavigationActionsOptions,
+  "currentPathname" | "currentSearchParams" | "navigate"
+>): CommandCenterGroup | null {
+  const match = /^\/repos\/([^/]+)\/([^/]+)/.exec(currentPathname);
+
+  if (!match?.[1] || !match[2]) {
+    return null;
+  }
+
+  const repositoryRoot = `/repos/${match[1]}/${match[2]}`;
+  const rawVersionType = currentSearchParams.get("versionType");
+  const versionType =
+    rawVersionType === "commit" || rawVersionType === "tag"
+      ? rawVersionType
+      : "branch";
+  const version = currentSearchParams.get("version");
+  const versionSearch = version
+    ? `?${new URLSearchParams({ version, versionType })}`
+    : "";
+  const destinations = [
+    {
+      description: "Browse repository files and README content",
+      href: "",
+      icon: Code2Icon,
+      id: "repository-code",
+      isActive:
+        currentPathname === repositoryRoot ||
+        currentPathname.startsWith(`${repositoryRoot}/tree`) ||
+        currentPathname.startsWith(`${repositoryRoot}/blob`),
+      keywords: ["blob", "code", "file", "readme", "tree"],
+      label: "Repository code",
+      shortcut: ["G", "C"],
+    },
+    {
+      description: "Inspect branch and path commit history",
+      href: "/commits",
+      icon: Clock3Icon,
+      id: "repository-commits",
+      isActive: currentPathname.startsWith(`${repositoryRoot}/commits`),
+      keywords: ["change", "commit", "diff", "history"],
+      label: "Repository commits",
+      shortcut: ["G", "H"],
+    },
+    {
+      description: "Review repository pull requests",
+      href: "/pulls",
+      icon: GitPullRequestArrowIcon,
+      id: "repository-pull-requests",
+      isActive: currentPathname.startsWith(`${repositoryRoot}/pulls`),
+      keywords: ["branch", "merge", "pr", "pull request"],
+      label: "Repository pull requests",
+      shortcut: ["G", "P"],
+    },
+    {
+      description: "Follow Azure Git push and ref updates",
+      href: "/activity",
+      icon: UploadIcon,
+      id: "repository-push-activity",
+      isActive: currentPathname.startsWith(`${repositoryRoot}/activity`),
+      keywords: ["activity", "branch", "push", "ref"],
+      label: "Repository push activity",
+      shortcut: ["G", "A"],
+    },
+    {
+      description: "Search indexed code in this repository",
+      href: "/search",
+      icon: SearchIcon,
+      id: "repository-search",
+      isActive: currentPathname.startsWith(`${repositoryRoot}/search`),
+      keywords: ["code", "find", "search", "symbol"],
+      label: "Search repository code",
+      shortcut: ["/"],
+    },
+  ] as const;
+
+  return {
+    actions: destinations.map((destination) => ({
+      checked: destination.isActive,
+      description: destination.description,
+      icon: destination.icon,
+      id: destination.id,
+      keywords: destination.keywords,
+      label: destination.label,
+      run: () =>
+        navigate(
+          `${repositoryRoot}${destination.href}${versionSearch}`,
+        ),
+      shortcut: destination.shortcut,
+    })),
+    heading: "Current repository",
+    id: "current-repository",
+  };
+}
+
 function getSuggestedActionIds(currentPathname: string) {
   if (currentPathname === "/") {
     return ["your-queue", "new-work-item"];
@@ -205,10 +313,11 @@ export function buildDirectWorkItemAction(
 
 function buildSecondaryViewActions({
   availableProjects,
+  navigate,
   openView,
 }: Pick<
   BuildRootCommandGroupsOptions,
-  "availableProjects" | "openView"
+  "availableProjects" | "navigate" | "openView"
 >): CommandCenterAction[] {
   return [
     {
@@ -269,6 +378,14 @@ function buildSecondaryViewActions({
       nested: true,
       run: () => openView("appearance"),
     },
+    {
+      description: "Browse code across active Azure DevOps projects",
+      icon: FolderGit2Icon,
+      id: "repositories",
+      keywords: ["azure repos", "code", "git", "repository"],
+      label: "Repositories",
+      run: () => navigate("/repos"),
+    },
   ];
 }
 
@@ -307,6 +424,7 @@ export function buildRootCommandGroups(
     ),
     ...buildSecondaryViewActions(options),
   ];
+  const repositoryGroup = buildRepositoryCommandGroup(options);
 
   return [
     {
@@ -314,6 +432,7 @@ export function buildRootCommandGroups(
       heading: "Suggestions",
       id: "suggestions",
     },
+    ...(repositoryGroup ? [repositoryGroup] : []),
     {
       actions: commandActions,
       heading: "Commands",

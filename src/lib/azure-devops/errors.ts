@@ -34,12 +34,14 @@ export type PublicAzureDevOpsError = {
 type AzureDevOpsErrorOptions = {
   cause?: unknown;
   code: AzureDevOpsErrorCode;
+  correlationId?: string | null;
   retryAfterSeconds?: number | null;
   status?: number | null;
 };
 
 export class AzureDevOpsError extends Error {
   readonly code: AzureDevOpsErrorCode;
+  readonly correlationId: string | null;
   readonly retryAfterSeconds: number | null;
   readonly status: number | null;
 
@@ -47,9 +49,116 @@ export class AzureDevOpsError extends Error {
     super(message, { cause: options.cause });
     this.name = "AzureDevOpsError";
     this.code = options.code;
+    this.correlationId = options.correlationId ?? null;
     this.retryAfterSeconds = options.retryAfterSeconds ?? null;
     this.status = options.status ?? null;
   }
+}
+
+export type AzureDevOpsErrorKind =
+  | "authentication-required"
+  | "forbidden"
+  | "malformed-response"
+  | "not-configured"
+  | "not-found"
+  | "search-unavailable"
+  | "throttled"
+  | "unsupported"
+  | "upstream";
+
+export type AzureDevOpsErrorDescriptor = {
+  correlationId: string | null;
+  kind: AzureDevOpsErrorKind;
+  message: string;
+  retryAfterSeconds: number | null;
+  status: number | null;
+};
+
+export class AzureDevOpsDataError extends Error {
+  readonly descriptor: AzureDevOpsErrorDescriptor;
+
+  constructor(descriptor: AzureDevOpsErrorDescriptor) {
+    super(descriptor.message);
+    this.name = "AzureDevOpsDataError";
+    this.descriptor = descriptor;
+  }
+}
+
+export function createMalformedResponseError(operation: string) {
+  return new AzureDevOpsDataError({
+    correlationId: null,
+    kind: "malformed-response",
+    message: `Azure DevOps returned an invalid response while ${operation}.`,
+    retryAfterSeconds: null,
+    status: null,
+  });
+}
+
+export function describeAzureDevOpsError(
+  error: unknown,
+): AzureDevOpsErrorDescriptor {
+  if (error instanceof AzureDevOpsDataError) {
+    return error.descriptor;
+  }
+
+  if (error instanceof AzureDevOpsError) {
+    const shared = {
+      correlationId: error.correlationId,
+      retryAfterSeconds: error.retryAfterSeconds,
+      status: error.status,
+    };
+
+    switch (error.code) {
+      case "authentication_required":
+      case "azure_cli_not_installed":
+        return {
+          ...shared,
+          kind: "authentication-required",
+          message:
+            "Azure CLI authentication expired or is unavailable. Sign in again and retry.",
+        };
+      case "permission_denied":
+        return {
+          ...shared,
+          kind: "forbidden",
+          message:
+            "You do not have permission to read this Azure DevOps resource.",
+        };
+      case "not_found":
+        return {
+          ...shared,
+          kind: "not-found",
+          message: "The requested Azure DevOps resource could not be found.",
+        };
+      case "missing_config":
+        return {
+          ...shared,
+          kind: "not-configured",
+          message:
+            "Set AZURE_DEVOPS_ORG_URL before loading Azure DevOps data.",
+        };
+      case "throttled":
+        return {
+          ...shared,
+          kind: "throttled",
+          message: "Azure DevOps is throttling requests. Try again shortly.",
+        };
+      default:
+        return {
+          ...shared,
+          kind: "upstream",
+          message: "Azure DevOps could not complete the request.",
+        };
+    }
+  }
+
+  return {
+    correlationId: null,
+    kind: "upstream",
+    message: "Azure DevOps could not complete the request.",
+    retryAfterSeconds: null,
+    status: null,
+  };
 }
 
 export function createMissingAzureDevOpsConfigError() {

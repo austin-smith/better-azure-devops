@@ -41,6 +41,79 @@ describe("azure-devops asset helpers", () => {
     expect(isAzureDevOpsAssetUrl("https://aex.dev.azure.com/example")).toBe(true);
   });
 
+  it("keeps the organization when resolving a host-less attachment", async () => {
+    const { resolveAzureDevOpsAssetUrl } = await import(
+      "@/lib/azure-devops/assets"
+    );
+
+    // A root-relative path replaces the base's path, so resolving it against
+    // the organization URL directly would drop the organization segment.
+    expect(
+      resolveAzureDevOpsAssetUrl(
+        "/_apis/wit/attachments/abc?fileName=image.png",
+      ).toString(),
+    ).toBe(
+      "https://dev.azure.com/example/_apis/wit/attachments/abc?fileName=image.png",
+    );
+  });
+
+  it("resolves a host-less attachment for an organization on its own host", async () => {
+    process.env.AZURE_DEVOPS_ORG_URL = "https://example.visualstudio.com";
+    vi.resetModules();
+
+    const { resolveAzureDevOpsAssetUrl } = await import(
+      "@/lib/azure-devops/assets"
+    );
+
+    expect(
+      resolveAzureDevOpsAssetUrl("/_apis/wit/attachments/abc").toString(),
+    ).toBe("https://example.visualstudio.com/_apis/wit/attachments/abc");
+  });
+
+  it("accepts the organization's legacy host but not another organization's", async () => {
+    const { isAzureDevOpsAssetUrl } = await import(
+      "@/lib/azure-devops/assets"
+    );
+
+    expect(
+      isAzureDevOpsAssetUrl("https://example.visualstudio.com/_apis/wit/attachments/abc"),
+    ).toBe(true);
+    // Sending this organization's token to another organization's host.
+    expect(
+      isAzureDevOpsAssetUrl("https://other.visualstudio.com/_apis/wit/attachments/abc"),
+    ).toBe(false);
+  });
+
+  it("hands host-less API paths to the proxy and leaves page assets alone", async () => {
+    const { isProxyableAzureDevOpsAssetUrl } = await import(
+      "@/lib/azure-devops/assets"
+    );
+
+    expect(
+      isProxyableAzureDevOpsAssetUrl("/_apis/wit/attachments/abc?fileName=i.png"),
+    ).toBe(true);
+    expect(
+      isProxyableAzureDevOpsAssetUrl("/example/proj/_apis/wit/attachments/abc"),
+    ).toBe(true);
+    expect(isProxyableAzureDevOpsAssetUrl("/logo.png")).toBe(false);
+    expect(isProxyableAzureDevOpsAssetUrl("./screenshot.png")).toBe(false);
+  });
+
+  it("leaves images on another organization's host loading directly", async () => {
+    const { isProxyableAzureDevOpsAssetUrl } = await import(
+      "@/lib/azure-devops/assets"
+    );
+
+    // Rewriting these sends them to a proxy that refuses hosts outside this
+    // organization, turning an image that renders into one that does not.
+    expect(
+      isProxyableAzureDevOpsAssetUrl("https://other.visualstudio.com/a.png"),
+    ).toBe(false);
+    expect(
+      isProxyableAzureDevOpsAssetUrl("https://dev.azure.com/other/_apis/a.png"),
+    ).toBe(true);
+  });
+
   it("rejects non-https and disallowed hosts", async () => {
     const { isAzureDevOpsAssetUrl, resolveAzureDevOpsAssetUrl } = await import(
       "@/lib/azure-devops/assets"

@@ -7,6 +7,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronDownIcon,
   FolderIcon,
+  FolderGit2Icon,
   HouseIcon,
   LayoutListIcon,
   Loader2Icon,
@@ -68,6 +69,8 @@ function SidebarNavigation({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isHome = pathname === "/";
+  const isRepositoryRoute =
+    pathname === "/repos" || pathname.startsWith("/repos/");
   const isTaskRoute = pathname === "/tasks" || pathname.startsWith("/tasks/");
   const isQueue = isTaskRoute && searchParams.get("assignee") === "me";
   const isTasks = isTaskRoute && !isQueue;
@@ -82,6 +85,16 @@ function SidebarNavigation({
         >
           <HouseIcon />
           <span>Home</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          render={<Link href="/repos" />}
+          isActive={isRepositoryRoute}
+          tooltip="Repositories"
+        >
+          <FolderGit2Icon />
+          <span>Repositories</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
       <SidebarMenuItem>
@@ -127,6 +140,15 @@ function SidebarNavigationFallback({
         >
           <HouseIcon />
           <span>Home</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          render={<Link href="/repos" />}
+          tooltip="Repositories"
+        >
+          <FolderGit2Icon />
+          <span>Repositories</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
       <SidebarMenuItem>

@@ -5,6 +5,26 @@ export type AzureDevOpsMarkup = {
   format: "html" | "markdown" | "unknown";
 };
 
+function escapeMarkdownLinkText(value: string) {
+  return value.replace(/([\\[\]])/g, "\\$1");
+}
+
+export function normalizeAzureDevOpsMarkdownMentions(
+  content: string,
+  mentionLabels: ReadonlyMap<string, string>,
+) {
+  return content.replace(/@<([^>]+)>/g, (token, mentionId) => {
+    const normalizedMentionId = String(mentionId).trim().toLowerCase();
+    const mentionLabel = mentionLabels.get(normalizedMentionId);
+
+    if (!mentionLabel) {
+      return token;
+    }
+
+    return `[${escapeMarkdownLinkText(mentionLabel)}](./ado-mention/${encodeURIComponent(normalizedMentionId)})`;
+  });
+}
+
 type SanitizeAzureDevOpsHtmlOptions = {
   transformImageSource?: (source: string) => string | null | undefined;
 };
@@ -74,10 +94,15 @@ export function sanitizeAzureDevOpsHtml(
         const transformedSource = source
           ? options.transformImageSource?.(source)
           : null;
-        const nextAttribs = {
-          ...attribs,
-          ...(transformedSource ? { src: transformedSource } : {}),
-        };
+        const nextAttribs = { ...attribs };
+
+        if (options.transformImageSource) {
+          if (transformedSource) {
+            nextAttribs.src = transformedSource;
+          } else {
+            delete nextAttribs.src;
+          }
+        }
 
         return {
           attribs: {

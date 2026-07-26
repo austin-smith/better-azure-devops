@@ -7,6 +7,18 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* The interface is information dense, so the whole type scale steps down
+     rather than the two body sizes alone: a partial change leaves uneven
+     jumps between adjacent steps. Every value is a whole pixel at the default
+     16px root, which keeps rendering crisp and honours a reader who has
+     changed their browser font size. */
+  --text-xs: 0.6875rem; /* 11px */
+  --text-sm: 0.8125rem; /* 13px */
+  --text-base: 0.9375rem; /* 15px */
+  --text-lg: 1.0625rem; /* 17px */
+  --text-xl: 1.1875rem; /* 19px */
+  --text-2xl: 1.375rem; /* 22px */
+  --text-3xl: 1.625rem; /* 26px */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--app-font-sans);
@@ -30,6 +42,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -62,28 +75,29 @@
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
+  --card: oklch(0.995 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
+  --secondary: oklch(0.87 0 0);
+  --secondary-foreground: oklch(0.145 0 0);
+  --muted: oklch(0.95 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --accent: oklch(0.95 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.95 0 0);
+  --input: oklch(0.97 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
+  --chart-1: oklch(0.81 0.1 252);
+  --chart-2: oklch(0.62 0.19 260);
+  --chart-3: oklch(0.55 0.22 263);
+  --chart-4: oklch(0.49 0.22 264);
+  --chart-5: oklch(0.42 0.18 266);
+  --radius: 0.5rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -92,28 +106,29 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --app-font-sans: "Inter", "Segoe UI", sans-serif;
-  --app-font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia,
-    serif;
-  --app-font-mono: "SFMono-Regular", "Menlo", "Monaco", monospace;
-  --app-font-heading: "Inter", "Segoe UI", sans-serif;
-  --shadow-2xs: 0 1px rgb(0 0 0 / 0.05);
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1),
-    0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1),
-    0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1),
-    0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --app-font-sans: var(--font-dm-sans), ui-sans-serif, sans-serif;
+  --app-font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --app-font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --app-font-heading: var(--font-dm-sans), ui-sans-serif, sans-serif;
+  --shadow-2xs: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  --shadow-xs: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 2px 4px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 1px 3px 0 rgb(0 0 0 / 0.1),
+    0 8px 10px -1px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 1px 3px 0 rgb(0 0 0 / 0.25);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: oklch(0.205 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.165 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
@@ -123,41 +138,26 @@
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --accent: oklch(0.371 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
+  --chart-1: oklch(0.81 0.1 252);
+  --chart-2: oklch(0.62 0.19 260);
+  --chart-3: oklch(0.55 0.22 263);
+  --chart-4: oklch(0.49 0.22 264);
+  --chart-5: oklch(0.42 0.18 266);
+  --sidebar: oklch(0.19 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-  --app-font-sans: "Inter", "Segoe UI", sans-serif;
-  --app-font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia,
-    serif;
-  --app-font-mono: "SFMono-Regular", "Menlo", "Monaco", monospace;
-  --app-font-heading: "Inter", "Segoe UI", sans-serif;
-  --shadow-2xs: 0 1px rgb(0 0 0 / 0.12);
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.12);
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.16);
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.22), 0 1px 2px -1px rgb(0 0 0 / 0.22);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.22),
-    0 2px 4px -2px rgb(0 0 0 / 0.22);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.24),
-    0 4px 6px -4px rgb(0 0 0 / 0.24);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.26),
-    0 8px 10px -6px rgb(0 0 0 / 0.26);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.45);
+  --sidebar-border: oklch(0.275 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
 }
 
 :root[class~="perpetuity"] {
@@ -373,4 +373,105 @@
   html {
     @apply font-sans;
   }
+}
+
+/*
+ * Diffs render inside a shadow root, so the type scale does not reach them.
+ * Their code lines set no size of their own and inherit from this host, which
+ * meant they were drawn at the 16px document root while the interface around
+ * them sat at 11-13px. Inherited properties do cross the shadow boundary, so
+ * sizing the host is enough; the custom properties cover the header and
+ * controls, which read them directly.
+ */
+.repository-pierre {
+  --diffs-font-size: 0.75rem;
+  --diffs-line-height: 1.125rem;
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+.repository-markdown {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.repository-markdown :where(h1, h2, h3, h4, h5, h6) {
+  scroll-margin-top: 6rem;
+  font-family: var(--font-heading);
+  line-height: 1.25;
+}
+
+.repository-markdown :where(h1, h2) {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.3em;
+}
+
+.repository-markdown :where(h1) {
+  margin-block: 0 1rem;
+  font-size: 1.5rem;
+}
+
+.repository-markdown :where(h2) {
+  margin-block: 1.5rem 1rem;
+  font-size: 1.25rem;
+}
+
+.repository-markdown :where(h3) {
+  margin-block: 1.5rem 0.75rem;
+  font-size: 1rem;
+}
+
+.repository-markdown :where(h4, h5, h6) {
+  margin-block: 1rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.repository-markdown :where(p, ul, ol, blockquote, pre, figure) {
+  margin-block: 1rem;
+}
+
+.repository-markdown :where(ul, ol) {
+  padding-inline-start: 2rem;
+}
+
+.repository-markdown :where(li) {
+  margin-block: 0.25rem;
+}
+
+.repository-markdown :where(a) {
+  color: var(--primary);
+}
+
+.repository-markdown :where(code)::before,
+.repository-markdown :where(code)::after {
+  content: none;
+}
+
+.repository-markdown :where(pre) {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  background: color-mix(in oklab, var(--muted) 30%, transparent);
+}
+
+.repository-markdown :where(img) {
+  margin-block: 1rem;
+}
+
+.repository-markdown-table {
+  max-width: 100%;
+  margin-block: 1rem;
+  overflow-x: auto;
+}
+
+.repository-markdown-table:focus-visible {
+  border-radius: var(--radius);
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.repository-markdown-table > table {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
 }

@@ -68,6 +68,29 @@ describe("getAzureDevOpsAccessToken", () => {
     );
   });
 
+  it("honors an explicit Azure CLI config directory", async () => {
+    setPlatform("linux");
+    process.env.AZURE_CONFIG_DIR = "/tmp/custom-azure-config";
+    mockExecFileSuccess({
+      accessToken: "token",
+      expires_on: Math.floor(Date.now() / 1000) + 3600,
+    });
+
+    const { getAzureDevOpsAccessToken } = await import("@/lib/azure-devops/access-token");
+
+    await expect(getAzureDevOpsAccessToken()).resolves.toBe("token");
+    expect(execFileMock).toHaveBeenCalledWith(
+      "az",
+      expect.any(Array),
+      {
+        env: expect.objectContaining({
+          AZURE_CONFIG_DIR: "/tmp/custom-azure-config",
+        }),
+      },
+      expect.any(Function),
+    );
+  });
+
   it("invokes Azure CLI through cmd.exe from a trusted Windows cwd", async () => {
     setPlatform("win32");
     process.env.ComSpec = "C:\\Windows\\System32\\cmd.exe";

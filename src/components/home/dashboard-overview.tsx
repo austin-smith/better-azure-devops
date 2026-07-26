@@ -1,334 +1,312 @@
 import Link from "next/link";
-import type { ComponentType } from "react";
-import {
-  AlertTriangleIcon,
-  ArrowRightIcon,
-  Clock3Icon,
-  LayoutListIcon,
-  UserCircle2Icon,
-} from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { AzureDevOpsFailure } from "@/components/azure-devops-failure";
 import { DateLabel } from "@/components/date-label";
+import { RepositoryErrorAlert } from "@/components/repositories/repository-state";
+import { RepositoryPullRequestRow } from "@/components/repositories/repository-pull-request-row";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { ThemeToggle } from "@/components/themes/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import type { DashboardOverview } from "@/lib/tasks/load-dashboard-overview";
+import { getTaskStateBadgeVariant } from "@/lib/tasks/state";
+import type { DashboardOverview as DashboardOverviewData } from "@/lib/tasks/load-dashboard-overview";
+import type { DashboardPullRequests } from "@/lib/repositories/load-dashboard-pull-requests";
 import {
   getDefaultTaskListHref,
   getTaskDetailHref,
   getTaskListHref,
 } from "@/lib/tasks/navigation";
-import { getTaskStateBadgeVariant } from "@/lib/tasks/state";
+import { cn } from "@/lib/utils";
+
+const MAX_ROWS = 5;
 
 type DashboardOverviewProps = {
-  overview: DashboardOverview;
+  overview: DashboardOverviewData;
+  pullRequests: DashboardPullRequests;
 };
 
-type KpiCardProps = {
+function StatTile({
+  href,
+  label,
+  value,
+}: {
   href?: string;
-  icon: ComponentType<{ className?: string }>;
   label: string;
   value: number;
-};
-
-function KpiCard({ href, icon: Icon, label, value }: KpiCardProps) {
-  const card = (
-    <Card
-      size="sm"
-      className={`h-full gap-0 ${href ? "transition-colors hover:bg-muted/40" : ""}`}
-    >
-      <CardHeader className="gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle className="text-xs font-medium tracking-normal text-muted-foreground">
-            {label}
-          </CardTitle>
-          <div className="flex size-7 items-center justify-center rounded-md border bg-background text-muted-foreground">
-            <Icon className="size-3.5" />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-1">
-        <div className="text-2xl font-semibold tracking-tight">{value}</div>
-      </CardContent>
-    </Card>
+}) {
+  const content = (
+    <div className="flex flex-col gap-0.5 rounded-lg border bg-card px-3 py-2.5 transition-colors hover:bg-muted/40">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xl font-semibold tabular-nums">{value}</span>
+    </div>
   );
 
-  if (!href) {
-    return card;
-  }
-
-  return <Link href={href}>{card}</Link>;
+  return href ? <Link href={href}>{content}</Link> : content;
 }
 
-export function DashboardOverview({ overview }: DashboardOverviewProps) {
+function Panel({
+  action,
+  children,
+  count,
+  title,
+}: {
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  count?: number;
+  title: string;
+}) {
+  return (
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-lg border bg-card">
+      <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-3 py-1.5">
+        <h2 className="text-xs font-medium text-muted-foreground">
+          {title}
+          {count === undefined ? null : (
+            <span className="ml-1.5 tabular-nums">{count}</span>
+          )}
+        </h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function EmptyRow({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
+function ViewAll({ href }: { href: string }) {
+  return (
+    <Button
+      className="h-6"
+      nativeButton={false}
+      render={<Link href={href} />}
+      size="xs"
+      variant="ghost"
+    >
+      View all
+      <ArrowRightIcon data-icon="inline-end" />
+    </Button>
+  );
+}
+
+export function DashboardOverview({
+  overview,
+  pullRequests,
+}: DashboardOverviewProps) {
   const tasksHref = getDefaultTaskListHref();
   const queueHref = getTaskListHref({ assignee: "me" });
 
   return (
     <>
-      <AppHeader
-        actions={
-          <>
-            <Button
-              nativeButton={false}
-              variant="outline"
-              size="sm"
-              render={<Link href={tasksHref} />}
-            >
-              Work Items
-            </Button>
-            <Button
-              nativeButton={false}
-              variant="outline"
-              size="sm"
-              render={<Link href={queueHref} />}
-            >
-              Your Queue
-            </Button>
-            <ThemeToggle />
-          </>
-        }
-        items={[{ label: "Home" }]}
-      />
+      <AppHeader actions={<ThemeToggle />} items={[{ label: "Home" }]} />
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 md:p-5">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 p-3 md:p-4">
           {overview.error ? (
             <AzureDevOpsFailure error={overview.error} />
           ) : null}
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <KpiCard
-              href={tasksHref}
-              icon={LayoutListIcon}
-              label="Open Work Items"
-              value={overview.openTaskCount}
+          {/* A project that could not be read leaves the pull request panels
+              showing everything else, so the gap is named rather than left to
+              look like an empty queue. */}
+          {pullRequests.errors.map(({ error, project }) => (
+            <RepositoryErrorAlert
+              error={{
+                ...error,
+                message: `${project.name}: ${error.message}`,
+              }}
+              key={project.id}
             />
-            <KpiCard
-              icon={Clock3Icon}
-              label={`Updated ${overview.recentChangeWindowHours}h`}
-              value={overview.recentChangeCount}
-            />
-            <KpiCard
-              icon={AlertTriangleIcon}
-              label="Needs Attention"
-              value={overview.attentionCount}
-            />
-            <KpiCard
+          ))}
+
+          {/* Every tile is something the reader can act on, and each one is
+              the headline for a panel below rather than a lone number. */}
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <StatTile
               href={queueHref}
-              icon={UserCircle2Icon}
-              label="Your Queue"
+              label="Your queue"
               value={overview.queueCount}
+            />
+            <StatTile
+              label="Awaiting your review"
+              value={pullRequests.awaitingReview.length}
+            />
+            <StatTile
+              label="Your pull requests"
+              value={pullRequests.createdByMe.length}
+            />
+            <StatTile
+              href={tasksHref}
+              label="Open work items"
+              value={overview.openTaskCount}
             />
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            {/* Recent Changes */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Changes</CardTitle>
-                <CardDescription>
-                  {overview.recentChangeCount} updated across{" "}
-                  {overview.projectCount} project{overview.projectCount === 1 ? "" : "s"} in
-                  the last {overview.recentChangeWindowHours}h
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {overview.recentLatestItem ? (
-                  <Link
-                    className="flex flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-muted/40"
-                    href={getTaskDetailHref(
-                      overview.recentLatestItem.id,
-                      {},
-                      { taskProjectId: overview.recentLatestItem.projectId },
-                    )}
-                  >
-                    <div className="font-medium">
-                      #{overview.recentLatestItem.id}{" "}
-                      {overview.recentLatestItem.title}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <Badge variant="outline">
-                        {overview.recentLatestItem.projectName}
-                      </Badge>
-                      <Badge
-                        variant={getTaskStateBadgeVariant(
-                          overview.recentLatestItem.state,
+          <div className="grid items-start gap-3 lg:grid-cols-2">
+            <Panel
+              count={pullRequests.awaitingReview.length}
+              title="Awaiting your review"
+            >
+              {pullRequests.awaitingReview.length > 0 ? (
+                <ol className="divide-y">
+                  {pullRequests.awaitingReview
+                    .slice(0, MAX_ROWS)
+                    .map((pullRequest) => (
+                      <RepositoryPullRequestRow
+                        key={`${pullRequest.repository.id}:${pullRequest.pullRequestId}`}
+                        pullRequest={pullRequest}
+                        showRepository
+                      />
+                    ))}
+                </ol>
+              ) : (
+                <EmptyRow>
+                  {pullRequests.isAvailable
+                    ? "Nothing is waiting on your review."
+                    : "Pull request activity is unavailable."}
+                </EmptyRow>
+              )}
+            </Panel>
+
+            <Panel
+              count={pullRequests.createdByMe.length}
+              title="Your pull requests"
+            >
+              {pullRequests.createdByMe.length > 0 ? (
+                <ol className="divide-y">
+                  {pullRequests.createdByMe
+                    .slice(0, MAX_ROWS)
+                    .map((pullRequest) => (
+                      <RepositoryPullRequestRow
+                        key={`${pullRequest.repository.id}:${pullRequest.pullRequestId}`}
+                        pullRequest={pullRequest}
+                        showRepository
+                      />
+                    ))}
+                </ol>
+              ) : (
+                <EmptyRow>
+                  {pullRequests.isAvailable
+                    ? "You have no active pull requests."
+                    : "Pull request activity is unavailable."}
+                </EmptyRow>
+              )}
+            </Panel>
+
+            <Panel
+              action={<ViewAll href={queueHref} />}
+              count={overview.queueCount}
+              title="Your queue"
+            >
+              {overview.queueItems.length > 0 ? (
+                <ol className="divide-y">
+                  {overview.queueItems.slice(0, MAX_ROWS).map((task) => (
+                    <li key={task.id}>
+                      <Link
+                        className="flex min-w-0 flex-col gap-0.5 px-3 py-2 transition-colors hover:bg-muted/50"
+                        href={getTaskDetailHref(
+                          task.id,
+                          { assignee: "me" },
+                          { taskProjectId: task.projectId },
                         )}
                       >
-                        {overview.recentLatestItem.state}
-                      </Badge>
-                      <span>{overview.recentLatestItem.assignee}</span>
-                      <DateLabel value={overview.recentLatestItem.updatedAt} />
-                    </div>
-                  </Link>
-                ) : (
-                  <div className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                    No recent changes.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Needs Attention */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Needs Attention</CardTitle>
-                <CardDescription>
-                  {overview.attentionCount} items flagged
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3 sm:flex-col sm:items-start sm:justify-start">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Blocked
-                    </span>
-                    <span className="text-2xl font-semibold tracking-tight">
-                      {overview.blockedCount}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3 sm:flex-col sm:items-start sm:justify-start">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Stale ({overview.staleAfterDays}+ days)
-                    </span>
-                    <span className="text-2xl font-semibold tracking-tight">
-                      {overview.staleCount}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-3 sm:flex-col sm:items-start sm:justify-start">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Unassigned
-                    </span>
-                    <span className="text-2xl font-semibold tracking-tight">
-                      {overview.unassignedCount}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Project Health */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Health</CardTitle>
-                <CardDescription>
-                  {overview.openTaskCount} open work items across{" "}
-                  {overview.projectCount} project{overview.projectCount === 1 ? "" : "s"} and{" "}
-                  {overview.stateDistribution.length} states
-                </CardDescription>
-                <CardAction>
-                  <Button
-                    nativeButton={false}
-                    variant="outline"
-                    size="sm"
-                    render={<Link href={tasksHref} />}
-                  >
-                    View all
-                  </Button>
-                </CardAction>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {overview.stateDistribution.length > 0 ? (
-                  <>
-                    <div className="flex h-2 overflow-hidden rounded-full bg-muted">
-                      {overview.stateDistribution.map((item) => (
-                        <div
-                          key={item.state}
-                          className="bg-foreground/70 first:rounded-l-full last:rounded-r-full"
-                          style={{
-                            width: `${Math.max(item.share * 100, 2)}%`,
-                            opacity: 0.4 + item.share * 0.6,
-                          }}
-                        />
-                      ))}
-                    </div>
-                    <div className="grid gap-1.5">
-                      {overview.stateDistribution.map((item) => (
-                        <Link
-                          key={item.state}
-                          className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-sm hover:bg-muted/40"
-                          href={getTaskListHref({ states: [item.state] })}
-                        >
-                          <Badge variant={getTaskStateBadgeVariant(item.state)}>
-                            {item.state}
+                        <span className="truncate text-sm font-medium">
+                          <span className="font-mono text-muted-foreground">
+                            #{task.id}
+                          </span>{" "}
+                          {task.title}
+                        </span>
+                        <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <Badge variant={getTaskStateBadgeVariant(task.state)}>
+                            {task.state}
                           </Badge>
-                          <span className="tabular-nums text-muted-foreground">
-                            {item.count}
-                          </span>
-                        </Link>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                    No open work items.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                          <PriorityBadge priority={task.priority} />
+                          <span className="truncate">{task.projectName}</span>
+                          <span aria-hidden="true">·</span>
+                          <DateLabel value={task.updatedAt} />
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <EmptyRow>No work items are assigned to you.</EmptyRow>
+              )}
+            </Panel>
 
-            {/* Your Queue */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Queue</CardTitle>
-                <CardDescription>
-                  {overview.queueCount} assigned to you
-                </CardDescription>
-                <CardAction>
-                  <Button
-                    nativeButton={false}
-                    variant="outline"
-                    size="sm"
-                    render={<Link href={queueHref} />}
-                  >
-                    View all
-                    <ArrowRightIcon />
-                  </Button>
-                </CardAction>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
-                {overview.queueItems.length > 0 ? (
-                  overview.queueItems.map((task) => (
-                    <Link
-                      key={task.id}
-                      className="rounded-lg border p-3 transition-colors hover:bg-muted/40"
-                      href={getTaskDetailHref(
-                        task.id,
-                        { assignee: "me" },
-                        { taskProjectId: task.projectId },
-                      )}
-                    >
-                      <div className="line-clamp-2 font-medium">
-                        #{task.id} {task.title}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline">{task.projectName}</Badge>
-                        <Badge variant={getTaskStateBadgeVariant(task.state)}>
-                          {task.state}
+            <Panel
+              action={<ViewAll href={tasksHref} />}
+              title="Work item states"
+            >
+              {overview.stateDistribution.length > 0 ? (
+                <ol className="divide-y">
+                  {overview.stateDistribution.map((item) => (
+                    <li key={item.state}>
+                      <Link
+                        className="flex items-center gap-3 px-3 py-1.5 transition-colors hover:bg-muted/50"
+                        href={getTaskListHref({ states: [item.state] })}
+                      >
+                        <Badge
+                          className="shrink-0"
+                          variant={getTaskStateBadgeVariant(item.state)}
+                        >
+                          {item.state}
                         </Badge>
-                        <PriorityBadge priority={task.priority} />
-                        <DateLabel value={task.updatedAt} />
-                      </div>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-                    No assigned work items.
-                  </div>
+                        {/* A share bar reads faster than a raw count when the
+                            question is which states dominate. */}
+                        <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                          <span
+                            className="block h-full rounded-full bg-foreground/60"
+                            style={{
+                              width: `${Math.max(item.share * 100, 2)}%`,
+                            }}
+                          />
+                        </span>
+                        <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                          {item.count}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <EmptyRow>No open work items.</EmptyRow>
+              )}
+            </Panel>
+          </div>
+
+          {/* Kept as a compact strip: these were previously a headline tile and
+              a full card showing the same three numbers. */}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: "Blocked", value: overview.blockedCount },
+              {
+                label: `Stale ${overview.staleAfterDays}d+`,
+                value: overview.staleCount,
+              },
+              { label: "Unassigned", value: overview.unassignedCount },
+            ].map((stat) => (
+              <div
+                className={cn(
+                  "flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2",
+                  stat.value === 0 && "text-muted-foreground",
                 )}
-              </CardContent>
-            </Card>
+                key={stat.label}
+              >
+                <span className="truncate text-xs text-muted-foreground">
+                  {stat.label}
+                </span>
+                <span className="text-sm font-semibold tabular-nums">
+                  {stat.value}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

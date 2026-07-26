@@ -20,6 +20,7 @@ import {
 } from "@/lib/azure-devops/markup";
 import { cache } from "react";
 import sanitizeHtml from "sanitize-html";
+import { normalizeAzureDevOpsMarkdownMentions } from "@/lib/azure-devops/markup";
 
 export type { AzureDevOpsMarkup } from "@/lib/azure-devops/markup";
 
@@ -68,6 +69,9 @@ export type AzureDevOpsLinkedPullRequest = {
   createdAt: string;
   id: number;
   isDraft: boolean;
+  projectId: string | null;
+  projectName: string | null;
+  repositoryId: string | null;
   repositoryName: string;
   sourceBranch: string;
   state: string;
@@ -194,7 +198,12 @@ type PullRequest = {
   isDraft?: boolean;
   pullRequestId: number;
   repository?: {
+    id?: string;
     name?: string;
+    project?: {
+      id?: string;
+      name?: string;
+    };
   };
   sourceRefName?: string;
   status?: string;
@@ -419,10 +428,6 @@ function extractRenderedMentionLabels(renderedText: string) {
   return mentions;
 }
 
-function escapeMarkdownLinkText(value: string) {
-  return value.replace(/([\\[\]])/g, "\\$1");
-}
-
 function normalizeAzureDevOpsMarkdown(text: string, renderedText?: string) {
   const normalizedText = normalizePlainText(decodeHtmlEntities(text));
 
@@ -432,16 +437,10 @@ function normalizeAzureDevOpsMarkdown(text: string, renderedText?: string) {
 
   const mentionLabels = extractRenderedMentionLabels(renderedText);
 
-  return normalizedText.replace(/@<([^>]+)>/g, (token, mentionId) => {
-    const normalizedMentionId = String(mentionId).trim().toLowerCase();
-    const mentionLabel = mentionLabels.get(normalizedMentionId);
-
-    if (!mentionLabel) {
-      return token;
-    }
-
-    return `[${escapeMarkdownLinkText(mentionLabel)}](./ado-mention/${normalizedMentionId})`;
-  });
+  return normalizeAzureDevOpsMarkdownMentions(
+    normalizedText,
+    mentionLabels,
+  );
 }
 
 function normalizeTaskPath(value: unknown) {
@@ -933,6 +932,9 @@ function toLinkedPullRequest(pullRequest: PullRequest): AzureDevOpsLinkedPullReq
     createdAt: String(pullRequest.creationDate ?? ""),
     id: pullRequest.pullRequestId,
     isDraft: Boolean(pullRequest.isDraft),
+    projectId: readString(pullRequest.repository?.project?.id),
+    projectName: readString(pullRequest.repository?.project?.name),
+    repositoryId: readString(pullRequest.repository?.id),
     repositoryName: readString(pullRequest.repository?.name) ?? "Unknown repository",
     sourceBranch: normalizeBranchName(pullRequest.sourceRefName),
     state: String(pullRequest.status ?? "unknown"),
@@ -1369,8 +1371,25 @@ export async function listTasks(
   const projectsByName = new Map(
     selectedProjects.map((project) => [project.name.toLowerCase(), project]),
   );
+
+  return getWorkItemSummaries(accessToken, ids, projectsByName);
+}
+
+/**
+ * Batch-loads work items by id with the same fields and shape as the task
+ * list. Inaccessible ids are omitted rather than failing the whole batch.
+ */
+export async function getWorkItemSummaries(
+  accessToken: string,
+  ids: readonly number[],
+  projectsByName: ReadonlyMap<string, TaskProjectContext> = new Map(),
+) {
+  if (ids.length === 0) {
+    return [];
+  }
+
   const workItemsResponses = await Promise.all(
-    chunkIds(ids, WORK_ITEMS_BATCH_LIMIT).map((batchIds) =>
+    chunkIds([...ids], WORK_ITEMS_BATCH_LIMIT).map((batchIds) =>
       azureDevOpsRequest<WorkItemsResponse>(
         "/_apis/wit/workitemsbatch",
         {
