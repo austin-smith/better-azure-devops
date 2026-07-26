@@ -312,6 +312,17 @@ function CommandCenterDialog({
   const [selectedActionValue, setSelectedActionValue] = useState("");
   const [view, setView] = useState<CommandCenterView>("root");
 
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    if (!nextOpen) {
+      setProjectError(null);
+      setSearch("");
+      setSelectedActionValue("");
+      setView("root");
+    }
+
+    onOpenChange(nextOpen);
+  }, [onOpenChange]);
+
   useEffect(() => {
     setProjects([...availableProjects]);
   }, [availableProjects]);
@@ -320,10 +331,29 @@ function CommandCenterDialog({
     setProjectIds([...selectedProjectIds]);
   }, [selectedProjectIds]);
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.repeat ||
+        event.altKey ||
+        !(event.metaKey || event.ctrlKey) ||
+        event.key.toLowerCase() !== "k"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      handleOpenChange(!open);
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleOpenChange, open]);
+
   const navigate = useCallback((href: string) => {
-    onOpenChange(false);
     router.push(href);
-  }, [onOpenChange, router]);
+  }, [router]);
 
   const openNewWorkItem = useCallback(() => {
     const url = new URL(window.location.href);
@@ -528,20 +558,9 @@ function CommandCenterDialog({
       ? "Search commands"
       : `Search ${viewDetails.label.toLowerCase()}`;
 
-  function handleOpenChange(nextOpen: boolean) {
-    onOpenChange(nextOpen);
-
-    if (!nextOpen) {
-      setProjectError(null);
-      setSearch("");
-      setSelectedActionValue("");
-      setView("root");
-    }
-  }
-
   function runAction(action: CommandCenterAction) {
     if (!action.keepOpen) {
-      onOpenChange(false);
+      handleOpenChange(false);
     }
 
     void action.run();
@@ -713,26 +732,6 @@ export function CommandCenterProvider({
 }: CommandCenterProviderProps) {
   const [open, setOpen] = useState(false);
   const openCommandCenter = useCallback(() => setOpen(true), []);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (
-        event.defaultPrevented ||
-        event.repeat ||
-        event.altKey ||
-        !(event.metaKey || event.ctrlKey) ||
-        event.key.toLowerCase() !== "k"
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      setOpen((isOpen) => !isOpen);
-    }
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
   const contextValue = useMemo(
     () => ({ openCommandCenter }),

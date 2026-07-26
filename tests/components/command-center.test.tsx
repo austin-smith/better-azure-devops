@@ -135,6 +135,34 @@ describe("CommandCenter", () => {
       .not.toBeInTheDocument();
   });
 
+  it("resets a searched drill-in when the shortcut closes the dialog", async () => {
+    renderCommandCenter();
+    fireEvent.click(screen.getByRole("button", { name: "Open command center" }));
+    fireEvent.click(await screen.findByRole("option", {
+      name: /Browse filters/,
+    }));
+    fireEvent.change(screen.getByRole("combobox", {
+      name: "Search filters",
+    }), {
+      target: { value: "bugs" },
+    });
+
+    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Command center" }))
+        .not.toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(document, { key: "k", metaKey: true });
+
+    const search = await screen.findByRole("combobox", {
+      name: "Search commands",
+    });
+    expect(search).toHaveValue("");
+    expect(screen.getByRole("option", { name: /Browse filters/ }))
+      .toBeInTheDocument();
+  });
+
   it("filters grouped actions as the user searches", async () => {
     renderCommandCenter();
     fireEvent.click(screen.getByRole("button", { name: "Open command center" }));
@@ -418,6 +446,15 @@ describe("CommandCenter", () => {
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith("/tasks?priority=1");
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "Open command center" }));
+
+    const reopenedSearch = await screen.findByRole("combobox", {
+      name: "Search commands",
+    });
+    expect(reopenedSearch).toHaveValue("");
+    expect(screen.getByRole("option", { name: /Browse filters/ }))
+      .toBeInTheDocument();
   });
 
   it("navigates directly to a numeric work item ID", async () => {
