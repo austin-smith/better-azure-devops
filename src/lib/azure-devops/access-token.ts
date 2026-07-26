@@ -31,6 +31,7 @@ let cachedToken:
       expiresAt: number;
     }
   | null = null;
+let pendingToken: Promise<string> | null = null;
 
 function parseExpiresAt(payload: AzureCliAccessTokenResponse) {
   if (typeof payload.expires_on === "number") {
@@ -135,14 +136,7 @@ async function runAzureCli() {
   return execFileAsync("az", [...AZURE_CLI_ACCESS_TOKEN_ARGS], { env });
 }
 
-export async function getAzureDevOpsAccessToken() {
-  if (
-    cachedToken &&
-    cachedToken.expiresAt - TOKEN_REFRESH_BUFFER_MS > Date.now()
-  ) {
-    return cachedToken.accessToken;
-  }
-
+async function requestAzureDevOpsAccessToken() {
   try {
     const { stdout } = await runAzureCli();
 
@@ -165,4 +159,21 @@ export async function getAzureDevOpsAccessToken() {
 
     throw classifyAzureCliError(error);
   }
+}
+
+export async function getAzureDevOpsAccessToken() {
+  if (
+    cachedToken &&
+    cachedToken.expiresAt - TOKEN_REFRESH_BUFFER_MS > Date.now()
+  ) {
+    return cachedToken.accessToken;
+  }
+
+  if (!pendingToken) {
+    pendingToken = requestAzureDevOpsAccessToken().finally(() => {
+      pendingToken = null;
+    });
+  }
+
+  return pendingToken;
 }

@@ -9,6 +9,7 @@ import {
   readAppSetting,
   writeAppSetting,
 } from "@/db/repositories/app-settings";
+import { cache } from "react";
 
 const SELECTED_PROJECT_IDS_KEY = "azure-devops.selected-project-ids.v1";
 
@@ -98,9 +99,9 @@ function resolveLegacyProject(
   );
 }
 
-export async function loadAzureDevOpsProjectSelection(
+async function loadProjectSelection(
   accessToken: string,
-  preferredProjectIds: readonly string[] = [],
+  preferredProjectIds: readonly string[],
 ): Promise<AzureDevOpsProjectSelection> {
   const availableProjects = await listProjects(accessToken);
   const normalizedPreferredProjectIds = normalizeProjectIds(preferredProjectIds);
@@ -148,6 +149,31 @@ export async function loadAzureDevOpsProjectSelection(
     selectedProjects: [],
     source: "empty",
   };
+}
+
+const loadCachedProjectSelection = cache(
+  async (accessToken: string, preferredProjectIdsKey: string) => {
+    const preferredProjectIds = JSON.parse(preferredProjectIdsKey) as unknown;
+
+    return loadProjectSelection(
+      accessToken,
+      Array.isArray(preferredProjectIds)
+        ? preferredProjectIds.filter(
+            (projectId): projectId is string => typeof projectId === "string",
+          )
+        : [],
+    );
+  },
+);
+
+export function loadAzureDevOpsProjectSelection(
+  accessToken: string,
+  preferredProjectIds: readonly string[] = [],
+) {
+  return loadCachedProjectSelection(
+    accessToken,
+    JSON.stringify(normalizeProjectIds(preferredProjectIds)),
+  );
 }
 
 export async function saveAzureDevOpsProjectSelection(

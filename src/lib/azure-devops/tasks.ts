@@ -1,5 +1,9 @@
 import { azureDevOpsRequest } from "@/lib/azure-devops/client";
 import {
+  AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
+  getAzureDevOpsMetadataCacheTags,
+} from "@/lib/azure-devops/cache-scope";
+import {
   buildAzureDevOpsAssetProxyPath,
   isAzureDevOpsAssetUrl,
 } from "@/lib/azure-devops/assets";
@@ -14,6 +18,7 @@ import {
   sanitizeAzureDevOpsHtml,
   type AzureDevOpsMarkup,
 } from "@/lib/azure-devops/markup";
+import { cache } from "react";
 import sanitizeHtml from "sanitize-html";
 
 export type { AzureDevOpsMarkup } from "@/lib/azure-devops/markup";
@@ -258,6 +263,10 @@ type TaskRequestContext = {
   projectId?: string | null;
   projectImageUrl?: string | null;
   projectName?: string | null;
+};
+
+type ListTasksOptions = {
+  maxItems?: number;
 };
 
 type TaskUpdateFields = Partial<{
@@ -809,6 +818,15 @@ async function listClassificationPathOptions(
         `/_apis/wit/classificationnodes/${kind}?$depth=100`,
         {
           accessToken,
+          cache: "force-cache",
+          next: {
+            revalidate: AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
+            tags: getAzureDevOpsMetadataCacheTags(
+              accessToken,
+              `classification-${kind}`,
+              project.id,
+            ),
+          },
           projectName: project.name,
         },
       );
@@ -1236,21 +1254,13 @@ async function listLinkedPullRequests(
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
-export async function listTasks(
-  accessToken: string,
+function buildTaskWiql(
   selectedProjects: readonly TaskProjectContext[],
-  filters: TaskListFilters = getDefaultTaskListFilters(),
+  filters: TaskListFilters,
 ) {
-  if (selectedProjects.length === 0) {
-    return [];
-  }
-
   const workItemTypes =
     filters.types.length > 0 ? filters.types : getDefaultWorkItemTypes();
   const projectNames = selectedProjects.map((project) => project.name);
-  const projectsByName = new Map(
-    selectedProjects.map((project) => [project.name.toLowerCase(), project]),
-  );
   const normalizedAreaPath = filters.areaPath
     ? normalizeClassificationFilterPath("areas", filters.areaPath)
     : "";
@@ -1284,7 +1294,7 @@ export async function listTasks(
   const workItemTypeFilter = `\n  AND [System.WorkItemType] IN (${workItemTypes
     .map((type) => `'${escapeWiqlString(type)}'`)
     .join(", ")})`;
-  const wiql = `SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], [System.ChangedDate]
+  return `SELECT [System.Id]
 FROM WorkItems
 WHERE [System.TeamProject] IN (${projectNames
     .map((projectName) => `'${escapeWiqlString(projectName)}'`)
@@ -1298,7 +1308,9 @@ ${priorityFilter}
   AND [System.State] <> 'Closed'
   AND [System.State] <> 'Removed'
 ORDER BY [System.ChangedDate] DESC`;
+}
 
+const executeTaskIdQuery = cache(async (accessToken: string, wiql: string) => {
   const result = await azureDevOpsRequest<WiqlResponse>(
     "/_apis/wit/wiql",
     {
@@ -1308,11 +1320,55 @@ ORDER BY [System.ChangedDate] DESC`;
     },
   );
 
-  if (result.workItems.length === 0) {
+  return result.workItems.map((item) => item.id);
+});
+
+async function queryTaskIds(
+  accessToken: string,
+  selectedProjects: readonly TaskProjectContext[],
+  filters: TaskListFilters,
+) {
+  if (selectedProjects.length === 0) {
     return [];
   }
 
-  const ids = result.workItems.map((item) => item.id);
+  return executeTaskIdQuery(
+    accessToken,
+    buildTaskWiql(selectedProjects, filters),
+  );
+}
+
+export async function countTasks(
+  accessToken: string,
+  selectedProjects: readonly TaskProjectContext[],
+  filters: TaskListFilters = getDefaultTaskListFilters(),
+) {
+  return (await queryTaskIds(accessToken, selectedProjects, filters)).length;
+}
+
+export async function listTasks(
+  accessToken: string,
+  selectedProjects: readonly TaskProjectContext[],
+  filters: TaskListFilters = getDefaultTaskListFilters(),
+  options: ListTasksOptions = {},
+) {
+  if (selectedProjects.length === 0) {
+    return [];
+  }
+
+  const matchingIds = await queryTaskIds(accessToken, selectedProjects, filters);
+  const ids =
+    options.maxItems === undefined
+      ? matchingIds
+      : matchingIds.slice(0, Math.max(0, options.maxItems));
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const projectsByName = new Map(
+    selectedProjects.map((project) => [project.name.toLowerCase(), project]),
+  );
   const workItemsResponses = await Promise.all(
     chunkIds(ids, WORK_ITEMS_BATCH_LIMIT).map((batchIds) =>
       azureDevOpsRequest<WorkItemsResponse>(
@@ -1384,6 +1440,15 @@ export async function getTaskEditMetadata(
     `/_apis/wit/workitemtypes/${encodeURIComponent(workItemType)}/fields/${encodeURIComponent("Microsoft.VSTS.Common.Priority")}?$expand=allowedValues`,
     {
       accessToken,
+      cache: "force-cache",
+      next: {
+        revalidate: AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
+        tags: getAzureDevOpsMetadataCacheTags(
+          accessToken,
+          `work-item-type-${workItemType}`,
+          context.projectId ?? projectName,
+        ),
+      },
       projectName,
     },
   );
@@ -1456,6 +1521,15 @@ export async function getTeamAreaSettings(
     "/_apis/work/teamsettings/teamfieldvalues",
     {
       accessToken,
+      cache: "force-cache",
+      next: {
+        revalidate: AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
+        tags: getAzureDevOpsMetadataCacheTags(
+          accessToken,
+          "team-area-settings",
+          project.id,
+        ),
+      },
       projectName: project.name,
     },
   );

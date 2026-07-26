@@ -6,12 +6,15 @@ import {
   hasAzureDevOpsConfig,
 } from "@/lib/azure-devops/config";
 import {
+  countTasks,
+  type AzureDevOpsTask,
+} from "@/lib/azure-devops/tasks";
+import {
   createPublicAzureDevOpsError,
   getPublicAzureDevOpsError,
   type PublicAzureDevOpsError,
 } from "@/lib/azure-devops/errors";
 import { reportAzureDevOpsError } from "@/lib/azure-devops/report-error";
-import type { AzureDevOpsTask } from "@/lib/azure-devops/tasks";
 import {
   normalizeTaskListFilters,
 } from "@/lib/tasks/filters";
@@ -104,18 +107,31 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
       );
     }
 
-    const [allTasksResult, queueResult] = await Promise.all([
+    const queueFilters = normalizeTaskListFilters({
+      assignee: "me",
+    });
+    const [allTasksResult, queueCountResult, queueResult] = await Promise.all([
       loadTaskList(
         accessToken,
         selection.selectedProjects,
         normalizeTaskListFilters(),
       ),
+      countTasks(accessToken, selection.selectedProjects, queueFilters).then(
+        (count) => ({ count, error: null }),
+        (error: unknown) => {
+          reportAzureDevOpsError(error);
+
+          return {
+            count: 0,
+            error: getPublicAzureDevOpsError(error),
+          };
+        },
+      ),
       loadTaskList(
         accessToken,
         selection.selectedProjects,
-        normalizeTaskListFilters({
-          assignee: "me",
-        }),
+        queueFilters,
+        { maxItems: MAX_QUEUE_ITEMS },
       ),
     ]);
     const now = new Date();
@@ -152,11 +168,12 @@ export async function loadDashboardOverview(): Promise<DashboardOverview> {
     return {
       attentionCount: attentionTaskIds.size,
       blockedCount,
-      error: allTasksResult.error ?? queueResult.error,
+      error:
+        allTasksResult.error ?? queueResult.error ?? queueCountResult.error,
       openTaskCount,
       projectCount: selection.selectedProjects.length,
-      queueCount: queueResult.items.length,
-      queueItems: queueResult.items.slice(0, MAX_QUEUE_ITEMS),
+      queueCount: queueCountResult.count,
+      queueItems: queueResult.items,
       recentChangeCount,
       recentChangeWindowHours: RECENT_CHANGE_WINDOW_HOURS,
       recentLatestItem: allTasksResult.items[0] ?? null,

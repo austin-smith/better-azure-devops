@@ -43,6 +43,36 @@ describe("azureDevOpsRequest", () => {
           Authorization: "Bearer token",
         },
         method: "GET",
+        next: undefined,
+      }),
+    );
+  });
+
+  it("allows slow-changing metadata requests to opt into scoped caching", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ value: "ok" }), {
+        headers: { "content-type": "application/json" },
+        status: 200,
+      }),
+    );
+
+    await azureDevOpsRequest("/_apis/projects", {
+      accessToken: "token",
+      cache: "force-cache",
+      next: {
+        revalidate: 300,
+        tags: ["ado-metadata:user:projects"],
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(URL),
+      expect.objectContaining({
+        cache: "force-cache",
+        next: {
+          revalidate: 300,
+          tags: ["ado-metadata:user:projects"],
+        },
       }),
     );
   });

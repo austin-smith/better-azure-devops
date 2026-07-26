@@ -1,4 +1,5 @@
 import {
+  countTasks,
   createTask,
   getTaskEditMetadata,
   getTaskDetails,
@@ -27,6 +28,10 @@ vi.mock("@/lib/azure-devops/client", () => ({
 }));
 
 vi.mock("@/lib/azure-devops/config", () => ({
+  getAzureDevOpsConfig: vi.fn(() => ({
+    apiVersion: "7.1",
+    orgUrl: "https://dev.azure.com/example",
+  })),
   getAzureDevOpsOrganizationName: vi.fn(() => "example"),
 }));
 
@@ -188,6 +193,82 @@ describe("azure-devops task helpers", () => {
     expect(String(azureDevOpsRequestMock.mock.calls[1]?.[1]?.body)).not.toContain(
       "System.Description",
     );
+  });
+
+  it("counts matching tasks from WIQL without loading work item records", async () => {
+    azureDevOpsRequestMock.mockResolvedValue({
+      workItems: [{ id: 11 }, { id: 10 }],
+    });
+
+    await expect(
+      countTasks(
+        "token",
+        [
+          {
+            defaultTeamImageUrl: null,
+            id: "project-id",
+            name: "Project",
+          },
+        ],
+        {
+          areaPath: null,
+          assignee: "me",
+          iterationPath: null,
+          priorities: [],
+          query: "",
+          states: [],
+          types: [],
+        },
+      ),
+    ).resolves.toBe(2);
+
+    expect(azureDevOpsRequestMock).toHaveBeenCalledOnce();
+    expect(azureDevOpsRequestMock).toHaveBeenCalledWith(
+      "/_apis/wit/wiql",
+      expect.objectContaining({
+        accessToken: "token",
+        method: "POST",
+      }),
+    );
+  });
+
+  it("hydrates only the requested number of matching task records", async () => {
+    azureDevOpsRequestMock
+      .mockResolvedValueOnce({
+        workItems: [{ id: 11 }, { id: 10 }, { id: 9 }],
+      })
+      .mockResolvedValueOnce({
+        value: [
+          {
+            fields: {
+              "System.ChangedDate": "2025-01-06T12:00:00.000Z",
+              "System.State": "Active",
+              "System.TeamProject": "Project",
+              "System.Title": "First",
+              "System.WorkItemType": "Task",
+            },
+            id: 11,
+          },
+        ],
+      });
+
+    const result = await listTasks(
+      "token",
+      [
+        {
+          defaultTeamImageUrl: null,
+          id: "project-id",
+          name: "Project",
+        },
+      ],
+      undefined,
+      { maxItems: 1 },
+    );
+
+    expect(result.map((task) => task.id)).toEqual([11]);
+    expect(
+      JSON.parse(String(azureDevOpsRequestMock.mock.calls[1]?.[1]?.body)).ids,
+    ).toEqual([11]);
   });
 
   it("does not send a bare project root as an area path filter", async () => {
@@ -709,10 +790,11 @@ describe("azure-devops task helpers", () => {
     expect(azureDevOpsRequestMock).toHaveBeenNthCalledWith(
       2,
       "/_apis/wit/workitemtypes/Task/fields/Microsoft.VSTS.Common.Priority?$expand=allowedValues",
-      {
+      expect.objectContaining({
         accessToken: "token",
+        cache: "force-cache",
         projectName: "Project",
-      },
+      }),
     );
   });
 
@@ -760,10 +842,11 @@ describe("azure-devops task helpers", () => {
 
     expect(azureDevOpsRequestMock).toHaveBeenCalledWith(
       "/_apis/work/teamsettings/teamfieldvalues",
-      {
+      expect.objectContaining({
         accessToken: "token",
+        cache: "force-cache",
         projectName: "Project",
-      },
+      }),
     );
   });
 

@@ -8,6 +8,13 @@ vi.mock("@/lib/azure-devops/client", () => ({
   azureDevOpsRequest: azureDevOpsRequestMock,
 }));
 
+vi.mock("@/lib/azure-devops/config", () => ({
+  getAzureDevOpsConfig: vi.fn(() => ({
+    apiVersion: "7.1",
+    orgUrl: "https://dev.azure.com/example",
+  })),
+}));
+
 describe("listProjects", () => {
   beforeEach(() => {
     azureDevOpsRequestMock.mockReset();
@@ -37,7 +44,14 @@ describe("listProjects", () => {
 
     expect(azureDevOpsRequestMock).toHaveBeenCalledWith(
       "/_apis/projects?$top=1000&stateFilter=wellFormed&getDefaultTeamImageUrl=true",
-      { accessToken: "token" },
+      expect.objectContaining({
+        accessToken: "token",
+        cache: "force-cache",
+        next: expect.objectContaining({
+          revalidate: 300,
+          tags: expect.arrayContaining([expect.stringMatching(/^ado-metadata:/)]),
+        }),
+      }),
     );
     expect(result).toEqual([
       {
