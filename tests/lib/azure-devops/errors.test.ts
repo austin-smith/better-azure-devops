@@ -4,6 +4,7 @@ import {
   getAzureDevOpsErrorHttpStatus,
   getAzureDevOpsWorkItemCreateError,
   getPublicAzureDevOpsError,
+  parsePublicAzureDevOpsError,
 } from "@/lib/azure-devops/errors";
 
 describe("Azure DevOps errors", () => {
@@ -61,6 +62,26 @@ describe("Azure DevOps errors", () => {
         },
       ],
     });
+  });
+
+  it("reconstructs complete public errors from untrusted response data", () => {
+    expect(
+      parsePublicAzureDevOpsError({
+        code: "throttled",
+        message: "untrusted message",
+        retryAfterSeconds: 12,
+      }),
+    ).toEqual({
+      ...createPublicAzureDevOpsError("throttled"),
+      retryAfterSeconds: 12,
+    });
+    expect(
+      parsePublicAzureDevOpsError({
+        code: "network",
+        retryAfterSeconds: "soon",
+      }),
+    ).toEqual(createPublicAzureDevOpsError("network"));
+    expect(parsePublicAzureDevOpsError({ code: "not-real" })).toBeNull();
   });
 
   it("marks only ambiguous create outcomes as uncertain", () => {

@@ -3,6 +3,7 @@ import {
   createTaskDetailEditableValues,
   getTaskDetailEditableChanges,
   hasTaskDetailEditableChanges,
+  rebaseTaskDetailEditableValues,
   serializeEditableMarkdownForAzureDevOps,
 } from "@/lib/tasks/task-detail-edit";
 
@@ -71,6 +72,33 @@ describe("task detail edit helpers", () => {
       title: "Updated title",
     });
     expect(hasTaskDetailEditableChanges(initialValues, draftValues)).toBe(true);
+  });
+
+  it("rebases only locally changed fields onto the latest values", () => {
+    const initialValues = createTaskDetailEditableValues(detail);
+    const draftValues = {
+      ...initialValues,
+      description: "Locally updated **markdown**",
+      title: "Locally updated title",
+    };
+    const latestValues = {
+      ...initialValues,
+      description: "Remotely updated **markdown**",
+      priority: "1",
+      title: "Remotely updated title",
+    };
+
+    expect(
+      rebaseTaskDetailEditableValues(
+        initialValues,
+        draftValues,
+        latestValues,
+      ),
+    ).toEqual({
+      ...latestValues,
+      description: "Locally updated **markdown**",
+      title: "Locally updated title",
+    });
   });
 
   it("applies editable values back to task detail data", () => {

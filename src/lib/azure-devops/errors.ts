@@ -204,6 +204,33 @@ export function createPublicAzureDevOpsError(
   };
 }
 
+export function parsePublicAzureDevOpsError(
+  value: unknown,
+): PublicAzureDevOpsError | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  if (!isAzureDevOpsErrorCode(record.code)) {
+    return null;
+  }
+
+  const error = createPublicAzureDevOpsError(record.code);
+  const retryAfterSeconds =
+    typeof record.retryAfterSeconds === "number" &&
+    Number.isInteger(record.retryAfterSeconds) &&
+    record.retryAfterSeconds >= 0
+      ? record.retryAfterSeconds
+      : null;
+
+  return {
+    ...error,
+    retryAfterSeconds,
+  };
+}
+
 export function getAzureDevOpsWorkItemCreateError(error: unknown) {
   if (error instanceof AzureDevOpsError) {
     const isAmbiguous =
