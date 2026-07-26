@@ -42,14 +42,13 @@ describe("pull request actions", () => {
     setPullRequestReviewerVoteMock.mockResolvedValue(undefined);
   });
 
-  it("uses zero-based offsets for an inline line selection", async () => {
+  it("anchors an inline line selection with one-based offsets", async () => {
     const formData = new FormData();
 
     formData.set("content", "Please update this.");
     formData.set("side", "additions");
     formData.set("start", "8");
     formData.set("end", "10");
-    formData.set("endOffset", "12");
 
     await expect(
       createInlinePullRequestComment(
@@ -79,10 +78,45 @@ describe("pull request actions", () => {
         content: "Please update this.",
         filePath: "/src/app.ts",
         firstComparingIteration: 0,
-        rightFileEnd: { line: 10, offset: 12 },
-        rightFileStart: { line: 8, offset: 0 },
+        rightFileEnd: { line: 10, offset: 1000 },
+        rightFileStart: { line: 8, offset: 1 },
         secondComparingIteration: 3,
       },
+    );
+  });
+
+  it("anchors a deletion-side selection on the left file", async () => {
+    const formData = new FormData();
+
+    formData.set("content", "Why was this removed?");
+    formData.set("side", "deletions");
+    // Submitted in reverse, as a reader dragging a selection upwards does.
+    formData.set("start", "10");
+    formData.set("end", "8");
+
+    await createInlinePullRequestComment(
+      {
+        changeTrackingId: 12,
+        filePath: "/src/app.ts",
+        firstComparingIteration: 0,
+        projectId: "project",
+        pullRequestId: 42,
+        repositoryId: "repository",
+        secondComparingIteration: 3,
+      },
+      { message: "", status: "idle" },
+      formData,
+    );
+
+    expect(createPullRequestThreadMock).toHaveBeenCalledWith(
+      "token",
+      "project",
+      "repository",
+      42,
+      expect.objectContaining({
+        leftFileEnd: { line: 10, offset: 1000 },
+        leftFileStart: { line: 8, offset: 1 },
+      }),
     );
   });
 

@@ -21,6 +21,26 @@ import type { PullRequestActionState } from "@/lib/repositories/pull-request-act
 
 const MAX_COMMENT_LENGTH = 100_000;
 
+/**
+ * A thread's span is described by `CommentPosition`, whose `offset` is a
+ * character position within the line. The 7.1 reference says it starts at 0 and
+ * the 7.2 reference says it starts at 1; the worked example is identical in
+ * both and starts a line's span at 1, so the 7.1 wording is stale. The end
+ * position is documented as the position of the span's *last* character, so it
+ * is inclusive rather than one-past-the-end.
+ *
+ * Selection here is whole lines, never a character range, so the end has to be
+ * the last character of the line. Rather than measure the line, this writes the
+ * same fixed value Azure DevOps' own review UI writes for a line-granularity
+ * comment, which its API accepts and clamps to the true end of the line. That
+ * is observed behaviour and not documented anywhere: every line comment in this
+ * organization authored through Azure DevOps stores exactly this pair. A line
+ * longer than the value would be spanned only up to it, which is equally true
+ * of comments left through Azure DevOps itself.
+ */
+const LINE_START_OFFSET = 1;
+const LINE_END_OFFSET = 1000;
+
 type PullRequestActionContext = {
   projectId: string;
   pullRequestId: number;
@@ -275,7 +295,6 @@ export async function createInlinePullRequestComment(
   const side = formData.get("side");
   const start = Number(formData.get("start"));
   const end = Number(formData.get("end"));
-  const endOffset = Number(formData.get("endOffset"));
   const filePath = normalizeRepositoryPath(context.filePath);
 
   if (
@@ -284,8 +303,6 @@ export async function createInlinePullRequestComment(
     (side !== "additions" && side !== "deletions") ||
     !isPositiveInteger(start) ||
     !isPositiveInteger(end) ||
-    !Number.isSafeInteger(endOffset) ||
-    endOffset < 0 ||
     !isPositiveInteger(context.changeTrackingId) ||
     !isPositiveInteger(context.secondComparingIteration) ||
     context.firstComparingIteration < 0 ||
@@ -299,8 +316,8 @@ export async function createInlinePullRequestComment(
 
   const firstLine = Math.min(start, end);
   const lastLine = Math.max(start, end);
-  const startPosition = { line: firstLine, offset: 0 };
-  const endPosition = { line: lastLine, offset: endOffset };
+  const startPosition = { line: firstLine, offset: LINE_START_OFFSET };
+  const endPosition = { line: lastLine, offset: LINE_END_OFFSET };
 
   try {
     const accessToken = await getAzureDevOpsAccessToken();

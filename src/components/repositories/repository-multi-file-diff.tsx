@@ -413,13 +413,6 @@ export function RepositoryMultiFileDiff<LAnnotation = undefined>({
 
       const firstLine = Math.min(selectedLines.start, selectedLines.end);
       const lastLine = Math.max(selectedLines.start, selectedLines.end);
-      const selectedFile =
-        selectionSide === "additions" ? newFile : oldFile;
-      const endOffset = Math.max(
-        0,
-        (selectedFile.contents.split(/\r?\n/)[lastLine - 1]?.length ?? 1) -
-          1,
-      );
 
       return createPortal(
         <div className="border-y bg-card px-3 py-2.5">
@@ -428,7 +421,6 @@ export function RepositoryMultiFileDiff<LAnnotation = undefined>({
             autoFocus
             hiddenFields={{
               end: selectedLines.end,
-              endOffset,
               side: selectionSide,
               start: selectedLines.start,
             }}
