@@ -14,65 +14,13 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-const FILE_TREE_WIDTH_KEY = "pull-request-file-tree-width";
-const DEFAULT_TREE_PERCENTAGE = 24;
-const MIN_TREE_PERCENTAGE = 12;
-const MAX_TREE_PERCENTAGE = 50;
-
-type FilesLayout = { diffs: number; tree: number };
-
-const DEFAULT_LAYOUT: FilesLayout = {
-  diffs: 100 - DEFAULT_TREE_PERCENTAGE,
-  tree: DEFAULT_TREE_PERCENTAGE,
-};
-
-function normalizeLayout(layout: Record<string, number>): FilesLayout | null {
-  const tree = layout.tree;
-  const diffs = layout.diffs;
-
-  if (
-    typeof tree !== "number" ||
-    typeof diffs !== "number" ||
-    tree < MIN_TREE_PERCENTAGE ||
-    tree > MAX_TREE_PERCENTAGE
-  ) {
-    return null;
-  }
-
-  return { diffs, tree };
-}
-
-function readStoredLayout(): FilesLayout | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const stored = window.localStorage.getItem(FILE_TREE_WIDTH_KEY);
-
-    return stored ? normalizeLayout(JSON.parse(stored) as never) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredLayout(layout: Record<string, number>) {
-  const normalized = normalizeLayout(layout);
-
-  if (!normalized) {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(
-      FILE_TREE_WIDTH_KEY,
-      JSON.stringify(normalized),
-    );
-  } catch {
-    // A width preference should never block reviewing a pull request.
-  }
-}
+import {
+  DEFAULT_LAYOUT,
+  MAX_TREE_PERCENTAGE,
+  MIN_TREE_PERCENTAGE,
+  readStoredLayout,
+  writeStoredLayout,
+} from "@/lib/repositories/pull-request-files-layout";
 
 /**
  * The file tree is a navigation aid rather than part of the diff, so its width
@@ -152,21 +100,30 @@ export function RepositoryPullRequestFilesLayout({
   }
 
   return (
-    /* The panels are left to stretch to the group's height so the drag handle
-       spans the whole column rather than collapsing to a sliver at the top.
-       The library also clips the group and scrolls each panel's content
-       wrapper, and any overflow other than `visible` is a scrolling box, so
-       both of those captured the tree's sticky positioning and pinned it to a
-       container that never scrolls, leaving the tree to slide away with the
-       page. Both are restored to `visible` so the viewport is the scrolling
-       ancestor again. Nothing is left unclipped: the tree caps and scrolls its
-       own height, and the diff panel keeps the wrapper scrolling that wide
-       code relies on. */
+    /* The panels stretch to the group's height so the drag handle spans the
+       whole column rather than collapsing to a sliver at the top.
+
+       The group and each panel's content wrapper are given `overflow` by the
+       library, and any value other than `visible` is a scrolling box, so both
+       captured the tree's sticky positioning and pinned it to a container that
+       never scrolls. Both are restored to `visible` so the viewport is the
+       scrolling ancestor and the page keeps its single, ordinary scroll.
+
+       The library documents `overflow` on the group as a property that cannot
+       be overridden; it can be today, and the alternative it steers toward —
+       a fixed-height group whose panels scroll internally — puts a second
+       scrollbar inside the page and was materially worse to use. The override
+       is asserted in `tests/components/repositories` so a release that starts
+       enforcing this fails loudly rather than unpinning the tree in silence. */
     <ResizablePanelGroup
       defaultLayout={DEFAULT_LAYOUT}
       groupRef={groupRef}
       onLayoutChanged={writeStoredLayout}
       orientation="horizontal"
+      // Matched to the separator's own width so the grab region is not widened
+      // past the element drawing it. The touch figure keeps the default's
+      // headroom over the pointer one.
+      resizeTargetMinimumSize={{ coarse: 24, fine: 16 }}
       style={{ overflow: "visible" }}
     >
       <ResizablePanel
@@ -182,12 +139,20 @@ export function RepositoryPullRequestFilesLayout({
       {/* No grip: the tree and the diff cards already draw their own borders,
           so a permanent handle would be a third vertical line in the same
           gutter. The divider stays invisible until hovered, which is how the
-          editors this view resembles behave. A 1px line is an unusable target,
-          so the grab area is widened well past it. The library exposes no
-          drag-state attribute, so `active` carries the pressed state. */}
+          editors this view resembles behave. The library exposes no drag-state
+          attribute, so `active` carries the pressed state.
+
+          The separator is widened to the whole gutter and the visible line is
+          drawn inside it, rather than the line being the element and the gutter
+          being margins. The group grabs anywhere within
+          `resizeTargetMinimumSize` of the separator, expanding its box when it
+          is narrower, so a hairline element leaves the pointer able to drag in
+          places that `:hover` never matches: the line would appear only across
+          the middle of a gutter that is grabbable end to end. Element and grab
+          region are the same box here, so both agree. */}
       <ResizableHandle
         aria-label="Resize the file tree"
-        className="mx-1.5 cursor-col-resize bg-transparent transition-colors after:w-4 hover:bg-border active:bg-ring"
+        className="w-4 bg-transparent after:w-px after:bg-transparent after:transition-colors hover:after:bg-border active:after:bg-ring"
       />
       <ResizablePanel
         className="min-w-0"
