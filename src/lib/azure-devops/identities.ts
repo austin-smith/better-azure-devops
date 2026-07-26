@@ -68,35 +68,50 @@ export async function getAzureDevOpsIdentityGroupIds(
     return [] as string[];
   }
 
-  const groupParams = new URLSearchParams({
-    "api-version": "7.1-preview.1",
-    descriptors: descriptors.slice(0, MAX_IDENTITY_IDS_PER_REQUEST).join(","),
-    queryMembership: "None",
-  });
-  const groupResponse = await azureDevOpsRequest<unknown>(
-    `/_apis/identities?${groupParams}`,
-    {
-      accessToken,
-      baseUrl,
-      cache: "force-cache",
-      next: {
-        revalidate: AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
-        tags: getAzureDevOpsMetadataCacheTags(
-          accessToken,
-          `identity-groups:${normalizedId}`,
-        ),
-      },
-    },
-  );
+  // Descriptors are resolved in batches rather than truncated to one request:
+  // dropping the remainder would quietly lose the teams behind them, and a
+  // review assigned through one of those teams would never be matched.
+  const batches: string[][] = [];
 
-  if (!isRecord(groupResponse)) {
-    return [] as string[];
+  for (
+    let index = 0;
+    index < descriptors.length;
+    index += MAX_IDENTITY_IDS_PER_REQUEST
+  ) {
+    batches.push(
+      descriptors.slice(index, index + MAX_IDENTITY_IDS_PER_REQUEST),
+    );
   }
+
+  const responses = await Promise.all(
+    batches.map((batch, batchIndex) => {
+      const groupParams = new URLSearchParams({
+        "api-version": "7.1-preview.1",
+        descriptors: batch.join(","),
+        queryMembership: "None",
+      });
+
+      return azureDevOpsRequest<unknown>(`/_apis/identities?${groupParams}`, {
+        accessToken,
+        baseUrl,
+        cache: "force-cache",
+        next: {
+          revalidate: AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
+          tags: getAzureDevOpsMetadataCacheTags(
+            accessToken,
+            `identity-groups:${normalizedId}:${batchIndex}`,
+          ),
+        },
+      });
+    }),
+  );
 
   // A descriptor that cannot be resolved comes back as a null entry.
   return [
     ...new Set(
-      readArray(groupResponse.value)
+      responses
+        .filter(isRecord)
+        .flatMap((groupResponse) => readArray(groupResponse.value))
         .map((group) => (isRecord(group) ? readString(group.id) : null))
         .filter((id): id is string => Boolean(id))
         .map((id) => id.toLowerCase()),

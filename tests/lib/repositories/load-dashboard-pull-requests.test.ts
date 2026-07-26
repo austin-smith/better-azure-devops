@@ -209,7 +209,7 @@ describe("loadDashboardPullRequests", () => {
     getAzureDevOpsAccessTokenMock.mockResolvedValue("token");
     getCurrentAzureDevOpsIdentityIdMock.mockResolvedValue("reviewer");
     loadAzureDevOpsProjectSelectionMock.mockResolvedValue({
-      selectedProjects: [{ id: "project" }],
+      selectedProjects: [{ id: "project", name: "Platform" }],
     });
   });
 
@@ -273,6 +273,74 @@ describe("loadDashboardPullRequests", () => {
       "project",
       expect.objectContaining({ cursor: "100", top: 100 }),
     );
+  });
+
+  it("keeps direct reviews when group membership cannot be read", async () => {
+    // Membership comes from a different host to the Git APIs and can be refused
+    // on its own. Losing it must cost team matching, not the whole dashboard.
+    getAzureDevOpsIdentityGroupIdsMock.mockRejectedValue(new Error("forbidden"));
+
+    const awaiting = createPullRequest({
+      authorId: "colleague",
+      creationDate: "2026-07-26T00:00:00Z",
+      id: 6,
+    });
+
+    listProjectPullRequestsMock.mockResolvedValue({
+      items: [awaiting],
+      nextCursor: null,
+    });
+
+    await expect(loadDashboardPullRequests()).resolves.toMatchObject({
+      awaitingReview: [expect.objectContaining({ pullRequestId: 6 })],
+      isAvailable: true,
+    });
+  });
+
+  it("keeps the projects it could read when one fails", async () => {
+    loadAzureDevOpsProjectSelectionMock.mockResolvedValue({
+      selectedProjects: [
+        { id: "readable", name: "Platform" },
+        { id: "forbidden", name: "Secret" },
+      ],
+    });
+
+    const awaiting = createPullRequest({
+      authorId: "colleague",
+      creationDate: "2026-07-26T00:00:00Z",
+      id: 7,
+    });
+
+    listProjectPullRequestsMock.mockImplementation((
+      _accessToken: string,
+      projectId: string,
+    ) =>
+      projectId === "readable"
+        ? Promise.resolve({ items: [awaiting], nextCursor: null })
+        : Promise.reject(new Error("no access")),
+    );
+
+    const result = await loadDashboardPullRequests();
+
+    expect(result.awaitingReview).toEqual([
+      expect.objectContaining({ pullRequestId: 7 }),
+    ]);
+    expect(result.isAvailable).toBe(true);
+    // Named rather than left looking like an empty queue.
+    expect(result.errors).toEqual([
+      expect.objectContaining({
+        project: expect.objectContaining({ id: "forbidden" }),
+      }),
+    ]);
+  });
+
+  it("reports the pull request sections unavailable when every project fails", async () => {
+    listProjectPullRequestsMock.mockRejectedValue(new Error("no access"));
+
+    const result = await loadDashboardPullRequests();
+
+    expect(result.isAvailable).toBe(false);
+    expect(result.errors).toHaveLength(1);
   });
 
   it("keeps a review reaching the user only through a team", async () => {

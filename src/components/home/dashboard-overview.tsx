@@ -3,6 +3,7 @@ import { ArrowRightIcon } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { AzureDevOpsFailure } from "@/components/azure-devops-failure";
 import { DateLabel } from "@/components/date-label";
+import { RepositoryErrorAlert } from "@/components/repositories/repository-state";
 import { RepositoryPullRequestRow } from "@/components/repositories/repository-pull-request-row";
 import { PriorityBadge } from "@/components/tasks/priority-badge";
 import { ThemeToggle } from "@/components/themes/theme-toggle";
@@ -110,6 +111,19 @@ export function DashboardOverview({
           {overview.error ? (
             <AzureDevOpsFailure error={overview.error} />
           ) : null}
+
+          {/* A project that could not be read leaves the pull request panels
+              showing everything else, so the gap is named rather than left to
+              look like an empty queue. */}
+          {pullRequests.errors.map(({ error, project }) => (
+            <RepositoryErrorAlert
+              error={{
+                ...error,
+                message: `${project.name}: ${error.message}`,
+              }}
+              key={project.id}
+            />
+          ))}
 
           {/* Every tile is something the reader can act on, and each one is
               the headline for a panel below rather than a lone number. */}

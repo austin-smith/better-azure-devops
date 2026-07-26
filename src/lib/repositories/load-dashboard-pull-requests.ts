@@ -1,5 +1,9 @@
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
+import {
+  describeAzureDevOpsError,
+  type AzureDevOpsErrorDescriptor,
+} from "@/lib/azure-devops/errors";
 import { getCurrentAzureDevOpsIdentityId } from "@/lib/azure-devops/current-user";
 import { getAzureDevOpsIdentityGroupIds } from "@/lib/azure-devops/identities";
 import { listProjectPullRequests } from "@/lib/azure-devops/git/pull-requests";
@@ -7,7 +11,12 @@ import type {
   AzureGitPullRequest,
   AzureGitPullRequestReviewer,
 } from "@/lib/azure-devops/git/types";
-import { loadAzureDevOpsProjectSelection } from "@/lib/azure-devops/project-selection";
+import {
+  loadAzureDevOpsProjectSelection,
+  type AzureDevOpsProjectSelection,
+} from "@/lib/azure-devops/project-selection";
+
+type AzureDevOpsProject = AzureDevOpsProjectSelection["selectedProjects"][number];
 
 const PULL_REQUEST_PAGE_SIZE = 100;
 
@@ -15,12 +24,18 @@ export type DashboardPullRequests = {
   /** Reviewer on these and has not voted yet. */
   awaitingReview: AzureGitPullRequest[];
   createdByMe: AzureGitPullRequest[];
+  /** Projects that could not be read, so the sections above are partial. */
+  errors: Array<{
+    error: AzureDevOpsErrorDescriptor;
+    project: AzureDevOpsProject;
+  }>;
   isAvailable: boolean;
 };
 
 const EMPTY_DASHBOARD_PULL_REQUESTS: DashboardPullRequests = {
   awaitingReview: [],
   createdByMe: [],
+  errors: [],
   isAvailable: false,
 };
 
@@ -116,6 +131,17 @@ export async function loadDashboardPullRequests(): Promise<DashboardPullRequests
     }
 
     /**
+     * Group membership only widens which reviews count as this person's, and it
+     * comes from a different host to the Git APIs, so it can be refused on its
+     * own. Losing it costs reviews reaching them through a team; it must not
+     * cost the reviews and pull requests that do not depend on it.
+     */
+    const groupIds = await getAzureDevOpsIdentityGroupIds(
+      accessToken,
+      identityId,
+    ).catch(() => [] as string[]);
+
+    /**
      * One request per project answers both sections. Reviews cannot be matched
      * by Azure DevOps at all: `searchCriteria.reviewerId` matches only the
      * reviewer named on the pull request, and a team assignment names the team,
@@ -126,18 +152,40 @@ export async function loadDashboardPullRequests(): Promise<DashboardPullRequests
      * Once every open pull request in the project is here, the ones the person
      * authored are in it too, and asking for those separately would be a second
      * request for a subset of what the first already returned.
+     *
+     * Projects are settled independently: one the person cannot read should not
+     * empty the sections for every project they can.
      */
-    const groupIds = await getAzureDevOpsIdentityGroupIds(
-      accessToken,
-      identityId,
+    const results = await Promise.allSettled(
+      selection.selectedProjects.map((project) =>
+        listAllProjectPullRequests(accessToken, project.id, {}),
+      ),
     );
-    const pullRequests = (
-      await Promise.all(
-        selection.selectedProjects.map((project) =>
-          listAllProjectPullRequests(accessToken, project.id, {}),
-        ),
-      )
-    ).flat();
+    const pullRequests: AzureGitPullRequest[] = [];
+    const errors: DashboardPullRequests["errors"] = [];
+
+    results.forEach((result, index) => {
+      const project = selection.selectedProjects[index];
+
+      if (!project) {
+        return;
+      }
+
+      if (result.status === "rejected") {
+        errors.push({
+          error: describeAzureDevOpsError(result.reason),
+          project,
+        });
+        return;
+      }
+
+      pullRequests.push(...result.value);
+    });
+
+    if (errors.length === selection.selectedProjects.length) {
+      return { ...EMPTY_DASHBOARD_PULL_REQUESTS, errors };
+    }
+
     const identity = identityId.toLowerCase();
 
     return {
@@ -155,6 +203,7 @@ export async function loadDashboardPullRequests(): Promise<DashboardPullRequests
           (pullRequest) => pullRequest.createdBy?.id?.toLowerCase() === identity,
         ),
       ),
+      errors,
       isAvailable: true,
     };
   } catch {
