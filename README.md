@@ -121,7 +121,7 @@ services:
     image: ghcr.io/austin-smith/better-azure-devops:latest
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3002:3002"
+      - "3002:3002"
     environment:
       AZURE_DEVOPS_ORG_URL: https://dev.azure.com/your-org
     volumes:
