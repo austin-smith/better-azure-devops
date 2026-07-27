@@ -324,14 +324,6 @@ function CommandCenterDialog({
   }, [onOpenChange]);
 
   useEffect(() => {
-    setProjects([...availableProjects]);
-  }, [availableProjects]);
-
-  useEffect(() => {
-    setProjectIds([...selectedProjectIds]);
-  }, [selectedProjectIds]);
-
-  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (
         event.defaultPrevented ||
@@ -744,6 +736,14 @@ export function CommandCenterProvider({
     <CommandCenterContext.Provider value={contextValue}>
       {children}
       <CommandCenterDialog
+        key={JSON.stringify([
+          availableProjects.map((project) => [
+            project.id,
+            project.name,
+            project.defaultTeamImageUrl,
+          ]),
+          selectedProjectIds,
+        ])}
         availableProjects={availableProjects}
         onOpenChange={setOpen}
         open={open}

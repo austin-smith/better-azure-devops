@@ -34,10 +34,10 @@ export function ThemeShortcut() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [cycleTheme, isOpen]);
 
-  return (
+  return isOpen ? (
     <ThemeSwitcherModal
-      isOpen={isOpen}
+      isOpen
       onClose={() => setIsOpen(false)}
     />
-  );
+  ) : null;
 }

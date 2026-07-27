@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Suspense, useEffect, useRef, useState, useTransition } from "react";
+import { Suspense, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronDownIcon,
@@ -244,22 +244,6 @@ function ActiveProjectsControl({
       ? findProjectById(availableProjects, selectedProjectIds[0] ?? null)
       : null;
 
-  useEffect(() => {
-    setAvailableProjects([...initialAvailableProjects]);
-  }, [initialAvailableProjects]);
-
-  useEffect(() => {
-    const nextSelectedProjectIds = [...initialSelectedProjectIds];
-    savedProjectIdsRef.current = nextSelectedProjectIds;
-
-    if (isSavingProjectsRef.current || pendingProjectIdsRef.current) {
-      return;
-    }
-
-    latestSelectedProjectIdsRef.current = nextSelectedProjectIds;
-    setSelectedProjectIds(nextSelectedProjectIds);
-  }, [initialSelectedProjectIds]);
-
   async function flushProjectSelection() {
     if (isSavingProjectsRef.current) {
       return;
@@ -446,6 +430,14 @@ export function AppSidebar({
 
       <SidebarContent>
         <ActiveProjectsControl
+          key={JSON.stringify([
+            availableProjects.map((project) => [
+              project.id,
+              project.name,
+              project.defaultTeamImageUrl,
+            ]),
+            selectedProjectIds,
+          ])}
           availableProjects={availableProjects}
           selectedProjectIds={selectedProjectIds}
         />

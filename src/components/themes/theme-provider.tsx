@@ -64,6 +64,29 @@ function getSystemTheme() {
     : "light";
 }
 
+function subscribeToSystemTheme(onStoreChange: () => void) {
+  const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+  mediaQuery.addEventListener("change", onStoreChange);
+  return () => mediaQuery.removeEventListener("change", onStoreChange);
+}
+
+function subscribeToThemeMode(onStoreChange: () => void) {
+  const handleStorageChange = (event: StorageEvent) => {
+    if (event.key === THEME_MODE_STORAGE_KEY) {
+      onStoreChange();
+    }
+  };
+
+  window.addEventListener("storage", handleStorageChange);
+  window.addEventListener(THEME_MODE_CHANGE_EVENT, onStoreChange);
+
+  return () => {
+    window.removeEventListener("storage", handleStorageChange);
+    window.removeEventListener(THEME_MODE_CHANGE_EVENT, onStoreChange);
+  };
+}
+
 function disableTransitionsTemporarily() {
   const style = document.createElement("style");
 
@@ -105,12 +128,10 @@ function applyThemeModeToDocument(
 }
 
 function readStoredThemeMode(defaultTheme: ThemeModeValue) {
-  if (typeof window === "undefined") {
-    return defaultTheme;
-  }
-
   try {
-    return normalizeThemeMode(window.localStorage.getItem(THEME_MODE_STORAGE_KEY));
+    return normalizeThemeMode(
+      window.localStorage.getItem(THEME_MODE_STORAGE_KEY) ?? defaultTheme,
+    );
   } catch {
     return defaultTheme;
   }
@@ -258,18 +279,21 @@ export function ThemeProvider({
   initialTheme,
 }: ThemeProviderProps) {
   const serverTheme = initialTheme ?? defaultTheme;
-  const [theme, setThemeState] = React.useState<ThemeModeValue>(serverTheme);
-  const [resolvedTheme, setResolvedTheme] = React.useState<"light" | "dark">(
-    initialResolvedTheme,
+  const getThemeSnapshot = React.useCallback(
+    () => readStoredThemeMode(serverTheme),
+    [serverTheme],
   );
-
-  React.useEffect(() => {
-    const storedTheme = readStoredThemeMode(serverTheme);
-
-    if (storedTheme !== theme) {
-      setThemeState(storedTheme);
-    }
-  }, [serverTheme, theme]);
+  const theme = React.useSyncExternalStore(
+    subscribeToThemeMode,
+    getThemeSnapshot,
+    () => serverTheme,
+  );
+  const systemTheme = React.useSyncExternalStore(
+    subscribeToSystemTheme,
+    getSystemTheme,
+    () => initialResolvedTheme,
+  );
+  const resolvedTheme = theme === "system" ? systemTheme : theme;
 
   React.useEffect(() => {
     const syncPersistedThemeFamily = () => {
@@ -293,33 +317,10 @@ export function ThemeProvider({
   React.useEffect(() => {
     const resolved = applyThemeModeToDocument(theme, disableTransitionOnChange);
 
-    setResolvedTheme(resolved);
     persistThemeModeCookie(theme);
     persistResolvedThemeModeCookie(resolved);
-  }, [disableTransitionOnChange, theme]);
-
-  React.useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-
-    const handleMediaChange = () => {
-      if (theme !== "system") {
-        return;
-      }
-
-      const resolved = applyThemeModeToDocument(theme, disableTransitionOnChange);
-
-      setResolvedTheme(resolved);
-      persistResolvedThemeModeCookie(resolved);
-      window.dispatchEvent(new Event(THEME_MODE_CHANGE_EVENT));
-    };
-
-    handleMediaChange();
-    mediaQuery.addEventListener("change", handleMediaChange);
-
-    return () => {
-      mediaQuery.removeEventListener("change", handleMediaChange);
-    };
-  }, [disableTransitionOnChange, theme]);
+    window.dispatchEvent(new Event(THEME_MODE_CHANGE_EVENT));
+  }, [disableTransitionOnChange, resolvedTheme, theme]);
 
   React.useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {
@@ -334,12 +335,6 @@ export function ThemeProvider({
         window.dispatchEvent(new Event(THEME_FAMILY_CHANGE_EVENT));
       }
 
-      if (event.key === THEME_MODE_STORAGE_KEY) {
-        const nextTheme = normalizeThemeMode(event.newValue);
-
-        setThemeState(nextTheme);
-        persistThemeModeCookie(nextTheme);
-      }
     };
 
     window.addEventListener("storage", handleStorageChange);
@@ -350,7 +345,6 @@ export function ThemeProvider({
   }, []);
 
   const setTheme = React.useCallback((value: ThemeModeValue) => {
-    setThemeState(value);
     persistThemeModeValue(value);
   }, []);
 

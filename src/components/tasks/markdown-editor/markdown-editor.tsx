@@ -37,6 +37,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import {
   getActiveMarkdownCommands,
@@ -440,10 +441,8 @@ function isMarkdownEditorMode(value: unknown): value is MarkdownEditorMode {
   return value === "editor" || value === "split" || value === "preview";
 }
 
-function readMarkdownEditorPreferences() {
+function parseMarkdownEditorPreferences(storedValue: string | null) {
   try {
-    const storedValue = window.localStorage.getItem(markdownEditorPreferencesKey);
-
     if (!storedValue) {
       return null;
     }
@@ -536,10 +535,8 @@ function normalizeMarkdownEditorSplitLayout(
   };
 }
 
-function readMarkdownEditorSplitLayout() {
+function parseMarkdownEditorSplitLayout(storedValue: string | null) {
   try {
-    const storedValue = window.localStorage.getItem(markdownEditorSplitLayoutKey);
-
     if (!storedValue) {
       return null;
     }
@@ -549,6 +546,62 @@ function readMarkdownEditorSplitLayout() {
     return normalizeMarkdownEditorSplitLayout(parsedValue);
   } catch {
     return null;
+  }
+}
+
+const serverMarkdownEditorStorageSnapshot = "server";
+
+function getMarkdownEditorStorageSnapshot() {
+  try {
+    return JSON.stringify([
+      window.localStorage.getItem(markdownEditorPreferencesKey),
+      window.localStorage.getItem(markdownEditorSplitLayoutKey),
+    ]);
+  } catch {
+    return JSON.stringify([null, null]);
+  }
+}
+
+function subscribeToMarkdownEditorStorage(onStoreChange: () => void) {
+  const handleStorageChange = (event: StorageEvent) => {
+    if (
+      event.key === markdownEditorPreferencesKey ||
+      event.key === markdownEditorSplitLayoutKey
+    ) {
+      onStoreChange();
+    }
+  };
+
+  window.addEventListener("storage", handleStorageChange);
+  return () => window.removeEventListener("storage", handleStorageChange);
+}
+
+function parseMarkdownEditorStorageSnapshot(snapshot: string) {
+  if (snapshot === serverMarkdownEditorStorageSnapshot) {
+    return {
+      preferences: null,
+      preferencesLoaded: false,
+      splitLayout: null,
+    };
+  }
+
+  try {
+    const [preferencesValue, splitLayoutValue] = JSON.parse(snapshot) as [
+      string | null,
+      string | null,
+    ];
+
+    return {
+      preferences: parseMarkdownEditorPreferences(preferencesValue),
+      preferencesLoaded: true,
+      splitLayout: parseMarkdownEditorSplitLayout(splitLayoutValue),
+    };
+  } catch {
+    return {
+      preferences: null,
+      preferencesLoaded: true,
+      splitLayout: null,
+    };
   }
 }
 
@@ -731,11 +784,33 @@ function findTaskListItemChange(
   return null;
 }
 
-export function MarkdownEditor({
+export function MarkdownEditor(props: MarkdownEditorProps) {
+  const storageSnapshot = useSyncExternalStore(
+    subscribeToMarkdownEditorStorage,
+    getMarkdownEditorStorageSnapshot,
+    () => serverMarkdownEditorStorageSnapshot,
+  );
+  const initialState = parseMarkdownEditorStorageSnapshot(storageSnapshot);
+
+  return (
+    <MarkdownEditorState
+      key={storageSnapshot}
+      {...props}
+      initialPreferences={initialState.preferences}
+      initialPreferencesLoaded={initialState.preferencesLoaded}
+      initialSplitLayout={initialState.splitLayout}
+    />
+  );
+}
+
+function MarkdownEditorState({
   ariaLabel = "Markdown content",
   autoFocus = false,
   className,
   disabled = false,
+  initialPreferences,
+  initialPreferencesLoaded,
+  initialSplitLayout,
   modeAriaLabel = "Markdown editor mode",
   onChange,
   placeholder: placeholderText = "Add markdown...",
@@ -743,7 +818,13 @@ export function MarkdownEditor({
   statisticsAriaLabel = "Markdown statistics",
   toolbarAriaLabel = "Markdown formatting",
   value,
-}: MarkdownEditorProps) {
+}: MarkdownEditorProps & {
+  initialPreferences: MarkdownEditorPreferences | null;
+  initialPreferencesLoaded: boolean;
+  initialSplitLayout: MarkdownEditorSplitLayout | null;
+}) {
+  const preferredMode = initialPreferences?.mode ?? "split";
+  const initialWrapLines = initialPreferences?.wrapLines ?? true;
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
   const initialAutoFocusRef = useRef(autoFocus);
@@ -751,9 +832,9 @@ export function MarkdownEditor({
   const initialDisabledRef = useRef(disabled);
   const initialPlaceholderRef = useRef(placeholderText);
   const initialValueRef = useRef(value);
-  const initialWrapLinesRef = useRef(true);
+  const initialWrapLinesRef = useRef(initialWrapLines);
   const isSyncingScrollRef = useRef(false);
-  const modePreferenceRef = useRef<MarkdownEditorMode>("split");
+  const modePreferenceRef = useRef<MarkdownEditorMode>(preferredMode);
   const modeDescriptionId = useId();
   const onChangeRef = useRef(onChange);
   const shouldFocusEditorAfterModeChangeRef = useRef(false);
@@ -761,7 +842,9 @@ export function MarkdownEditor({
   const [editableCompartment] = useState(() => new Compartment());
   const [wrapCompartment] = useState(() => new Compartment());
   const [placeholderCompartment] = useState(() => new Compartment());
-  const [mode, setMode] = useState<MarkdownEditorMode>("split");
+  const [mode, setMode] = useState<MarkdownEditorMode>(() =>
+    initialMarkdownEditorDisplayMode(preferredMode, autoFocus)
+  );
   const [activeToolbarCommands, setActiveToolbarCommands] = useState<
     ReadonlySet<MarkdownCommandName>
   >(() => new Set());
@@ -770,10 +853,9 @@ export function MarkdownEditor({
     undo: 0,
   });
   const [splitLayout, setSplitLayout] = useState<MarkdownEditorSplitLayout>(
-    defaultMarkdownEditorSplitLayout,
+    initialSplitLayout ?? defaultMarkdownEditorSplitLayout,
   );
-  const [wrapLines, setWrapLines] = useState(true);
-  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [wrapLines, setWrapLines] = useState(initialWrapLines);
   const stats = useMemo(() => getMarkdownStats(value), [value]);
   const isCodeBlockActive = activeToolbarCommands.has("codeBlock");
   const showEditor = mode !== "preview";
@@ -806,33 +888,8 @@ export function MarkdownEditor({
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  useLayoutEffect(() => {
-    const preferences = readMarkdownEditorPreferences();
-    const preferredMode = preferences?.mode ?? "split";
-
-    modePreferenceRef.current = preferredMode;
-
-    if (preferences) {
-      initialWrapLinesRef.current = preferences.wrapLines;
-      setWrapLines(preferences.wrapLines);
-    }
-
-    setMode(initialMarkdownEditorDisplayMode(
-      preferredMode,
-      initialAutoFocusRef.current,
-    ));
-
-    const storedSplitLayout = readMarkdownEditorSplitLayout();
-
-    if (storedSplitLayout) {
-      setSplitLayout(storedSplitLayout);
-    }
-
-    setPreferencesLoaded(true);
-  }, []);
-
   useEffect(() => {
-    if (!preferencesLoaded) {
+    if (!initialPreferencesLoaded) {
       return;
     }
 
@@ -840,7 +897,7 @@ export function MarkdownEditor({
       mode: modePreferenceRef.current,
       wrapLines,
     });
-  }, [mode, preferencesLoaded, wrapLines]);
+  }, [initialPreferencesLoaded, mode, wrapLines]);
 
   useEffect(() => {
     const view = editorViewRef.current;

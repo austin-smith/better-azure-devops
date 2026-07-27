@@ -165,10 +165,6 @@ function TaskSearchInput({
   const [inputValue, setInputValue] = useState(value);
 
   useEffect(() => {
-    setInputValue(value);
-  }, [value]);
-
-  useEffect(() => {
     if (inputValue === value) {
       return;
     }
@@ -330,24 +326,12 @@ function AssigneeFilter({
 
   useEffect(() => {
     if (!isOpen) {
-      setQuery("");
-      setResults([]);
-      setIsLoading(false);
-      setLookupError(null);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) {
       return;
     }
 
     const trimmedQuery = query.trim();
 
     if (trimmedQuery.length < 2) {
-      setResults([]);
-      setIsLoading(false);
-      setLookupError(null);
       return;
     }
 
@@ -397,21 +381,37 @@ function AssigneeFilter({
     };
   }, [isOpen, query]);
 
+  function handleOpenChange(open: boolean) {
+    setIsOpen(open);
+
+    if (!open) {
+      setQuery("");
+      setResults([]);
+      setIsLoading(false);
+      setLookupError(null);
+    }
+  }
+
+  function handleQueryChange(value: string) {
+    setQuery(value);
+
+    if (value.trim().length < 2) {
+      setResults([]);
+      setIsLoading(false);
+      setLookupError(null);
+    }
+  }
+
   function selectAssignee(assignee: string | null) {
     onChange(assignee);
-    setIsOpen(false);
+    handleOpenChange(false);
   }
 
   return (
     <Popover
       modal={false}
       open={isOpen}
-      onOpenChange={(open) => {
-        setIsOpen(open);
-        if (!open) {
-          setQuery("");
-        }
-      }}
+      onOpenChange={handleOpenChange}
     >
       <PopoverTrigger
         data-active={currentAssignee !== null ? "true" : undefined}
@@ -430,7 +430,7 @@ function AssigneeFilter({
           <CommandInput
             autoFocus
             disabled={disabled}
-            onValueChange={setQuery}
+            onValueChange={handleQueryChange}
             placeholder="Search assignee"
             value={query}
           />
@@ -856,6 +856,7 @@ export function TaskTable({
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex max-w-full flex-none flex-wrap items-center gap-2">
             <TaskSearchInput
+              key={searchQuery}
               disabled={isPending}
               value={searchQuery}
               onChange={setSearchQuery}

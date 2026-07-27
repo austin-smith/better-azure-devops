@@ -27,7 +27,7 @@ import {
 import { computeThemeFamilySwatches } from "@/components/themes/theme-provider";
 
 export function ThemeToggle() {
-  const { resolvedTheme, theme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const { themeFamily, setThemeFamily } = useThemeFamily();
   const selectedTheme = normalizeThemeMode(theme);
   const selectedThemeLabel =
@@ -45,12 +45,21 @@ export function ThemeToggle() {
       })),
   );
 
-  React.useEffect(() => {
-    setThemeFamilyOptions(computeThemeFamilySwatches());
-  }, [resolvedTheme, selectedTheme]);
+  function selectTheme(value: Parameters<typeof setTheme>[0]) {
+    setTheme(value);
+    window.requestAnimationFrame(() => {
+      setThemeFamilyOptions(computeThemeFamilySwatches());
+    });
+  }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open) {
+          setThemeFamilyOptions(computeThemeFamilySwatches());
+        }
+      }}
+    >
       <DropdownMenuTrigger
         aria-label={triggerLabel}
         title={triggerLabel}
@@ -72,7 +81,7 @@ export function ThemeToggle() {
                 <DropdownMenuRadioItem
                   key={option.value}
                   value={option.value}
-                  onClick={() => setTheme(option.value)}
+                  onClick={() => selectTheme(option.value)}
                 >
                   <Icon />
                   <span>{option.label}</span>

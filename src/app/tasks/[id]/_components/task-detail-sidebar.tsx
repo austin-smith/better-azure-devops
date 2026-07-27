@@ -163,22 +163,10 @@ function SearchPopoverField({
 
   useEffect(() => {
     if (!isOpen) {
-      setQuery("");
-      setResults([]);
-      setLookupError(null);
-      setIsLoading(false);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) {
       return;
     }
 
     if (!shouldLookup && minQueryLength > 0) {
-      setResults([]);
-      setLookupError(null);
-      setIsLoading(false);
       return;
     }
 
@@ -236,13 +224,32 @@ function SearchPopoverField({
     };
   }, [endpoint, isOpen, minQueryLength, shouldLookup, trimmedQuery]);
 
+  function handleOpenChange(open: boolean) {
+    setIsOpen(open);
+
+    if (!open) {
+      setQuery("");
+      setResults([]);
+      setLookupError(null);
+      setIsLoading(false);
+    }
+  }
+
+  function handleQueryChange(value: string) {
+    setQuery(value);
+
+    if (value.trim().length < minQueryLength && minQueryLength > 0) {
+      setResults([]);
+      setLookupError(null);
+      setIsLoading(false);
+    }
+  }
+
   return (
     <Popover
       modal={false}
       open={isOpen}
-      onOpenChange={(open) => {
-        setIsOpen(open);
-      }}
+      onOpenChange={handleOpenChange}
     >
       <PopoverTrigger
         aria-label={accessibleName}
@@ -262,7 +269,7 @@ function SearchPopoverField({
           <CommandInput
             autoFocus
             disabled={disabled}
-            onValueChange={setQuery}
+            onValueChange={handleQueryChange}
             placeholder={placeholder}
             value={query}
           />
@@ -290,7 +297,7 @@ function SearchPopoverField({
                       disabled={disabled}
                       onSelect={() => {
                         onSelect(option);
-                        setIsOpen(false);
+                        handleOpenChange(false);
                       }}
                       value={option.key}
                     >
@@ -322,7 +329,7 @@ function SearchPopoverField({
                       disabled={disabled}
                       onSelect={() => {
                         onSelect(option);
-                        setIsOpen(false);
+                        handleOpenChange(false);
                       }}
                       value={option.key}
                     >

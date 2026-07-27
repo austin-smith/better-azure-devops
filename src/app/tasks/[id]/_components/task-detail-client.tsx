@@ -54,7 +54,20 @@ function getTaskApiPath(taskId: number, projectId: string | null | undefined) {
   return `/api/tasks/${taskId}${params.size > 0 ? `?${params.toString()}` : ""}`;
 }
 
-export function TaskDetail({
+export function TaskDetail(props: TaskDetailProps) {
+  const detailKey = props.detail
+    ? `${props.detail.id}:${props.detail.revision}`
+    : `${props.taskId}:missing`;
+
+  return (
+    <TaskDetailState
+      key={`${props.mode ?? "edit"}:${detailKey}:${props.taskProjectId ?? ""}`}
+      {...props}
+    />
+  );
+}
+
+function TaskDetailState({
   createProjectId = null,
   detail,
   detailError,
@@ -74,7 +87,9 @@ export function TaskDetail({
     null,
   );
   const [editMetadataError, setEditMetadataError] = useState<string | null>(null);
-  const [isLoadingEditMetadata, setIsLoadingEditMetadata] = useState(false);
+  const [isLoadingEditMetadata, setIsLoadingEditMetadata] = useState(
+    Boolean(detail && mode !== "create"),
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveErrorDetails, setSaveErrorDetails] =
@@ -84,18 +99,7 @@ export function TaskDetail({
   const [draftResetKey, setDraftResetKey] = useState(0);
 
   useEffect(() => {
-    setCurrentDetail(detail);
-    setDraftValues(detail ? createTaskDetailEditableValues(detail) : null);
-    setSaveError(null);
-    setSaveErrorDetails(null);
-    setSaveRecoveryAction("save");
-  }, [detail]);
-
-  useEffect(() => {
     if (!detail || mode === "create") {
-      setEditMetadata(null);
-      setEditMetadataError(null);
-      setIsLoadingEditMetadata(false);
       return;
     }
 
@@ -106,9 +110,6 @@ export function TaskDetail({
     if (projectId) {
       params.set("project", projectId);
     }
-
-    setIsLoadingEditMetadata(true);
-    setEditMetadataError(null);
 
     void (async () => {
       try {

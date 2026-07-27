@@ -118,9 +118,12 @@ export function NewWorkItemDialog({
   const [title, setTitle] = useState("");
   const [type, setType] = useState(DEFAULT_WORK_ITEM_TYPES[0] ?? "Task");
   const handledOpenRequestKeyRef = useRef<string | null>(null);
+  const selectedProjectId = projects.some((project) => project.id === projectId)
+    ? projectId
+    : getInitialProjectId(projects);
   const selectedProject = useMemo(
-    () => projects.find((project) => project.id === projectId) ?? null,
-    [projectId, projects],
+    () => projects.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId],
   );
   const isCreateDisabled = disabled || projects.length === 0;
   const selectedArea = areaOptions.find((option) => option.value === areaPath) ?? null;
@@ -139,24 +142,17 @@ export function NewWorkItemDialog({
     onOpenRequestHandled?.(openRequestKey);
   }, [isCreateDisabled, onOpenRequestHandled, openRequestKey]);
 
-  useEffect(() => {
-    if (projectId && projects.some((project) => project.id === projectId)) {
-      return;
-    }
-
-    setProjectId(getInitialProjectId(projects));
-  }, [projectId, projects]);
-
-  useEffect(() => {
+  function selectProject(nextProjectId: string) {
+    setProjectId(nextProjectId);
     setAreaPath("");
     setAreaOptions([]);
     setAreaError(null);
     setHasLoadedAreas(false);
-    setIsLoadingAreas(Boolean(projectId));
-  }, [projectId]);
+    setIsLoadingAreas(false);
+  }
 
   useEffect(() => {
-    if (!isOpen || !projectId || hasLoadedAreas) {
+    if (!isOpen || !selectedProjectId || hasLoadedAreas) {
       return;
     }
 
@@ -168,7 +164,7 @@ export function NewWorkItemDialog({
 
       try {
         const response = await fetch(
-          `/api/projects/area-settings?project=${encodeURIComponent(projectId)}`,
+          `/api/projects/area-settings?project=${encodeURIComponent(selectedProjectId)}`,
           {
             signal: controller.signal,
           },
@@ -211,7 +207,7 @@ export function NewWorkItemDialog({
     })();
 
     return () => controller.abort();
-  }, [hasLoadedAreas, isOpen, projectId]);
+  }, [hasLoadedAreas, isOpen, selectedProjectId]);
 
   function resetForm() {
     setAreaPath("");
@@ -240,7 +236,7 @@ export function NewWorkItemDialog({
 
     const trimmedTitle = title.trim();
 
-    if (!selectedProject || !projectId || !trimmedTitle || !type) {
+    if (!selectedProject || !selectedProjectId || !trimmedTitle || !type) {
       setError("Project, work item type, and title are required.");
       return;
     }
@@ -280,10 +276,10 @@ export function NewWorkItemDialog({
                 disabled={projects.length === 0}
                 onValueChange={(value) => {
                   if (value) {
-                    setProjectId(value);
+                    selectProject(value);
                   }
                 }}
-                value={projectId}
+                value={selectedProjectId}
               >
                 <SelectTrigger
                   className="w-full"
@@ -315,7 +311,7 @@ export function NewWorkItemDialog({
                 onOpenChange={setIsAreaOpen}
               >
                 <PopoverTrigger
-                  disabled={!projectId}
+                  disabled={!selectedProjectId}
                   render={(
                     <Button
                       aria-label="Select area"
@@ -487,7 +483,7 @@ export function NewWorkItemDialog({
             >
               Cancel
             </Button>
-            <Button disabled={!title.trim() || !projectId} type="submit">
+            <Button disabled={!title.trim() || !selectedProjectId} type="submit">
               <ArrowRightIcon data-icon="inline-start" />
               Continue
             </Button>

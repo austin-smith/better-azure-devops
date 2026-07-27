@@ -20,12 +20,14 @@ function resolveModifierKey() {
   return /Mac|iPhone|iPad|iPod/i.test(platform) ? "⌘" : "Ctrl";
 }
 
+function subscribeToModifierKey() {
+  return () => {};
+}
+
 export function useModifierKey() {
-  const [modifierKey, setModifierKey] = React.useState("Ctrl");
-
-  React.useEffect(() => {
-    setModifierKey(resolveModifierKey());
-  }, []);
-
-  return modifierKey;
+  return React.useSyncExternalStore(
+    subscribeToModifierKey,
+    resolveModifierKey,
+    () => "Ctrl",
+  );
 }

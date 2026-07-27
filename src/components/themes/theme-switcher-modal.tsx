@@ -27,7 +27,6 @@ import {
 } from "@/components/themes/theme-provider";
 import { useThemeFamily } from "@/hooks/use-theme-family";
 import {
-  THEME_FAMILY_OPTIONS,
   THEME_MODE_ICON_MAP,
   THEME_MODE_OPTIONS,
   normalizeThemeMode,
@@ -48,22 +47,15 @@ export function ThemeSwitcherModal({
   const selectedButtonRef = React.useRef<HTMLButtonElement | null>(null);
   const selectedTheme = normalizeThemeMode(theme);
   const [themeFamilyOptions, setThemeFamilyOptions] = React.useState(
-    () =>
-      THEME_FAMILY_OPTIONS.map((option) => ({
-        ...option,
-        primaryColor: "currentColor",
-        secondaryColor: "currentColor",
-        accentColor: "currentColor",
-      })),
+    computeThemeFamilySwatches,
   );
 
-  React.useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    setThemeFamilyOptions(computeThemeFamilySwatches());
-  }, [isOpen, selectedTheme]);
+  function selectTheme(value: Parameters<typeof setTheme>[0]) {
+    setTheme(value);
+    window.requestAnimationFrame(() => {
+      setThemeFamilyOptions(computeThemeFamilySwatches());
+    });
+  }
 
   const selectedThemeFamilyOption =
     themeFamilyOptions.find((option) => option.value === themeFamily) ??
@@ -105,7 +97,7 @@ export function ThemeSwitcherModal({
                   key={option.value}
                   ref={isCurrent ? selectedButtonRef : null}
                   type="button"
-                  onClick={() => setTheme(option.value)}
+                  onClick={() => selectTheme(option.value)}
                   className={cn(
                     "flex w-full items-center justify-between rounded-md px-2 py-2 text-left outline-none transition-colors",
                     "hover:bg-accent focus-visible:bg-accent focus-visible:ring-[2px] focus-visible:ring-inset focus-visible:ring-ring/50",
