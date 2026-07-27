@@ -29,6 +29,11 @@ This repo expects direct, modern, maintainable code. Match the stack and convent
 - Reuse existing server-side loaders and integration code before adding new fetch or transformation paths.
 - Keep auth, data loading, and response shaping out of presentation code when they do not belong there.
 
+## Authentication
+
+- Local authentication must not require an Entra app registration, tenant administration, or app credentials.
+- Keep Azure CLI authentication unless the maintainer explicitly approves a replacement. Design hosted or multi-user authentication separately.
+
 ## UI And Libraries
 
 - `components.json` is the source of truth for UI setup, aliases, and icon library.
