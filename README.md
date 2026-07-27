@@ -125,12 +125,8 @@ services:
     environment:
       AZURE_DEVOPS_ORG_URL: https://dev.azure.com/your-org
     volumes:
-      - azure-config:/app/.azure
-      - data:/data
-
-volumes:
-  azure-config:
-  data:
+      - ./.azure:/app/.azure
+      - ./.data:/data
 ```
 
 Sign in:
