@@ -50,9 +50,12 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Check Dockerfile
+        run: pnpm docker:check
+
   container:
     needs: validate
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
 
     strategy:
@@ -60,8 +63,10 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
+            runner: ubuntu-24.04
             slug: amd64
           - platform: linux/arm64
+            runner: ubuntu-24.04-arm
             slug: arm64
 
     steps:
@@ -74,15 +79,8 @@ jobs:
           node-version: 24
           package-manager-cache: false
 
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
-
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
-
-      - name: Check Dockerfile
-        if: matrix.platform == 'linux/amd64'
-        run: docker build --check .
 
       - name: Build container
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
