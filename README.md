@@ -106,7 +106,7 @@ Run the app:
 docker run -d \
   --name better-ado \
   --restart unless-stopped \
-  -p 127.0.0.1:3002:3002 \
+  -p 3002:3002 \
   -e AZURE_DEVOPS_ORG_URL=https://dev.azure.com/your-org \
   --mount type=volume,source=better-ado-azure-config,target=/app/.azure \
   --mount type=volume,source=better-ado-data,target=/data \
@@ -119,6 +119,7 @@ docker run -d \
 services:
   better-ado:
     image: ghcr.io/austin-smith/better-ado:latest
+    container_name: better-ado
     restart: unless-stopped
     ports:
       - "3002:3002"
