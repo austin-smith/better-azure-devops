@@ -37,7 +37,7 @@ export function RepositoryPullRequestRow({
   )}/pulls/${pullRequest.pullRequestId}`;
 
   return (
-    <li className="flex min-w-0 items-center gap-2.5 px-3 py-2 transition-colors hover:bg-muted/50">
+    <li className="relative flex min-w-0 items-center gap-2.5 px-3 py-2 transition-colors hover:bg-muted/50">
       {/* The author identifies the row, so their avatar leads it rather than
           trailing at the far right edge. */}
       {pullRequest.createdBy ? (
@@ -58,8 +58,11 @@ export function RepositoryPullRequestRow({
               getCheckToneTextClassName(state.tone),
             )}
           />
+          {/* The title link stretches over the whole row so the entire card is
+              the target. The row tint is then the only hover signal needed, the
+              same as every other clickable row. */}
           <Link
-            className="truncate text-sm font-medium hover:underline"
+            className="truncate text-sm font-medium after:absolute after:inset-0 after:content-['']"
             href={href}
           >
             {pullRequest.title}

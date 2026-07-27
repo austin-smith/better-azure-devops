@@ -40,8 +40,10 @@ export function RepositoryPullRequestReviewers({
   const visible = ordered.slice(0, MAX_VISIBLE_REVIEWERS);
   const overflow = ordered.length - visible.length;
 
+  // Positioned so the avatars stay above a stretched row link and keep their
+  // tooltips hoverable.
   return (
-    <span className="flex shrink-0 items-center gap-1">
+    <span className="relative flex shrink-0 items-center gap-1">
       {visible.map((reviewer) => {
         const vote = getVotePresentation(reviewer.vote);
 
