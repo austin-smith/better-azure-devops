@@ -1,0 +1,50 @@
+# Version control and automation
+.git
+.github
+
+# Dependencies and build output
+.next
+.pnpm-store
+build
+coverage
+node_modules
+out
+*.tsbuildinfo
+
+# Local configuration, credentials, and data
+.azure
+.data
+.env
+.env.*
+!.env.example
+.npmrc
+*.db
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.pem
+
+# Tests and development-only tooling
+.agents
+.claude
+scripts
+tests
+AGENTS.md
+CLAUDE.md
+skills-lock.json
+vitest.config.ts
+
+# Editor and operating-system files
+.idea
+.vscode
+**/.DS_Store
+*.swp
+*.swo
+
+# Documentation and debug logs
+README.md
+*.log
+pnpm-debug.log*

@@ -1,7 +1,7 @@
 <!-- LOGO -->
 <h1 align="center">
   <img src="./public/logo.png" alt="Better Azure DevOps logo" width="128">
-  <br>Better Azure DevOps
+  <br>Better ADO
 </h1>
 
 <p align="center">
@@ -16,7 +16,7 @@
 
 Better Azure DevOps is a small web client for Azure DevOps. Manage work items, browse repositories and code, read commit history, and review pull requests.
 
-## Setup
+## Local Development
 
 ### 1. Install dependencies
 
@@ -69,10 +69,80 @@ $env:AZURE_CONFIG_DIR=".azure"
 az login
 ```
 
-## Run
+### 5. Run
 
 ```bash
 pnpm dev
+```
+
+Open [http://localhost:3002](http://localhost:3002).
+
+## Docker
+
+`latest` is the current stable release. `canary` tracks the newest successful build from `main`.
+
+### Docker Run
+
+Create volumes for Azure credentials and app data:
+
+```bash
+docker volume create better-ado-azure-config
+docker volume create better-ado-data
+```
+
+Sign in:
+
+```bash
+docker run --rm -it \
+  --mount type=volume,source=better-ado-azure-config,target=/app/.azure \
+  --entrypoint az \
+  ghcr.io/austin-smith/better-azure-devops:latest \
+  login --use-device-code
+```
+
+Run the app:
+
+```bash
+docker run -d \
+  --name better-azure-devops \
+  --restart unless-stopped \
+  -p 127.0.0.1:3002:3002 \
+  -e AZURE_DEVOPS_ORG_URL=https://dev.azure.com/your-org \
+  --mount type=volume,source=better-ado-azure-config,target=/app/.azure \
+  --mount type=volume,source=better-ado-data,target=/data \
+  ghcr.io/austin-smith/better-azure-devops:latest
+```
+
+### Docker Compose
+
+```yaml
+services:
+  better-ado:
+    image: ghcr.io/austin-smith/better-azure-devops:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3002"
+    environment:
+      AZURE_DEVOPS_ORG_URL: https://dev.azure.com/your-org
+    volumes:
+      - azure-config:/app/.azure
+      - data:/data
+
+volumes:
+  azure-config:
+  data:
+```
+
+Sign in:
+
+```bash
+docker compose run --rm --entrypoint az better-ado login --use-device-code
+```
+
+Run the app:
+
+```bash
+docker compose up -d
 ```
 
 Open [http://localhost:3002](http://localhost:3002).
