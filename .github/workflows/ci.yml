@@ -54,6 +54,8 @@ jobs:
         run: pnpm docker:check
 
   container:
+    # Only run the Docker publishing pipeline after changes are merged to main.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: validate
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
