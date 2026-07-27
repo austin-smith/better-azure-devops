@@ -92,7 +92,7 @@ jobs:
           context: .
           load: true
           platforms: ${{ matrix.platform }}
-          tags: better-azure-devops:release-${{ matrix.slug }}
+          tags: better-ado:release-${{ matrix.slug }}
 
       - name: Scan container
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
@@ -100,14 +100,14 @@ jobs:
           exit-code: "1"
           format: table
           ignore-unfixed: true
-          image-ref: better-azure-devops:release-${{ matrix.slug }}
+          image-ref: better-ado:release-${{ matrix.slug }}
           scanners: vuln,secret
           severity: CRITICAL
 
       - name: Smoke test container
         run: >-
           node scripts/smoke-test-image.mjs
-          better-azure-devops:release-${{ matrix.slug }}
+          better-ado:release-${{ matrix.slug }}
           ${{ matrix.platform }}
 
   publish:

@@ -19,7 +19,7 @@ if (platform && !["linux/amd64", "linux/arm64"].includes(platform)) {
 }
 
 const suffix = `${process.pid}-${Date.now()}`;
-const containerName = `better-azure-devops-smoke-${suffix}`;
+const containerName = `better-ado-smoke-${suffix}`;
 const azureVolume = `${containerName}-azure`;
 const dataVolume = `${containerName}-data`;
 

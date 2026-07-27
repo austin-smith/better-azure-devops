@@ -1,5 +1,5 @@
 {
-  "name": "devops-project",
+  "name": "better-ado",
   "version": "0.2.1",
   "private": true,
   "packageManager": "pnpm@11.2.2",
@@ -12,9 +12,9 @@
     "start": "next start --port 3002",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "docker:build": "docker build --tag better-azure-devops:local .",
+    "docker:build": "docker build --tag better-ado:local .",
     "docker:check": "docker build --check .",
-    "docker:smoke": "node scripts/smoke-test-image.mjs better-azure-devops:local",
+    "docker:smoke": "node scripts/smoke-test-image.mjs better-ado:local",
     "lint": "eslint",
     "release": "node scripts/release.mjs",
     "release:dry-run": "node scripts/release.mjs --dry-run",

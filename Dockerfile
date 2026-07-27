@@ -104,7 +104,7 @@ COPY --from=builder --chown=10001:10001 /app/.next/static ./.next/static
 COPY --from=builder --chown=10001:10001 /app/drizzle ./drizzle
 COPY --from=builder --chown=10001:10001 /app/public ./public
 
-LABEL org.opencontainers.image.source="https://github.com/austin-smith/better-azure-devops"
+LABEL org.opencontainers.image.source="https://github.com/austin-smith/better-ado"
 
 USER 10001:10001
 
