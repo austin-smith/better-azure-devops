@@ -619,6 +619,34 @@ function saveUnsupportedMetrics(
   });
 }
 
+function getPullRequestDiffBaseCommitId(options: {
+  mergeParentIds: readonly string[];
+  mergeStrategy: string | null;
+  targetBeforeMergeId: string | null;
+}) {
+  const firstParentId = options.mergeParentIds[0] ?? null;
+
+  if (!firstParentId) {
+    return null;
+  }
+
+  if (options.mergeParentIds.length >= 2) {
+    return firstParentId;
+  }
+
+  if (options.mergeStrategy === "squash") {
+    return firstParentId;
+  }
+
+  if (options.mergeStrategy === "rebase") {
+    return options.targetBeforeMergeId;
+  }
+
+  return options.targetBeforeMergeId === firstParentId
+    ? firstParentId
+    : null;
+}
+
 async function measurePullRequest(
   accessToken: string,
   repository: typeof repositories.$inferSelect,
@@ -640,12 +668,10 @@ async function measurePullRequest(
     pullRequest.mergeCommitId,
     { signal },
   );
-  const firstParentId = mergeCommit.parents[0] ?? null;
   let strategy = pullRequest.mergeStrategy?.toLowerCase() ?? null;
   let targetBeforeMergeId: string | null = null;
 
   if (
-    firstParentId &&
     mergeCommit.parents.length === 1 &&
     strategy !== "squash"
   ) {
@@ -661,13 +687,13 @@ async function measurePullRequest(
     targetBeforeMergeId = details.lastMergeTargetCommitId;
   }
 
-  const supported =
-    Boolean(firstParentId) &&
-    (mergeCommit.parents.length >= 2 ||
-      strategy === "squash" ||
-      targetBeforeMergeId === firstParentId);
+  const baseCommitId = getPullRequestDiffBaseCommitId({
+    mergeParentIds: mergeCommit.parents,
+    mergeStrategy: strategy,
+    targetBeforeMergeId,
+  });
 
-  if (!firstParentId || !supported) {
+  if (!baseCommitId) {
     saveUnsupportedMetrics(
       repository.id,
       pullRequest.pullRequestId,
@@ -680,7 +706,7 @@ async function measurePullRequest(
     repository.projectId,
     repository.id,
     {
-      baseCommitId: firstParentId,
+      baseCommitId,
       signal,
       targetCommitId: pullRequest.mergeCommitId,
     },

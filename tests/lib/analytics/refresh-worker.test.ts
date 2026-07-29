@@ -16,7 +16,10 @@ import {
   getRepositoryPullRequest,
   listCompletedRepositoryPullRequests,
 } from "@/lib/azure-devops/git/pull-requests";
-import type { AzureGitPullRequest } from "@/lib/azure-devops/git/types";
+import type {
+  AzureGitCommitDetail,
+  AzureGitPullRequest,
+} from "@/lib/azure-devops/git/types";
 import { measurePullRequestFiles } from "@/lib/analytics/measure";
 import {
   enqueueRepositorySync,
@@ -89,6 +92,31 @@ const pullRequest: AzureGitPullRequest = {
   workItemIds: [],
 };
 
+function createCommit(parents: string[]): AzureGitCommitDetail {
+  return {
+    author: {
+      date: null,
+      email: null,
+      imageUrl: null,
+      name: null,
+    },
+    changeCounts: {},
+    comment: "",
+    commitId: "merge-commit",
+    committer: {
+      date: null,
+      email: null,
+      imageUrl: null,
+      name: null,
+    },
+    parents,
+    push: null,
+    remoteUrl: null,
+    tooManyChanges: false,
+    url: null,
+  };
+}
+
 describe("repository analytics worker", () => {
   beforeEach(() => {
     process.env.LOCAL_SETTINGS_DATABASE_PATH =
@@ -118,28 +146,9 @@ describe("repository analytics worker", () => {
       nextCursor: null,
     });
     vi.mocked(getRepositoryPullRequest).mockResolvedValue(pullRequest);
-    vi.mocked(getRepositoryCommit).mockResolvedValue({
-      author: {
-        date: null,
-        email: null,
-        imageUrl: null,
-        name: null,
-      },
-      changeCounts: {},
-      comment: "",
-      commitId: "merge-commit",
-      committer: {
-        date: null,
-        email: null,
-        imageUrl: null,
-        name: null,
-      },
-      parents: ["first-parent"],
-      push: null,
-      remoteUrl: null,
-      tooManyChanges: false,
-      url: null,
-    });
+    vi.mocked(getRepositoryCommit).mockResolvedValue(
+      createCommit(["first-parent"]),
+    );
     vi.mocked(measurePullRequestFiles).mockResolvedValue([
       {
         additions: 3,
@@ -218,6 +227,16 @@ describe("repository analytics worker", () => {
     expect(
       getLocalSettingsDb().select().from(pullRequestFileMetrics).all(),
     ).toHaveLength(4);
+    expect(measurePullRequestFiles).toHaveBeenCalledWith(
+      "token",
+      "project-1",
+      "repo-1",
+      {
+        baseCommitId: "first-parent",
+        signal: expect.any(AbortSignal),
+        targetCommitId: "merge-commit",
+      },
+    );
     expect(
       getLocalSettingsDb().query.repositories.findFirst().sync(),
     ).toMatchObject({
@@ -350,7 +369,7 @@ describe("repository analytics worker", () => {
       .values({
         measuredAt: "2026-07-25T12:00:00.000Z",
         measurementStatus: "partial",
-        measurementVersion: 0,
+        measurementVersion: 1,
         pullRequestId: pullRequest.pullRequestId,
         repositoryId: "repo-1",
       })
@@ -514,6 +533,132 @@ describe("repository analytics worker", () => {
     ).toMatchObject({
       measurementStatus: "measured",
     });
+  });
+
+  it("measures rebase-and-fast-forward from the pre-merge target", async () => {
+    vi.mocked(listCompletedRepositoryPullRequests).mockResolvedValueOnce({
+      items: [
+        {
+          ...pullRequest,
+          mergeStrategy: "rebase",
+        },
+      ],
+      nextCursor: null,
+    });
+    vi.mocked(getRepositoryPullRequest).mockResolvedValueOnce({
+      ...pullRequest,
+      lastMergeTargetCommitId: "target-before-merge",
+      mergeStrategy: "rebase",
+    });
+    vi.mocked(getRepositoryCommit).mockResolvedValueOnce(
+      createCommit(["previous-rebased-source-commit"]),
+    );
+
+    enqueueRepositorySync("repo-1", "manual");
+    await runNextRepositoryAnalyticsJob();
+
+    expect(measurePullRequestFiles).toHaveBeenCalledWith(
+      "token",
+      "project-1",
+      "repo-1",
+      {
+        baseCommitId: "target-before-merge",
+        signal: expect.any(AbortSignal),
+        targetCommitId: "merge-commit",
+      },
+    );
+    expect(
+      getLocalSettingsDb().select().from(pullRequestMetrics).get(),
+    ).toMatchObject({
+      measurementStatus: "measured",
+    });
+  });
+
+  it("keeps rebase measurement unsupported without a pre-merge target", async () => {
+    vi.mocked(listCompletedRepositoryPullRequests).mockResolvedValueOnce({
+      items: [
+        {
+          ...pullRequest,
+          mergeStrategy: "rebase",
+        },
+      ],
+      nextCursor: null,
+    });
+    vi.mocked(getRepositoryPullRequest).mockResolvedValueOnce({
+      ...pullRequest,
+      lastMergeTargetCommitId: null,
+      mergeStrategy: "rebase",
+    });
+    vi.mocked(getRepositoryCommit).mockResolvedValueOnce(
+      createCommit(["previous-rebased-source-commit"]),
+    );
+
+    enqueueRepositorySync("repo-1", "manual");
+    await runNextRepositoryAnalyticsJob();
+
+    expect(measurePullRequestFiles).not.toHaveBeenCalled();
+    expect(
+      getLocalSettingsDb().select().from(pullRequestMetrics).get(),
+    ).toMatchObject({
+      measurementStatus: "unsupported",
+    });
+  });
+
+  it("measures an unclassified one-parent merge when its target matches", async () => {
+    vi.mocked(listCompletedRepositoryPullRequests).mockResolvedValueOnce({
+      items: [
+        {
+          ...pullRequest,
+          mergeStrategy: null,
+        },
+      ],
+      nextCursor: null,
+    });
+    vi.mocked(getRepositoryPullRequest).mockResolvedValueOnce({
+      ...pullRequest,
+      lastMergeTargetCommitId: "first-parent",
+      mergeStrategy: null,
+    });
+
+    enqueueRepositorySync("repo-1", "manual");
+    await runNextRepositoryAnalyticsJob();
+
+    expect(measurePullRequestFiles).toHaveBeenCalledWith(
+      "token",
+      "project-1",
+      "repo-1",
+      expect.objectContaining({
+        baseCommitId: "first-parent",
+      }),
+    );
+  });
+
+  it("measures a two-parent merge from its first parent", async () => {
+    vi.mocked(listCompletedRepositoryPullRequests).mockResolvedValueOnce({
+      items: [
+        {
+          ...pullRequest,
+          mergeStrategy: "rebaseMerge",
+        },
+      ],
+      nextCursor: null,
+    });
+    vi.mocked(getRepositoryCommit).mockResolvedValueOnce(
+      createCommit(["target-before-merge", "rebased-source-tip"]),
+    );
+
+    enqueueRepositorySync("repo-1", "manual");
+    await runNextRepositoryAnalyticsJob();
+
+    expect(getRepositoryPullRequest).not.toHaveBeenCalled();
+    expect(measurePullRequestFiles).toHaveBeenCalledWith(
+      "token",
+      "project-1",
+      "repo-1",
+      expect.objectContaining({
+        baseCommitId: "target-before-merge",
+      }),
+    );
   });
 
   it("retries the job when a response body is interrupted", async () => {
