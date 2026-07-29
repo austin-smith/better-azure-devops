@@ -19,10 +19,9 @@ import {
 } from "@/components/ui/alert";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -419,6 +418,7 @@ export function RepositoryAnalytics({
             value={range}
           >
             <SelectTrigger aria-label="Time window" className="min-w-28">
+              <Clock3Icon aria-hidden="true" />
               <SelectValue>
                 {getAnalyticsRangeLabel(range)}
               </SelectValue>
@@ -433,6 +433,25 @@ export function RepositoryAnalytics({
               </SelectGroup>
             </SelectContent>
           </Select>
+          {hasData ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Link
+                    className={buttonVariants({
+                      size: "sm",
+                      variant: "outline",
+                    })}
+                    href={`${exportBase}&format=csv`}
+                  />
+                }
+              >
+                <DownloadIcon data-icon="inline-start" />
+                CSV
+              </TooltipTrigger>
+              <TooltipContent>Download CSV</TooltipContent>
+            </Tooltip>
+          ) : null}
           <Tooltip>
             <TooltipTrigger render={<span className="inline-flex" />}>
               <Button
@@ -538,25 +557,6 @@ export function RepositoryAnalytics({
           <Card>
             <CardHeader>
               <CardTitle>Contributor footprint</CardTitle>
-              <CardAction className="flex items-center gap-1">
-                <Button
-                  nativeButton={false}
-                  render={<Link href={`${exportBase}&format=csv`} />}
-                  size="sm"
-                  variant="outline"
-                >
-                  <DownloadIcon data-icon="inline-start" />
-                  CSV
-                </Button>
-                <Button
-                  nativeButton={false}
-                  render={<Link href={`${exportBase}&format=json`} />}
-                  size="sm"
-                  variant="outline"
-                >
-                  JSON
-                </Button>
-              </CardAction>
             </CardHeader>
             <CardContent className="px-0">
               <Table>

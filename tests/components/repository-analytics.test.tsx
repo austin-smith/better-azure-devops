@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import { act, render } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { RepositoryAnalytics } from "@/components/repositories/repository-analytics";
 import type { RepositoryAnalyticsReport } from "@/lib/analytics/report";
 import type { RepositoryAnalyticsJob } from "@/lib/analytics/refresh";
@@ -132,5 +138,57 @@ describe("RepositoryAnalytics", () => {
 
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("places the CSV download in the analytics toolbar", async () => {
+    render(
+      <RepositoryAnalytics
+        activeJob={null}
+        branch="refs/heads/main"
+        lastSyncedAt="2026-07-26T12:00:00.000Z"
+        projectId="project"
+        range="30"
+        report={{
+          ...emptyReport,
+          totals: {
+            ...emptyReport.totals,
+            pullRequests: 1,
+          },
+        }}
+        repositoryId="repository"
+      />,
+    );
+
+    const toolbar = screen
+      .getByRole("heading", { name: "Analytics" })
+      .closest("section");
+    const timeWindow = screen.getByRole("combobox", {
+      name: "Time window",
+    });
+
+    if (!toolbar) {
+      throw new Error("Analytics toolbar was not rendered.");
+    }
+
+    expect(
+      timeWindow.querySelector(".lucide-clock-3"),
+    ).toBeInTheDocument();
+
+    const csvLink = within(toolbar).getByRole("link", {
+      name: "CSV",
+    });
+
+    expect(csvLink).toHaveAttribute(
+      "href",
+      "/api/repos/project/repository/analytics/export?branch=refs%2Fheads%2Fmain&range=30&format=csv",
+    );
+    expect(screen.queryByText("JSON")).not.toBeInTheDocument();
+
+    fireEvent.focus(csvLink);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+
+    expect(screen.getByText("Download CSV")).toBeVisible();
   });
 });

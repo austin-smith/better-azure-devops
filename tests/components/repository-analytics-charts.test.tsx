@@ -97,10 +97,16 @@ describe("RepositoryAnalyticsCharts", () => {
 
     expect(weeklyFootprintChart).toBeVisible();
     expect(
+      screen.queryByTitle("Weekly footprint chart"),
+    ).not.toBeInTheDocument();
+    expect(
       screen.getByRole("application", {
         name: "Pull request size chart",
       }),
     ).toBeVisible();
+    expect(
+      screen.queryByTitle("Pull request size chart"),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByText("Added and deleted lines by merge week"),
     ).toBeVisible();

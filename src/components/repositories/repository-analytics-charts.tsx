@@ -177,10 +177,10 @@ function WeeklyFootprintChart({
         >
           <BarChart
             accessibilityLayer
+            aria-label="Weekly footprint chart"
             data={trend}
             desc="Stacked bars showing lines added and deleted for each completed pull request merge week."
             margin={{ left: 0, right: 8 }}
-            title="Weekly footprint chart"
           >
             <CartesianGrid vertical={false} />
             <XAxis
@@ -274,11 +274,11 @@ function PullRequestSizeChart({
         >
           <BarChart
             accessibilityLayer
+            aria-label="Pull request size chart"
             data={data}
             desc="Horizontal bars showing the number of completed pull requests in each measured churn range."
             layout="vertical"
             margin={{ left: 8, right: 12 }}
-            title="Pull request size chart"
           >
             <CartesianGrid horizontal={false} />
             <XAxis
