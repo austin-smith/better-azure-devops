@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { saveAnalyticsSettings } from "@/lib/analytics/settings";
+import {
+  loadAnalyticsSettings,
+  saveAnalyticsSettings,
+} from "@/lib/analytics/settings";
+import { requestRepositoryCatalogRefresh } from "@/lib/analytics/scheduler";
 import type { AnalyticsSettingsActionState } from "@/lib/analytics/settings-action-state";
 import { validateAnalyticsSettings } from "@/lib/analytics/settings-schema";
 
@@ -10,6 +14,7 @@ export async function updateAnalyticsSettings(
   formData: FormData,
 ): Promise<AnalyticsSettingsActionState> {
   const result = validateAnalyticsSettings({
+    enabled: formData.get("enabled"),
     historyWindowDays: formData.get("historyWindowDays"),
     refreshIntervalHours: formData.get("refreshIntervalHours"),
   });
@@ -23,8 +28,15 @@ export async function updateAnalyticsSettings(
   }
 
   try {
+    const previousSettings = loadAnalyticsSettings();
+
     saveAnalyticsSettings(result.data);
-    revalidatePath("/settings");
+
+    if (result.data.enabled && !previousSettings.enabled) {
+      requestRepositoryCatalogRefresh();
+    }
+
+    revalidatePath("/", "layout");
 
     return {
       errors: {},

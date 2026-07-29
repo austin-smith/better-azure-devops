@@ -3,6 +3,7 @@ import { createAzureDevOpsErrorResponse } from "@/lib/azure-devops/error-respons
 import { getRepository } from "@/lib/azure-devops/git/repositories";
 import { parseAnalyticsRange } from "@/lib/analytics/filters";
 import { loadRepositoryAnalyticsReport } from "@/lib/analytics/report";
+import { isRepositoryAnalyticsEnabled } from "@/lib/analytics/settings";
 
 function csvCell(value: string | number) {
   const raw = String(value);
@@ -52,6 +53,14 @@ export async function GET(
   },
 ) {
   const { projectId, repositoryId } = await context.params;
+
+  if (!isRepositoryAnalyticsEnabled()) {
+    return Response.json(
+      { error: "Enable repository analytics in Settings before exporting." },
+      { status: 409 },
+    );
+  }
+
   const url = new URL(request.url);
   const branch = url.searchParams.get("branch")?.trim();
   const format = url.searchParams.get("format") === "csv" ? "csv" : "json";

@@ -23,7 +23,10 @@ import {
   runNextRepositoryAnalyticsJob,
 } from "@/lib/analytics/refresh";
 import { ANALYTICS_MEASUREMENT_VERSION } from "@/lib/analytics/measurement-version";
-import { ANALYTICS_HISTORY_WINDOW_DAYS_KEY } from "@/lib/analytics/settings";
+import {
+  ANALYTICS_ENABLED_KEY,
+  ANALYTICS_HISTORY_WINDOW_DAYS_KEY,
+} from "@/lib/analytics/settings";
 import { TextResponseReadError } from "@/lib/azure-devops/text-response";
 import {
   claimNextJob,
@@ -96,6 +99,7 @@ describe("repository analytics worker", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-26T12:00:00.000Z"));
     vi.clearAllMocks();
+    writeAppSetting(ANALYTICS_ENABLED_KEY, "true");
 
     getLocalSettingsDb()
       .insert(repositories)
@@ -220,6 +224,15 @@ describe("repository analytics worker", () => {
       historySyncCompletedAt: "2026-07-26T12:00:00.000Z",
       pullRequestsSyncedThrough: "2026-07-26T12:00:00.000Z",
     });
+  });
+
+  it("leaves queued work untouched while analytics is disabled", async () => {
+    const queued = enqueueRepositorySync("repo-1", "manual");
+    writeAppSetting(ANALYTICS_ENABLED_KEY, "false");
+
+    await expect(runNextRepositoryAnalyticsJob()).resolves.toBeNull();
+    expect(getJob(queued.id)).toMatchObject({ status: "queued" });
+    expect(getAzureDevOpsAccessToken).not.toHaveBeenCalled();
   });
 
   it("recomputes a queued bootstrap from the current history setting", async () => {

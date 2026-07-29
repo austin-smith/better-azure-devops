@@ -46,6 +46,7 @@ import {
 import type { RepositoryPullRequestCount } from "@/lib/repositories/loaders";
 
 type RepositoryToolbarProps = {
+  analyticsEnabled: boolean;
   branches: AzureGitRef[];
   branchesTruncated: boolean;
   defaultBranch: string;
@@ -57,6 +58,7 @@ type RepositoryToolbarProps = {
 };
 
 type NavigationItem = {
+  analyticsOnly?: boolean;
   href: string;
   icon: typeof Code2Icon;
   isActive: (pathname: string, repositoryRoot: string) => boolean;
@@ -92,6 +94,7 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Activity",
   },
   {
+    analyticsOnly: true,
     href: "/analytics",
     icon: ChartNoAxesColumnIcon,
     isActive: (pathname, root) =>
@@ -264,6 +267,7 @@ function VersionSelector({
 }
 
 export function RepositoryToolbar({
+  analyticsEnabled,
   branches,
   branchesTruncated,
   defaultBranch,
@@ -295,7 +299,9 @@ export function RepositoryToolbar({
       <RepositoryTabNav
         ariaLabel="Repository"
         className="h-full flex-1"
-        items={NAVIGATION_ITEMS.map((item) => ({
+        items={NAVIGATION_ITEMS.filter(
+          (item) => analyticsEnabled || !item.analyticsOnly,
+        ).map((item) => ({
           active: item.isActive(pathname, repositoryRoot),
           count:
             item.href === "/pulls" && pullRequestCount

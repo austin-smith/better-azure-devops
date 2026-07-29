@@ -4,6 +4,7 @@ import path from "node:path";
 import { getLocalSettingsDb } from "@/db";
 import { repositories } from "@/db/schema";
 import { writeAppSetting } from "@/db/repositories/app-settings";
+import { ANALYTICS_ENABLED_KEY } from "@/lib/analytics/settings";
 import {
   claimNextJob,
   completeJob,
@@ -90,6 +91,8 @@ describe("analytics scheduler", () => {
     });
     listRepositoriesMock.mockResolvedValue([]);
 
+    writeAppSetting(ANALYTICS_ENABLED_KEY, "true");
+
     writeAppSetting(
       "analytics.repository-catalog-refreshed-at.v1",
       "2026-07-26T12:00:00.000Z",
@@ -119,6 +122,18 @@ describe("analytics scheduler", () => {
 
     expect(getJob(queued.id)?.status).toBe("queued");
     expect(runNextRepositoryAnalyticsJob).not.toHaveBeenCalled();
+  });
+
+  it("does not discover or schedule repositories while analytics is disabled", async () => {
+    writeAppSetting(ANALYTICS_ENABLED_KEY, "false");
+
+    await runAnalyticsSchedulerTick();
+
+    expect(getAzureDevOpsAccessTokenMock).not.toHaveBeenCalled();
+    expect(loadAzureDevOpsProjectSelectionMock).not.toHaveBeenCalled();
+    expect(listRepositoriesMock).not.toHaveBeenCalled();
+    expect(enqueueRepositoryBootstrap).not.toHaveBeenCalled();
+    expect(enqueueRepositorySync).not.toHaveBeenCalled();
   });
 
   it("schedules one full-history bootstrap for a new repository", async () => {

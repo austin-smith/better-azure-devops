@@ -51,7 +51,10 @@ import {
   type AnalyticsFileMeasurement,
 } from "@/lib/analytics/measure";
 import { ANALYTICS_MEASUREMENT_VERSION } from "@/lib/analytics/measurement-version";
-import { loadAnalyticsSettings } from "@/lib/analytics/settings";
+import {
+  isRepositoryAnalyticsEnabled,
+  loadAnalyticsSettings,
+} from "@/lib/analytics/settings";
 
 export const REPOSITORY_ANALYTICS_JOB_TYPE =
   "sync_repository_pull_requests";
@@ -1034,6 +1037,10 @@ function getJobErrorMessage(error: unknown) {
 }
 
 export async function runNextRepositoryAnalyticsJob() {
+  if (!isRepositoryAnalyticsEnabled()) {
+    return null;
+  }
+
   const job = claimNextJob(REPOSITORY_ANALYTICS_JOB_TYPE);
 
   if (!job) {

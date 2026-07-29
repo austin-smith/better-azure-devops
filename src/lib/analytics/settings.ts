@@ -15,6 +15,7 @@ export const ANALYTICS_REFRESH_INTERVAL_HOURS_KEY =
   "analytics.refreshIntervalHours";
 export const ANALYTICS_HISTORY_WINDOW_DAYS_KEY =
   "analytics.historyWindowDays";
+export const ANALYTICS_ENABLED_KEY = "analytics.enabled";
 
 function parseStoredInteger(
   value: string | null,
@@ -42,6 +43,7 @@ export function loadAnalyticsSettings(): AnalyticsSettings {
   const parsedHistoryWindowDays = Number(storedHistoryWindowDays);
 
   return {
+    enabled: isRepositoryAnalyticsEnabled(),
     historyWindowDays:
       storedHistoryWindowDays !== null &&
       Number.isSafeInteger(parsedHistoryWindowDays) &&
@@ -58,8 +60,16 @@ export function loadAnalyticsSettings(): AnalyticsSettings {
   };
 }
 
+export function isRepositoryAnalyticsEnabled() {
+  return readAppSetting(ANALYTICS_ENABLED_KEY) === "true";
+}
+
 export function saveAnalyticsSettings(settings: AnalyticsSettings) {
   writeAppSettings([
+    {
+      key: ANALYTICS_ENABLED_KEY,
+      value: String(settings.enabled),
+    },
     {
       key: ANALYTICS_REFRESH_INTERVAL_HOURS_KEY,
       value: String(settings.refreshIntervalHours),

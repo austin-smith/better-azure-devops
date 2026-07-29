@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircleIcon } from "lucide-react";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import {
   INITIAL_ANALYTICS_SETTINGS_ACTION_STATE,
   type AnalyticsSettingsActionState,
@@ -9,14 +9,14 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
-  FieldLegend,
-  FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import {
   MAX_ANALYTICS_HISTORY_WINDOW_DAYS,
   MAX_ANALYTICS_REFRESH_INTERVAL_HOURS,
@@ -41,16 +41,38 @@ export function AnalyticsSettingsForm({
     action,
     INITIAL_ANALYTICS_SETTINGS_ACTION_STATE,
   );
+  const [enabled, setEnabled] = useState(settings.enabled);
 
   return (
-    <form action={formAction} className="max-w-xl space-y-5">
-      <FieldSet>
-        <FieldLegend>Analytics</FieldLegend>
-        <FieldDescription>
-          Control imported history and the repository refresh schedule.
-        </FieldDescription>
-        <FieldGroup>
+    <form action={formAction} className="flex max-w-xl flex-col gap-5">
+      <FieldGroup>
+        <Field
+          data-disabled={pending}
+          data-invalid={Boolean(state.errors.enabled)}
+          orientation="horizontal"
+        >
+          <FieldContent>
+            <FieldLabel htmlFor="analyticsEnabled">
+              Repository analytics
+            </FieldLabel>
+            <FieldDescription>
+              Collect repository contribution and change metrics on a
+              configurable schedule.
+            </FieldDescription>
+            <FieldError>{state.errors.enabled}</FieldError>
+          </FieldContent>
+          <Switch
+            aria-invalid={Boolean(state.errors.enabled)}
+            checked={enabled}
+            disabled={pending}
+            id="analyticsEnabled"
+            name="enabled"
+            onCheckedChange={setEnabled}
+          />
+        </Field>
+        <FieldGroup hidden={!enabled}>
           <Field
+            data-disabled={pending}
             data-invalid={Boolean(state.errors.refreshIntervalHours)}
           >
             <FieldLabel htmlFor="refreshIntervalHours">
@@ -80,6 +102,7 @@ export function AnalyticsSettingsForm({
           </Field>
 
           <Field
+            data-disabled={pending}
             data-invalid={Boolean(state.errors.historyWindowDays)}
           >
             <FieldLabel htmlFor="historyWindowDays">
@@ -108,7 +131,7 @@ export function AnalyticsSettingsForm({
             </FieldError>
           </Field>
         </FieldGroup>
-      </FieldSet>
+      </FieldGroup>
 
       <div className="flex items-center gap-3">
         <Button disabled={pending} type="submit">

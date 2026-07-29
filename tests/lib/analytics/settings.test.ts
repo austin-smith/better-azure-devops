@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { writeAppSetting } from "@/db/repositories/app-settings";
 import {
+  ANALYTICS_ENABLED_KEY,
   ANALYTICS_HISTORY_WINDOW_DAYS_KEY,
   ANALYTICS_REFRESH_INTERVAL_HOURS_KEY,
   loadAnalyticsSettings,
@@ -27,6 +28,7 @@ describe("analytics settings", () => {
 
   it("uses the default when the setting has not been saved", () => {
     expect(loadAnalyticsSettings()).toEqual({
+      enabled: false,
       historyWindowDays: null,
       refreshIntervalHours: DEFAULT_ANALYTICS_REFRESH_INTERVAL_HOURS,
     });
@@ -34,11 +36,13 @@ describe("analytics settings", () => {
 
   it("saves and reloads the refresh interval", () => {
     saveAnalyticsSettings({
+      enabled: true,
       historyWindowDays: 365,
       refreshIntervalHours: 12,
     });
 
     expect(loadAnalyticsSettings()).toEqual({
+      enabled: true,
       historyWindowDays: 365,
       refreshIntervalHours: 12,
     });
@@ -47,8 +51,10 @@ describe("analytics settings", () => {
   it("falls back safely when the stored value is invalid", () => {
     writeAppSetting(ANALYTICS_REFRESH_INTERVAL_HOURS_KEY, "not-a-number");
     writeAppSetting(ANALYTICS_HISTORY_WINDOW_DAYS_KEY, "not-a-number");
+    writeAppSetting(ANALYTICS_ENABLED_KEY, "not-a-boolean");
 
     expect(loadAnalyticsSettings()).toEqual({
+      enabled: false,
       historyWindowDays: null,
       refreshIntervalHours: DEFAULT_ANALYTICS_REFRESH_INTERVAL_HOURS,
     });
@@ -57,11 +63,13 @@ describe("analytics settings", () => {
   it("validates the form field at the settings boundary", () => {
     expect(
       validateAnalyticsSettings({
+        enabled: "on",
         historyWindowDays: "",
         refreshIntervalHours: "12",
       }),
     ).toEqual({
       data: {
+        enabled: true,
         historyWindowDays: null,
         refreshIntervalHours: 12,
       },
@@ -70,6 +78,7 @@ describe("analytics settings", () => {
 
     expect(
       validateAnalyticsSettings({
+        enabled: null,
         historyWindowDays: "-1",
         refreshIntervalHours: "0",
       }),
@@ -85,6 +94,7 @@ describe("analytics settings", () => {
 
     expect(
       validateAnalyticsSettings({
+        enabled: null,
         historyWindowDays: String(
           MAX_ANALYTICS_HISTORY_WINDOW_DAYS + 1,
         ),
@@ -95,6 +105,19 @@ describe("analytics settings", () => {
       errors: {
         historyWindowDays:
           `History range must be a whole number from 1 through ${MAX_ANALYTICS_HISTORY_WINDOW_DAYS} or left blank.`,
+      },
+    });
+
+    expect(
+      validateAnalyticsSettings({
+        enabled: "invalid",
+        historyWindowDays: "",
+        refreshIntervalHours: "12",
+      }),
+    ).toEqual({
+      data: null,
+      errors: {
+        enabled: "Repository analytics must be on or off.",
       },
     });
   });

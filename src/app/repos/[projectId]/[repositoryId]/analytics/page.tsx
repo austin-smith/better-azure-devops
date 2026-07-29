@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { RepositoryAnalytics } from "@/components/repositories/repository-analytics";
 import { EmptyRepositoryPageState } from "@/components/repositories/repository-state";
 import { parseAnalyticsRange } from "@/lib/analytics/filters";
@@ -9,6 +10,7 @@ import {
 } from "@/lib/analytics/refresh";
 import { stripRefPrefix } from "@/lib/azure-devops/git/urls";
 import { loadRepositoryContext } from "@/lib/repositories/loaders";
+import { isRepositoryAnalyticsEnabled } from "@/lib/analytics/settings";
 
 type RepositoryAnalyticsPageProps = {
   params: Promise<{
@@ -27,6 +29,10 @@ export default async function RepositoryAnalyticsPage({
   params,
   searchParams,
 }: RepositoryAnalyticsPageProps) {
+  if (!isRepositoryAnalyticsEnabled()) {
+    notFound();
+  }
+
   const [{ projectId, repositoryId }, query] = await Promise.all([
     params,
     searchParams,

@@ -7,6 +7,7 @@ import {
   enqueueRepositorySync,
   saveRepository,
 } from "@/lib/analytics/refresh";
+import { isRepositoryAnalyticsEnabled } from "@/lib/analytics/settings";
 
 export async function POST(
   _request: Request,
@@ -15,6 +16,13 @@ export async function POST(
   },
 ) {
   const { projectId, repositoryId } = await context.params;
+
+  if (!isRepositoryAnalyticsEnabled()) {
+    return NextResponse.json(
+      { error: "Enable repository analytics in Settings before syncing." },
+      { status: 409 },
+    );
+  }
 
   try {
     const accessToken = await getAzureDevOpsAccessToken();

@@ -4,6 +4,7 @@ export const MIN_ANALYTICS_REFRESH_INTERVAL_HOURS = 1;
 export const MAX_ANALYTICS_REFRESH_INTERVAL_HOURS = 168;
 
 export type AnalyticsSettings = {
+  enabled: boolean;
   historyWindowDays: number | null;
   refreshIntervalHours: number;
 };
@@ -13,6 +14,7 @@ export type AnalyticsSettingsFieldErrors = Partial<
 >;
 
 type AnalyticsSettingsInput = {
+  enabled: FormDataEntryValue | null;
   historyWindowDays: FormDataEntryValue | null;
   refreshIntervalHours: FormDataEntryValue | null;
 };
@@ -78,9 +80,25 @@ function parseOptionalPositiveInteger(
   return { error: null, value: parsed } as const;
 }
 
+function parseEnabled(value: FormDataEntryValue | null) {
+  if (value === null) {
+    return { error: null, value: false } as const;
+  }
+
+  if (value === "on") {
+    return { error: null, value: true } as const;
+  }
+
+  return {
+    error: "Repository analytics must be on or off.",
+    value: null,
+  } as const;
+}
+
 export function validateAnalyticsSettings(
   input: AnalyticsSettingsInput,
 ): AnalyticsSettingsValidationResult {
+  const enabled = parseEnabled(input.enabled);
   const refreshIntervalHours = parseInputInteger(
     input.refreshIntervalHours,
     "Refresh interval",
@@ -94,6 +112,10 @@ export function validateAnalyticsSettings(
   );
   const errors: AnalyticsSettingsFieldErrors = {};
 
+  if (enabled.error) {
+    errors.enabled = enabled.error;
+  }
+
   if (refreshIntervalHours.error) {
     errors.refreshIntervalHours = refreshIntervalHours.error;
   }
@@ -103,6 +125,7 @@ export function validateAnalyticsSettings(
   }
 
   if (
+    enabled.value === null ||
     refreshIntervalHours.value === null ||
     historyWindowDays.error
   ) {
@@ -111,6 +134,7 @@ export function validateAnalyticsSettings(
 
   return {
     data: {
+      enabled: enabled.value,
       historyWindowDays: historyWindowDays.value,
       refreshIntervalHours: refreshIntervalHours.value,
     },

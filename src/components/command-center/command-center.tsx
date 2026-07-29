@@ -62,6 +62,7 @@ type CommandCenterContextValue = {
 };
 
 type CommandCenterProviderProps = {
+  analyticsEnabled: boolean;
   availableProjects: readonly CommandCenterProject[];
   children: ReactNode;
   selectedProjectIds: readonly string[];
@@ -288,11 +289,13 @@ function CommandGroups({
 }
 
 function CommandCenterDialog({
+  analyticsEnabled,
   availableProjects,
   onOpenChange,
   open,
   selectedProjectIds,
 }: {
+  analyticsEnabled: boolean;
   availableProjects: readonly CommandCenterProject[];
   onOpenChange: (open: boolean) => void;
   open: boolean;
@@ -487,6 +490,7 @@ function CommandCenterDialog({
   const rootGroups = useMemo(
     () =>
       buildRootCommandGroups({
+        analyticsEnabled,
         availableProjects: projects,
         currentPathname: pathname,
         currentSearchParams: searchParams,
@@ -497,6 +501,7 @@ function CommandCenterDialog({
         openView: selectView,
       }),
     [
+      analyticsEnabled,
       currentTaskFilters,
       navigate,
       openNewWorkItem,
@@ -720,6 +725,7 @@ function CommandCenterDialog({
 }
 
 export function CommandCenterProvider({
+  analyticsEnabled,
   availableProjects,
   children,
   selectedProjectIds,
@@ -744,6 +750,7 @@ export function CommandCenterProvider({
           ]),
           selectedProjectIds,
         ])}
+        analyticsEnabled={analyticsEnabled}
         availableProjects={availableProjects}
         onOpenChange={setOpen}
         open={open}

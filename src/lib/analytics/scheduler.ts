@@ -30,7 +30,10 @@ import {
   runNextRepositoryAnalyticsJob,
   saveRepository,
 } from "@/lib/analytics/refresh";
-import { loadAnalyticsSettings } from "@/lib/analytics/settings";
+import {
+  isRepositoryAnalyticsEnabled,
+  loadAnalyticsSettings,
+} from "@/lib/analytics/settings";
 import {
   deleteExpiredJobHistory,
   recoverExpiredJobs,
@@ -354,6 +357,10 @@ export async function runAnalyticsSchedulerTick() {
   recoverExpiredJobs();
   deleteExpiredJobHistory();
 
+  if (!isRepositoryAnalyticsEnabled()) {
+    return;
+  }
+
   if (!hasAzureDevOpsConfig()) {
     return;
   }
@@ -382,7 +389,14 @@ export async function runAnalyticsSchedulerTick() {
 }
 
 async function runAnalyticsWorkerTick() {
-  return runNextRepositoryAnalyticsJob();
+  if (!isRepositoryAnalyticsEnabled()) {
+    return { enabled: false, job: null } as const;
+  }
+
+  return {
+    enabled: true,
+    job: await runNextRepositoryAnalyticsJob(),
+  } as const;
 }
 
 function scheduleNextSchedulerTick() {
@@ -400,15 +414,23 @@ function scheduleNextSchedulerTick() {
 
 function scheduleNextWorkerTick(delayMilliseconds: number) {
   const timer = setTimeout(async () => {
+    let enabled = true;
     let worked = false;
 
     try {
-      worked = (await runAnalyticsWorkerTick()) !== null;
+      const result = await runAnalyticsWorkerTick();
+
+      enabled = result.enabled;
+      worked = result.job !== null;
     } catch (error) {
       reportAzureDevOpsError(error);
     } finally {
       scheduleNextWorkerTick(
-        worked ? 0 : WORKER_IDLE_MILLISECONDS,
+        !enabled
+          ? SCHEDULER_TICK_MILLISECONDS
+          : worked
+            ? 0
+            : WORKER_IDLE_MILLISECONDS,
       );
     }
   }, delayMilliseconds);
