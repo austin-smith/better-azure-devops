@@ -101,11 +101,81 @@ export async function listProjectPullRequests(
   };
 }
 
+export async function listCompletedRepositoryPullRequests(
+  accessToken: string,
+  projectId: string,
+  repositoryId: string,
+  options: {
+    cursor?: string | null;
+    maxClosedAt?: string | null;
+    minClosedAt?: string | null;
+    signal?: AbortSignal;
+    targetRefName?: string | null;
+    top?: number;
+  },
+) {
+  const skip = parsePageCursor(options.cursor);
+  const top = Math.min(Math.max(options.top ?? 100, 1), 100);
+  const searchParams = new URLSearchParams({
+    "$skip": String(skip),
+    "$top": String(top),
+    "searchCriteria.queryTimeRangeType": "closed",
+    "searchCriteria.repositoryId": repositoryId,
+    "searchCriteria.status": "completed",
+  });
+
+  if (options.targetRefName) {
+    searchParams.set(
+      "searchCriteria.targetRefName",
+      options.targetRefName,
+    );
+  }
+
+  if (options.minClosedAt) {
+    searchParams.set("searchCriteria.minTime", options.minClosedAt);
+  }
+
+  if (options.maxClosedAt) {
+    searchParams.set("searchCriteria.maxTime", options.maxClosedAt);
+  }
+
+  const response = await azureDevOpsRequest<unknown>(
+    `/${encodeURIComponent(projectId)}/_apis/git/pullrequests?${searchParams}`,
+    options.signal
+      ? { accessToken, signal: options.signal }
+      : { accessToken },
+  );
+
+  if (!isRecord(response) || !Array.isArray(response.value)) {
+    throw createMalformedResponseError(
+      "listing completed repository pull requests",
+    );
+  }
+
+  const rawItems = response.value;
+  const items = parsePullRequestList(response);
+
+  if (items.length !== rawItems.length) {
+    throw createMalformedResponseError(
+      "listing completed repository pull requests",
+    );
+  }
+
+  return {
+    items,
+    nextCursor:
+      rawItems.length === top ? String(skip + rawItems.length) : null,
+  };
+}
+
 export async function getRepositoryPullRequest(
   accessToken: string,
   projectId: string,
   repositoryId: string,
   pullRequestId: number,
+  options: {
+    signal?: AbortSignal;
+  } = {},
 ) {
   const searchParams = new URLSearchParams({
     includeCommits: "true",
@@ -113,7 +183,9 @@ export async function getRepositoryPullRequest(
   });
   const response = await azureDevOpsRequest<unknown>(
     `${getGitRepositoryApiPath(projectId, repositoryId)}/pullrequests/${pullRequestId}?${searchParams}`,
-    { accessToken },
+    options.signal
+      ? { accessToken, signal: options.signal }
+      : { accessToken },
   );
   const pullRequest = parsePullRequest(response);
 

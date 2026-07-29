@@ -193,9 +193,7 @@ describe("tasks route", () => {
     });
     expect(consoleError).toHaveBeenCalledWith(
       "Azure DevOps request failed.",
-      expect.objectContaining({
-        code: "create_status_unknown",
-      }),
+      expect.stringContaining('"code":"create_status_unknown"'),
     );
   });
 

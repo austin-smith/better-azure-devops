@@ -116,8 +116,10 @@ export type AzureGitPullRequest = {
   description: string | null;
   isDraft: boolean;
   labels: string[];
+  lastMergeCommitId: string | null;
   lastMergeSourceCommitId: string | null;
   lastMergeTargetCommitId: string | null;
+  mergeStrategy: string | null;
   mergeStatus: string | null;
   pullRequestId: number;
   repository: {

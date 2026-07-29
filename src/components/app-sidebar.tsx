@@ -10,7 +10,9 @@ import {
   FolderGit2Icon,
   HouseIcon,
   LayoutListIcon,
+  ListChecksIcon,
   Loader2Icon,
+  SettingsIcon,
   UserCircle2Icon,
 } from "lucide-react";
 import { ProjectImage } from "@/components/project-image";
@@ -20,6 +22,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -72,6 +75,7 @@ function SidebarNavigation({
   const isHome = pathname === "/";
   const isRepositoryRoute =
     pathname === "/repos" || pathname.startsWith("/repos/");
+  const isJobsRoute = pathname === "/jobs";
   const isTaskRoute = pathname === "/tasks" || pathname.startsWith("/tasks/");
   const isQueue = isTaskRoute && searchParams.get("assignee") === "me";
   const isTasks = isTaskRoute && !isQueue;
@@ -124,6 +128,16 @@ function SidebarNavigation({
           <SidebarMenuBadge>{queueCount}</SidebarMenuBadge>
         ) : null}
       </SidebarMenuItem>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          render={<Link href="/jobs" />}
+          isActive={isJobsRoute}
+          tooltip="Jobs"
+        >
+          <ListChecksIcon />
+          <span>Jobs</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
     </SidebarMenu>
   );
 }
@@ -175,6 +189,15 @@ function SidebarNavigationFallback({
         {queueCount !== null ? (
           <SidebarMenuBadge>{queueCount}</SidebarMenuBadge>
         ) : null}
+      </SidebarMenuItem>
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          render={<Link href="/jobs" />}
+          tooltip="Jobs"
+        >
+          <ListChecksIcon />
+          <span>Jobs</span>
+        </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>
   );
@@ -504,6 +527,14 @@ export function AppSidebar({
                       ) : null}
                     </div>
                   </div>
+                  <DropdownMenuGroup className="border-t p-1">
+                    <DropdownMenuItem
+                      render={<Link href="/settings" />}
+                    >
+                      <SettingsIcon />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuGroup>
                   <div className="border-t px-3 py-2 text-xs text-muted-foreground">
                     {orgLabel}
                   </div>

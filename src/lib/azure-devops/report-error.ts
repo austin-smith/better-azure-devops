@@ -13,8 +13,15 @@ export function reportAzureDevOpsError(error: unknown) {
     return;
   }
 
-  console.error("Azure DevOps request failed.", {
-    cause: error instanceof AzureDevOpsError ? error.cause : error,
+  const cause =
+    error instanceof AzureDevOpsError ? error.cause : error;
+  const details = {
+    cause:
+      cause instanceof Error
+        ? `${cause.name}: ${cause.message}`
+        : cause === undefined
+          ? null
+          : String(cause),
     code,
     message:
       error instanceof Error
@@ -23,5 +30,7 @@ export function reportAzureDevOpsError(error: unknown) {
     retryAfterSeconds:
       error instanceof AzureDevOpsError ? error.retryAfterSeconds : null,
     status: error instanceof AzureDevOpsError ? error.status : null,
-  });
+  };
+
+  console.error("Azure DevOps request failed.", JSON.stringify(details));
 }

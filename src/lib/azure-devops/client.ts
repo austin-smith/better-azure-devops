@@ -20,7 +20,10 @@ export type AzureDevOpsRequestOptions = {
   projectName?: string | null;
   revisionConflictOnBadRequest?: boolean;
   signal?: AbortSignal;
+  timeoutMilliseconds?: number;
 };
+
+export const DEFAULT_AZURE_DEVOPS_REQUEST_TIMEOUT_MILLISECONDS = 60_000;
 
 function readAzureDevOpsErrorMessage(details: string) {
   try {
@@ -148,62 +151,115 @@ function getRequestHeaders(options: AzureDevOpsRequestOptions) {
   return headers;
 }
 
-export async function azureDevOpsFetch(
+async function performAzureDevOpsRequest<T>(
   path: string,
   options: AzureDevOpsRequestOptions,
+  readResponse: (response: Response) => T | Promise<T>,
 ) {
   const url = createAzureDevOpsUrl(path, options);
-  let response: Response;
+  const timeoutMilliseconds =
+    options.timeoutMilliseconds ??
+    DEFAULT_AZURE_DEVOPS_REQUEST_TIMEOUT_MILLISECONDS;
+  const timeoutSignal = AbortSignal.timeout(timeoutMilliseconds);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, timeoutSignal])
+    : timeoutSignal;
+  let receivedResponse = false;
 
   try {
-    response = await fetch(url, {
+    const response = await fetch(url, {
       method: options.method ?? "GET",
       headers: getRequestHeaders(options),
       body: options.body,
       cache: options.cache ?? "no-store",
       next: options.next,
-      signal: options.signal,
+      signal,
     });
+    receivedResponse = true;
+
+    if (!response.ok) {
+      const details = (await response.text()).trim();
+
+      throw new AzureDevOpsError(
+        `Azure DevOps request failed (${response.status} ${response.statusText}): ${details || "No response body."}`,
+        {
+          code: getResponseErrorCode(
+            response.status,
+            details,
+            options.revisionConflictOnBadRequest ?? false,
+          ),
+          correlationId:
+            response.headers.get("x-vss-e2eid") ??
+            response.headers.get("x-tfs-session"),
+          retryAfterSeconds: parseRetryAfterSeconds(
+            response.headers.get("retry-after"),
+          ),
+          status: response.status,
+        },
+      );
+    }
+
+    return await readResponse(response);
   } catch (error) {
-    throw new AzureDevOpsError(
-      `Azure DevOps request could not reach ${url.origin}.`,
-      {
-        cause: error,
-        code: "network",
-      },
-    );
+    if (error instanceof AzureDevOpsError) {
+      throw error;
+    }
+
+    const timedOut =
+      timeoutSignal.aborted && !options.signal?.aborted;
+
+    if (timedOut) {
+      throw new AzureDevOpsError(
+        receivedResponse
+          ? `Azure DevOps did not finish sending the response within ${Math.ceil(timeoutMilliseconds / 1_000)} seconds.`
+          : `Azure DevOps did not respond within ${Math.ceil(timeoutMilliseconds / 1_000)} seconds.`,
+        {
+          cause: error,
+          code: "network",
+        },
+      );
+    }
+
+    if (options.signal?.aborted) {
+      throw new AzureDevOpsError(
+        "Azure DevOps request was cancelled.",
+        {
+          cause: error,
+          code: "network",
+        },
+      );
+    }
+
+    if (!receivedResponse || error instanceof TypeError) {
+      throw new AzureDevOpsError(
+        receivedResponse
+          ? "Azure DevOps stopped sending the response."
+          : `Azure DevOps request could not reach ${url.origin}.`,
+        {
+          cause: error,
+          code: "network",
+        },
+      );
+    }
+
+    throw error;
   }
+}
 
-  if (!response.ok) {
-    const details = (await response.text()).trim();
-
-    throw new AzureDevOpsError(
-      `Azure DevOps request failed (${response.status} ${response.statusText}): ${details || "No response body."}`,
-      {
-        code: getResponseErrorCode(
-          response.status,
-          details,
-          options.revisionConflictOnBadRequest ?? false,
-        ),
-        correlationId:
-          response.headers.get("x-vss-e2eid") ??
-          response.headers.get("x-tfs-session"),
-        retryAfterSeconds: parseRetryAfterSeconds(
-          response.headers.get("retry-after"),
-        ),
-        status: response.status,
-      },
-    );
-  }
-
-  return response;
+export function azureDevOpsFetch(
+  path: string,
+  options: AzureDevOpsRequestOptions,
+) {
+  return performAzureDevOpsRequest(path, options, (response) => response);
 }
 
 export async function azureDevOpsRequest<T>(
   path: string,
   options: AzureDevOpsRequestOptions,
 ) {
-  const response = await azureDevOpsFetch(path, options);
-
-  return (await response.json()) as T;
+  return performAzureDevOpsRequest(
+    path,
+    options,
+    async (response) => (await response.json()) as T,
+  );
 }

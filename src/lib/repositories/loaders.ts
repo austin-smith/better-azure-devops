@@ -36,6 +36,7 @@ import { listRepositoryPushes } from "@/lib/azure-devops/git/pushes";
 import { searchRepositoryCode } from "@/lib/azure-devops/git/search";
 import { getAzureDevOpsIdentityLabels } from "@/lib/azure-devops/identities";
 import { getWorkItemSummaries } from "@/lib/azure-devops/tasks";
+import { readTextResponseWithinLimit } from "@/lib/azure-devops/text-response";
 import {
   buildPullRequestThreadSnippet,
   getPullRequestThreadLineRange,
@@ -64,72 +65,6 @@ const README_NAMES = [
   "readme.mdown",
   "readme",
 ];
-
-function getTextEncodingLabel(encoding: number | null) {
-  switch (encoding) {
-    case 1_200:
-      return "utf-16le";
-    case 1_201:
-      return "utf-16be";
-    case 20_127:
-      return "ascii";
-    case 28_591:
-      return "iso-8859-1";
-    case 65_001:
-    case null:
-      return "utf-8";
-    default:
-      return encoding >= 1_250 && encoding <= 1_258
-        ? `windows-${encoding}`
-        : "utf-8";
-  }
-}
-
-async function readTextResponseWithinLimit(
-  response: Response,
-  maxBytes: number,
-  encoding: number | null,
-) {
-  const declaredLength = Number(response.headers.get("content-length"));
-
-  if (
-    Number.isFinite(declaredLength) &&
-    declaredLength > maxBytes
-  ) {
-    await response.body?.cancel();
-    return null;
-  }
-
-  if (!response.body) {
-    return "";
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder(getTextEncodingLabel(encoding));
-  let byteLength = 0;
-  let content = "";
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) {
-        return content + decoder.decode();
-      }
-
-      byteLength += value.byteLength;
-
-      if (byteLength > maxBytes) {
-        await reader.cancel();
-        return null;
-      }
-
-      content += decoder.decode(value, { stream: true });
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
 
 async function loadRepositoryTextContent(
   accessToken: string,

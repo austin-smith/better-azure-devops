@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   BracesIcon,
+  ChartNoAxesColumnIcon,
   CheckIcon,
   ChevronsUpDownIcon,
   Clock3Icon,
@@ -91,6 +92,13 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
     label: "Activity",
   },
   {
+    href: "/analytics",
+    icon: ChartNoAxesColumnIcon,
+    isActive: (pathname, root) =>
+      pathname.startsWith(`${root}/analytics`),
+    label: "Analytics",
+  },
+  {
     href: "/search",
     icon: SearchIcon,
     isActive: (pathname, root) => pathname.startsWith(`${root}/search`),
@@ -107,14 +115,20 @@ const VERSION_ICONS = {
 function getSelectedVersion(
   searchParams: URLSearchParams,
   defaultBranch: string,
+  branchOnly = false,
 ): GitVersionDescriptor {
   const rawType = searchParams.get("versionType");
   const type: GitVersionType =
-    rawType === "commit" || rawType === "tag" ? rawType : "branch";
+    !branchOnly && (rawType === "commit" || rawType === "tag")
+      ? rawType
+      : "branch";
 
   return {
     type,
-    value: searchParams.get("version")?.trim() || stripRefPrefix(defaultBranch),
+    value:
+      (!branchOnly || rawType === null || rawType === "branch"
+        ? searchParams.get("version")?.trim()
+        : null) || stripRefPrefix(defaultBranch),
   };
 }
 
@@ -132,7 +146,12 @@ function VersionSelector({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
-  const selected = getSelectedVersion(searchParams, defaultBranch);
+  const branchOnly = pathname.includes("/analytics");
+  const selected = getSelectedVersion(
+    searchParams,
+    defaultBranch,
+    branchOnly,
+  );
   const SelectedIcon = VERSION_ICONS[selected.type];
 
   function selectVersion(type: GitVersionType, value: string) {
@@ -198,7 +217,7 @@ function VersionSelector({
                 );
               })}
             </CommandGroup>
-            {tags.length > 0 ? (
+            {!branchOnly && tags.length > 0 ? (
               <>
                 <CommandSeparator />
                 <CommandGroup heading="Tags">
@@ -257,7 +276,11 @@ export function RepositoryToolbar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const repositoryRoot = getRepositoryHref(projectId, repositoryId);
-  const version = getSelectedVersion(searchParams, defaultBranch);
+  const version = getSelectedVersion(
+    searchParams,
+    defaultBranch,
+    pathname.startsWith(`${repositoryRoot}/analytics`),
+  );
   const versionParams = useMemo(
     () =>
       new URLSearchParams({

@@ -232,7 +232,9 @@ describe("Azure Git response parsers", () => {
     expect(
       parsePullRequest({
         artifactId: "vstfs:///CodeReview/CodeReviewId/project/42",
+        completionOptions: { mergeStrategy: "squash" },
         labels: [{ name: "frontend" }],
+        lastMergeCommit: { commitId: "merge-commit" },
         lastMergeSourceCommit: { commitId: "source-commit" },
         lastMergeTargetCommit: { commitId: "target-commit" },
         pullRequestId: 42,
@@ -261,8 +263,10 @@ describe("Azure Git response parsers", () => {
     ).toMatchObject({
       artifactId: "vstfs:///CodeReview/CodeReviewId/project/42",
       labels: ["frontend"],
+      lastMergeCommitId: "merge-commit",
       lastMergeSourceCommitId: "source-commit",
       lastMergeTargetCommitId: "target-commit",
+      mergeStrategy: "squash",
       reviewers: [
         {
           displayName: "Ada Lovelace",
@@ -272,6 +276,26 @@ describe("Azure Git response parsers", () => {
         },
       ],
       supportsIterations: true,
+    });
+  });
+
+  it("normalizes the legacy squash-merge completion option", () => {
+    expect(
+      parsePullRequest({
+        completionOptions: { squashMerge: true },
+        pullRequestId: 42,
+        repository: {
+          id: "target-repo",
+          name: "App",
+          project: {
+            id: "target-project",
+            name: "Platform",
+          },
+        },
+        title: "Legacy squash",
+      }),
+    ).toMatchObject({
+      mergeStrategy: "squash",
     });
   });
 

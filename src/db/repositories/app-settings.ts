@@ -17,19 +17,29 @@ export function readAppSetting(key: string) {
 }
 
 export function writeAppSetting(key: string, value: string) {
+  writeAppSettings([{ key, value }]);
+}
+
+export function writeAppSettings(
+  settings: readonly { key: string; value: string }[],
+) {
   const db = getLocalSettingsDb();
 
-  db.insert(appSettings)
-    .values({
-      key,
-      value,
-    })
-    .onConflictDoUpdate({
-      set: {
-        updatedAt: new Date().toISOString(),
-        value,
-      },
-      target: appSettings.key,
-    })
-    .run();
+  db.transaction((transaction) => {
+    const updatedAt = new Date().toISOString();
+
+    for (const setting of settings) {
+      transaction
+        .insert(appSettings)
+        .values(setting)
+        .onConflictDoUpdate({
+          set: {
+            updatedAt,
+            value: setting.value,
+          },
+          target: appSettings.key,
+        })
+        .run();
+    }
+  });
 }

@@ -480,6 +480,9 @@ export function parsePullRequest(
     sourceRepository && isRecord(sourceRepository.project)
       ? readString(sourceRepository.project.id)
       : null;
+  const completionOptions = isRecord(value.completionOptions)
+    ? value.completionOptions
+    : null;
 
   return {
     artifactId: readString(value.artifactId),
@@ -501,12 +504,23 @@ export function parsePullRequest(
       const labelName = readString(label.name);
       return labelName ? [labelName] : [];
     }),
+    lastMergeCommitId: isRecord(value.lastMergeCommit)
+      ? readString(value.lastMergeCommit.commitId)
+      : null,
     lastMergeSourceCommitId: isRecord(value.lastMergeSourceCommit)
       ? readString(value.lastMergeSourceCommit.commitId)
       : null,
     lastMergeTargetCommitId: isRecord(value.lastMergeTargetCommit)
       ? readString(value.lastMergeTargetCommit.commitId)
       : null,
+    mergeStrategy:
+      (completionOptions
+        ? readString(completionOptions.mergeStrategy)
+        : null) ??
+      (completionOptions &&
+      readBoolean(completionOptions.squashMerge)
+        ? "squash"
+        : null),
     mergeStatus: readString(value.mergeStatus),
     pullRequestId,
     repository: {

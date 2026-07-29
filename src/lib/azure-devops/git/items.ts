@@ -18,6 +18,7 @@ type RepositoryItemOptions = {
   includeContentMetadata?: boolean;
   recursionLevel?: "Full" | "None" | "OneLevel" | "OneLevelPlusNestedEmptyFolders";
   sanitize?: boolean;
+  signal?: AbortSignal;
 };
 
 function getItemSearchParams(
@@ -84,7 +85,9 @@ export async function getRepositoryItem(
   const searchParams = getItemSearchParams(path, version, options);
   const response = await azureDevOpsRequest<unknown>(
     `${getGitRepositoryApiPath(projectId, repositoryId)}/items?${searchParams}`,
-    { accessToken },
+    options.signal
+      ? { accessToken, signal: options.signal }
+      : { accessToken },
   );
 
   return parseGitItemResponse(response);
@@ -100,6 +103,7 @@ export async function getRepositoryItemContent(
     download?: boolean;
     resolveLfs?: boolean;
     sanitize?: boolean;
+    signal?: AbortSignal;
   } = {},
 ) {
   const searchParams = getVersionDescriptorSearchParams(version);
@@ -117,6 +121,7 @@ export async function getRepositoryItemContent(
     {
       accept: "*/*",
       accessToken,
+      ...(options.signal ? { signal: options.signal } : {}),
     },
   );
 }

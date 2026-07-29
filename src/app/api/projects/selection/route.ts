@@ -7,6 +7,7 @@ import {
 import { hasAzureDevOpsConfig } from "@/lib/azure-devops/config";
 import { createAzureDevOpsErrorResponse } from "@/lib/azure-devops/error-response";
 import { createMissingAzureDevOpsConfigError } from "@/lib/azure-devops/errors";
+import { requestRepositoryCatalogRefresh } from "@/lib/analytics/scheduler";
 
 function parseProjectIds(value: unknown) {
   if (!Array.isArray(value)) {
@@ -71,6 +72,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const accessToken = await getAzureDevOpsAccessToken();
     const selection = await saveAzureDevOpsProjectSelection(accessToken, projectIds);
+    requestRepositoryCatalogRefresh();
 
     return NextResponse.json({
       availableProjects: selection.availableProjects,

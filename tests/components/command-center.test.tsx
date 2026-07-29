@@ -307,7 +307,7 @@ describe("CommandCenter", () => {
     });
     const filters = screen.getByRole("option", { name: /Browse filters/ });
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       fireEvent.keyDown(search, { key: "ArrowDown" });
     }
 
