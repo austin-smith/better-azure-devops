@@ -3,8 +3,9 @@ import { measurePullRequestFiles } from "@/lib/analytics/measure";
 import { listRepositoryCommitDiffs } from "@/lib/azure-devops/git/diffs";
 import {
   getRepositoryItem,
-  getRepositoryItemContent,
+  getRepositoryItemText,
 } from "@/lib/azure-devops/git/items";
+import { TextResponseReadError } from "@/lib/azure-devops/text-response";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/azure-devops/git/diffs", () => ({
@@ -12,7 +13,7 @@ vi.mock("@/lib/azure-devops/git/diffs", () => ({
 }));
 vi.mock("@/lib/azure-devops/git/items", () => ({
   getRepositoryItem: vi.fn(),
-  getRepositoryItemContent: vi.fn(),
+  getRepositoryItemText: vi.fn(),
 }));
 
 describe("analytics line measurement", () => {
@@ -102,9 +103,7 @@ describe("analytics line measurement", () => {
       size: 13,
       url: null,
     });
-    vi.mocked(getRepositoryItemContent).mockResolvedValue(
-      new Response("const app = 1;\n"),
-    );
+    vi.mocked(getRepositoryItemText).mockResolvedValue("const app = 1;\n");
 
     const result = await measurePullRequestFiles(
       "token",
@@ -180,14 +179,8 @@ describe("analytics line measurement", () => {
       url: null,
     });
     const streamError = new TypeError("connection closed");
-    vi.mocked(getRepositoryItemContent).mockResolvedValue(
-      new Response(
-        new ReadableStream({
-          pull(controller) {
-            controller.error(streamError);
-          },
-        }),
-      ),
+    vi.mocked(getRepositoryItemText).mockRejectedValue(
+      new TextResponseReadError(streamError),
     );
 
     await expect(

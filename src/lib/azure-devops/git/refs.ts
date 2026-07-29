@@ -1,4 +1,4 @@
-import { azureDevOpsFetch } from "@/lib/azure-devops/client";
+import { readAzureDevOpsResponse } from "@/lib/azure-devops/client";
 import { getGitRepositoryApiPath } from "@/lib/azure-devops/git/api-path";
 import { parseRefList } from "@/lib/azure-devops/git/parsers";
 import type { AzureGitRef } from "@/lib/azure-devops/git/types";
@@ -36,15 +36,18 @@ export async function listRepositoryRefs(
     searchParams.set("filterContains", options.query.trim());
   }
 
-  const response = await azureDevOpsFetch(
+  const page = await readAzureDevOpsResponse(
     `${getGitRepositoryApiPath(projectId, repositoryId)}/refs?${searchParams}`,
     { accessToken },
+    async (response) => ({
+      nextCursor: getContinuationToken(response.headers),
+      payload: await response.json(),
+    }),
   );
-  const payload: unknown = await response.json();
 
   return {
-    items: parseRefList(payload),
-    nextCursor: getContinuationToken(response.headers),
+    items: parseRefList(page.payload),
+    nextCursor: page.nextCursor,
   } satisfies {
     items: AzureGitRef[];
     nextCursor: string | null;

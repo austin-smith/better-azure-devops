@@ -2,10 +2,10 @@ import { GET } from "@/app/api/repos/[projectId]/[repositoryId]/content/route";
 
 const {
   getAzureDevOpsAccessTokenMock,
-  getRepositoryItemContentMock,
+  streamRepositoryItemContentMock,
 } = vi.hoisted(() => ({
   getAzureDevOpsAccessTokenMock: vi.fn(),
-  getRepositoryItemContentMock: vi.fn(),
+  streamRepositoryItemContentMock: vi.fn(),
 }));
 
 vi.mock("@/lib/azure-devops/access-token", () => ({
@@ -13,18 +13,18 @@ vi.mock("@/lib/azure-devops/access-token", () => ({
 }));
 
 vi.mock("@/lib/azure-devops/git/items", () => ({
-  getRepositoryItemContent: getRepositoryItemContentMock,
+  streamRepositoryItemContent: streamRepositoryItemContentMock,
 }));
 
 describe("repository content route", () => {
   beforeEach(() => {
     getAzureDevOpsAccessTokenMock.mockReset();
-    getRepositoryItemContentMock.mockReset();
+    streamRepositoryItemContentMock.mockReset();
     getAzureDevOpsAccessTokenMock.mockResolvedValue("token");
   });
 
   it("sandboxes active repository content and forces it to download", async () => {
-    getRepositoryItemContentMock.mockResolvedValue(
+    streamRepositoryItemContentMock.mockResolvedValue(
       new Response("<script>window.parent.pwned = true</script>", {
         headers: {
           "content-type": "text/html; charset=utf-8",
@@ -60,7 +60,7 @@ describe("repository content route", () => {
   it("preserves exact SVG bytes for explicit downloads", async () => {
     const source = '<svg><script>alert("source")</script></svg>';
 
-    getRepositoryItemContentMock.mockResolvedValue(
+    streamRepositoryItemContentMock.mockResolvedValue(
       new Response(source, {
         headers: {
           "content-type": "image/svg+xml",
@@ -80,7 +80,7 @@ describe("repository content route", () => {
       },
     );
 
-    expect(getRepositoryItemContentMock).toHaveBeenCalledWith(
+    expect(streamRepositoryItemContentMock).toHaveBeenCalledWith(
       "token",
       "project",
       "repository",
@@ -93,6 +93,7 @@ describe("repository content route", () => {
         download: true,
         resolveLfs: true,
         sanitize: false,
+        signal: expect.any(AbortSignal),
       },
     );
     expect(response.headers.get("content-disposition")).toBe(
@@ -102,7 +103,7 @@ describe("repository content route", () => {
   });
 
   it("does not forward an upstream content length for a decoded stream", async () => {
-    getRepositoryItemContentMock.mockResolvedValue(
+    streamRepositoryItemContentMock.mockResolvedValue(
       new Response("decoded content", {
         headers: {
           "content-length": "7",
@@ -128,7 +129,7 @@ describe("repository content route", () => {
   });
 
   it("encodes Unicode download names with a safe ASCII fallback", async () => {
-    getRepositoryItemContentMock.mockResolvedValue(
+    streamRepositoryItemContentMock.mockResolvedValue(
       new Response("document", {
         headers: {
           "content-type": "application/pdf",

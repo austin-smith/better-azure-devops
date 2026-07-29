@@ -1,6 +1,7 @@
 import {
-  azureDevOpsFetch,
   azureDevOpsRequest,
+  readAzureDevOpsResponse,
+  streamAzureDevOpsResponse,
 } from "@/lib/azure-devops/client";
 import { getGitRepositoryApiPath } from "@/lib/azure-devops/git/api-path";
 import {
@@ -12,6 +13,7 @@ import {
   getVersionDescriptorSearchParams,
   normalizeRepositoryPath,
 } from "@/lib/azure-devops/git/urls";
+import { readTextResponseWithinLimit } from "@/lib/azure-devops/text-response";
 
 type RepositoryItemOptions = {
   includeContent?: boolean;
@@ -19,6 +21,12 @@ type RepositoryItemOptions = {
   recursionLevel?: "Full" | "None" | "OneLevel" | "OneLevelPlusNestedEmptyFolders";
   sanitize?: boolean;
   signal?: AbortSignal;
+};
+
+type RepositoryItemContentOptions = {
+  download?: boolean;
+  resolveLfs?: boolean;
+  sanitize?: boolean;
 };
 
 function getItemSearchParams(
@@ -93,18 +101,12 @@ export async function getRepositoryItem(
   return parseGitItemResponse(response);
 }
 
-export async function getRepositoryItemContent(
-  accessToken: string,
+function getRepositoryItemContentPath(
   projectId: string,
   repositoryId: string,
   path: string,
   version: GitVersionDescriptor,
-  options: {
-    download?: boolean;
-    resolveLfs?: boolean;
-    sanitize?: boolean;
-    signal?: AbortSignal;
-  } = {},
+  options: RepositoryItemContentOptions = {},
 ) {
   const searchParams = getVersionDescriptorSearchParams(version);
 
@@ -116,12 +118,72 @@ export async function getRepositoryItemContent(
     searchParams.set("sanitize", "true");
   }
 
-  return azureDevOpsFetch(
-    `${getGitRepositoryApiPath(projectId, repositoryId)}/items?${searchParams}`,
+  return `${getGitRepositoryApiPath(projectId, repositoryId)}/items?${searchParams}`;
+}
+
+export function getRepositoryItemText(
+  accessToken: string,
+  projectId: string,
+  repositoryId: string,
+  path: string,
+  version: GitVersionDescriptor,
+  options: {
+    encoding: number | null;
+    fatal?: boolean;
+    maxBytes: number;
+    resolveLfs?: boolean;
+    signal?: AbortSignal;
+  },
+) {
+  const requestPath = getRepositoryItemContentPath(
+    projectId,
+    repositoryId,
+    path,
+    version,
+    { resolveLfs: options.resolveLfs },
+  );
+
+  return readAzureDevOpsResponse(
+    requestPath,
     {
       accept: "*/*",
       accessToken,
       ...(options.signal ? { signal: options.signal } : {}),
     },
+    (response) =>
+      readTextResponseWithinLimit(
+        response,
+        options.maxBytes,
+        options.encoding,
+        {
+          fatal: options.fatal,
+          signal: options.signal,
+        },
+      ),
   );
+}
+
+export function streamRepositoryItemContent(
+  accessToken: string,
+  projectId: string,
+  repositoryId: string,
+  path: string,
+  version: GitVersionDescriptor,
+  options: RepositoryItemContentOptions & {
+    signal?: AbortSignal;
+  } = {},
+) {
+  const requestPath = getRepositoryItemContentPath(
+    projectId,
+    repositoryId,
+    path,
+    version,
+    options,
+  );
+
+  return streamAzureDevOpsResponse(requestPath, {
+    accept: "*/*",
+    accessToken,
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
 }

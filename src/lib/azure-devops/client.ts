@@ -151,19 +151,39 @@ function getRequestHeaders(options: AzureDevOpsRequestOptions) {
   return headers;
 }
 
+function createRequestDeadline(options: AzureDevOpsRequestOptions) {
+  const timeoutMilliseconds =
+    options.timeoutMilliseconds ??
+    DEFAULT_AZURE_DEVOPS_REQUEST_TIMEOUT_MILLISECONDS;
+  const timeoutController = new AbortController();
+  const timeout = setTimeout(() => {
+    timeoutController.abort(
+      new DOMException(
+        "The Azure DevOps request timed out.",
+        "TimeoutError",
+      ),
+    );
+  }, timeoutMilliseconds);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, timeoutController.signal])
+    : timeoutController.signal;
+
+  return {
+    clear: () => clearTimeout(timeout),
+    signal,
+    timedOut: () =>
+      timeoutController.signal.aborted && !options.signal?.aborted,
+    timeoutMilliseconds,
+  };
+}
+
 async function performAzureDevOpsRequest<T>(
   path: string,
   options: AzureDevOpsRequestOptions,
   readResponse: (response: Response) => T | Promise<T>,
 ) {
   const url = createAzureDevOpsUrl(path, options);
-  const timeoutMilliseconds =
-    options.timeoutMilliseconds ??
-    DEFAULT_AZURE_DEVOPS_REQUEST_TIMEOUT_MILLISECONDS;
-  const timeoutSignal = AbortSignal.timeout(timeoutMilliseconds);
-  const signal = options.signal
-    ? AbortSignal.any([options.signal, timeoutSignal])
-    : timeoutSignal;
+  const deadline = createRequestDeadline(options);
   let receivedResponse = false;
 
   try {
@@ -173,7 +193,7 @@ async function performAzureDevOpsRequest<T>(
       body: options.body,
       cache: options.cache ?? "no-store",
       next: options.next,
-      signal,
+      signal: deadline.signal,
     });
     receivedResponse = true;
 
@@ -205,14 +225,11 @@ async function performAzureDevOpsRequest<T>(
       throw error;
     }
 
-    const timedOut =
-      timeoutSignal.aborted && !options.signal?.aborted;
-
-    if (timedOut) {
+    if (deadline.timedOut()) {
       throw new AzureDevOpsError(
         receivedResponse
-          ? `Azure DevOps did not finish sending the response within ${Math.ceil(timeoutMilliseconds / 1_000)} seconds.`
-          : `Azure DevOps did not respond within ${Math.ceil(timeoutMilliseconds / 1_000)} seconds.`,
+          ? `Azure DevOps did not finish sending the response within ${Math.ceil(deadline.timeoutMilliseconds / 1_000)} seconds.`
+          : `Azure DevOps did not respond within ${Math.ceil(deadline.timeoutMilliseconds / 1_000)} seconds.`,
         {
           cause: error,
           code: "network",
@@ -243,10 +260,20 @@ async function performAzureDevOpsRequest<T>(
     }
 
     throw error;
+  } finally {
+    deadline.clear();
   }
 }
 
-export function azureDevOpsFetch(
+export function readAzureDevOpsResponse<T>(
+  path: string,
+  options: AzureDevOpsRequestOptions,
+  readResponse: (response: Response) => T | Promise<T>,
+) {
+  return performAzureDevOpsRequest(path, options, readResponse);
+}
+
+export function streamAzureDevOpsResponse(
   path: string,
   options: AzureDevOpsRequestOptions,
 ) {
@@ -257,7 +284,7 @@ export async function azureDevOpsRequest<T>(
   path: string,
   options: AzureDevOpsRequestOptions,
 ) {
-  return performAzureDevOpsRequest(
+  return readAzureDevOpsResponse(
     path,
     options,
     async (response) => (await response.json()) as T,

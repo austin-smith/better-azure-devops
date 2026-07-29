@@ -14,7 +14,7 @@ import {
 } from "@/lib/azure-devops/git/commits";
 import {
   getRepositoryItem,
-  getRepositoryItemContent,
+  getRepositoryItemText,
   listRepositoryItems,
 } from "@/lib/azure-devops/git/items";
 import {
@@ -36,7 +36,6 @@ import { listRepositoryPushes } from "@/lib/azure-devops/git/pushes";
 import { searchRepositoryCode } from "@/lib/azure-devops/git/search";
 import { getAzureDevOpsIdentityLabels } from "@/lib/azure-devops/identities";
 import { getWorkItemSummaries } from "@/lib/azure-devops/tasks";
-import { readTextResponseWithinLimit } from "@/lib/azure-devops/text-response";
 import {
   buildPullRequestThreadSnippet,
   getPullRequestThreadLineRange,
@@ -75,15 +74,17 @@ async function loadRepositoryTextContent(
   maxBytes: number,
   encoding: number | null,
 ) {
-  const response = await getRepositoryItemContent(
+  return getRepositoryItemText(
     accessToken,
     projectId,
     repositoryId,
     path,
     version,
+    {
+      encoding,
+      maxBytes,
+    },
   );
-
-  return readTextResponseWithinLimit(response, maxBytes, encoding);
 }
 
 export type RepositoryListEntry = AzureGitRepository & {

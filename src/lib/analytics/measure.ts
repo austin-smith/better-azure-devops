@@ -5,10 +5,9 @@ import { hasAzureGitChangeType } from "@/lib/azure-devops/git/change-types";
 import { listRepositoryCommitDiffs } from "@/lib/azure-devops/git/diffs";
 import {
   getRepositoryItem,
-  getRepositoryItemContent,
+  getRepositoryItemText,
 } from "@/lib/azure-devops/git/items";
 import {
-  readTextResponseWithinLimit,
   TextResponseReadError,
 } from "@/lib/azure-devops/text-response";
 import { countAnalyticsTextDiff } from "@/lib/analytics/diff-count";
@@ -64,11 +63,12 @@ async function loadFileSide(
       { includeContentMetadata: true, signal },
     );
   } catch (error) {
-    if (
-      error instanceof AzureDevOpsError &&
-      error.code === "not_found"
-    ) {
-      return { kind: "unavailable" };
+    if (error instanceof AzureDevOpsError) {
+      if (error.code === "not_found") {
+        return { kind: "unavailable" };
+      }
+
+      throw error;
     }
 
     throw error;
@@ -94,17 +94,31 @@ async function loadFileSide(
     return { kind: "too_large" };
   }
 
-  let response: Response;
-
   try {
-    response = await getRepositoryItemContent(
+    const contents = await getRepositoryItemText(
       accessToken,
       projectId,
       repositoryId,
       path,
       version,
-      { resolveLfs: false, signal },
+      {
+        encoding: item.contentMetadata.encoding,
+        fatal: true,
+        maxBytes: MAX_ANALYTICS_FILE_BYTES,
+        resolveLfs: false,
+        signal,
+      },
     );
+
+    if (contents === null) {
+      return { kind: "too_large" };
+    }
+
+    if (contents.startsWith(LFS_POINTER_PREFIX)) {
+      return { kind: "lfs" };
+    }
+
+    return { contents, kind: "text" };
   } catch (error) {
     if (
       error instanceof AzureDevOpsError &&
@@ -113,35 +127,12 @@ async function loadFileSide(
       return { kind: "unavailable" };
     }
 
-    throw error;
-  }
-
-  let contents: string | null;
-
-  try {
-    contents = await readTextResponseWithinLimit(
-      response,
-      MAX_ANALYTICS_FILE_BYTES,
-      item.contentMetadata.encoding,
-      { fatal: true, signal },
-    );
-  } catch (error) {
     if (error instanceof TextResponseReadError || signal.aborted) {
       throw error;
     }
 
     return { kind: "unavailable" };
   }
-
-  if (contents === null) {
-    return { kind: "too_large" };
-  }
-
-  if (contents.startsWith(LFS_POINTER_PREFIX)) {
-    return { kind: "lfs" };
-  }
-
-  return { contents, kind: "text" };
 }
 
 function fileWithoutTextMeasurement(
