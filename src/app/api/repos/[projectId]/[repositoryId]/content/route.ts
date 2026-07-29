@@ -1,6 +1,6 @@
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { describeAzureDevOpsError } from "@/lib/azure-devops/errors";
-import { getRepositoryItemContent } from "@/lib/azure-devops/git/items";
+import { streamRepositoryItemContent } from "@/lib/azure-devops/git/items";
 import type {
   GitVersionDescriptor,
   GitVersionType,
@@ -82,7 +82,7 @@ export async function GET(
 
   try {
     const accessToken = await getAzureDevOpsAccessToken();
-    const upstream = await getRepositoryItemContent(
+    const upstream = await streamRepositoryItemContent(
       accessToken,
       projectId,
       repositoryId,
@@ -92,6 +92,7 @@ export async function GET(
         download,
         resolveLfs: true,
         sanitize,
+        signal: request.signal,
       },
     );
     const headers = new Headers();

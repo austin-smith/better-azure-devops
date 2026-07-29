@@ -2,7 +2,7 @@ import {
   AZURE_DEVOPS_METADATA_REVALIDATE_SECONDS,
   getAzureDevOpsMetadataCacheTags,
 } from "@/lib/azure-devops/cache-scope";
-import { azureDevOpsFetch } from "@/lib/azure-devops/client";
+import { readAzureDevOpsResponse } from "@/lib/azure-devops/client";
 import { getContinuationToken } from "@/lib/azure-devops/pagination";
 
 export type AzureDevOpsProject = {
@@ -46,7 +46,7 @@ export async function listProjects(accessToken: string) {
       searchParams.set("continuationToken", continuationToken);
     }
 
-    const response = await azureDevOpsFetch(
+    const page = await readAzureDevOpsResponse(
       `/_apis/projects?${searchParams}`,
       {
         accessToken,
@@ -56,11 +56,14 @@ export async function listProjects(accessToken: string) {
           tags: getAzureDevOpsMetadataCacheTags(accessToken, "projects"),
         },
       },
+      async (response) => ({
+        continuationToken: getContinuationToken(response.headers),
+        payload: (await response.json()) as ProjectsResponse,
+      }),
     );
-    const payload = (await response.json()) as ProjectsResponse;
 
     projects.push(
-      ...(payload.value ?? [])
+      ...(page.payload.value ?? [])
         .map((project) => {
           if (!project || typeof project !== "object") {
             return null;
@@ -85,7 +88,7 @@ export async function listProjects(accessToken: string) {
         .filter((project): project is AzureDevOpsProject => Boolean(project)),
     );
 
-    continuationToken = getContinuationToken(response.headers);
+    continuationToken = page.continuationToken;
   } while (continuationToken);
 
   return projects.sort(compareProjects);

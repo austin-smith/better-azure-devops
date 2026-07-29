@@ -1,0 +1,1 @@
+export const ANALYTICS_MEASUREMENT_VERSION = 2;

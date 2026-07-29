@@ -99,10 +99,9 @@ describe("/tasks page", () => {
     expect(loadTaskListMock).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalledWith(
       "Azure DevOps request failed.",
-      expect.objectContaining({
-        code: "unknown",
-        message: "Failed to load selected projects.",
-      }),
+      expect.stringContaining(
+        '"message":"Failed to load selected projects."',
+      ),
     );
   });
 

@@ -89,8 +89,10 @@ function createPullRequest({
     description: null,
     isDraft: false,
     labels: [],
+    lastMergeCommitId: null,
     lastMergeSourceCommitId: null,
     lastMergeTargetCommitId: null,
+    mergeStrategy: null,
     mergeStatus: null,
     pullRequestId: id,
     repository: {

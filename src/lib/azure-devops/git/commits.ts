@@ -62,6 +62,7 @@ export async function getRepositoryCommit(
   projectId: string,
   repositoryId: string,
   commitId: string,
+  options: { signal?: AbortSignal } = {},
 ) {
   const searchParams = new URLSearchParams({
     includePushData: "true",
@@ -70,7 +71,9 @@ export async function getRepositoryCommit(
   });
   const response = await azureDevOpsRequest<unknown>(
     `${getGitRepositoryApiPath(projectId, repositoryId)}/commits/${encodeURIComponent(commitId)}?${searchParams}`,
-    { accessToken },
+    options.signal
+      ? { accessToken, signal: options.signal }
+      : { accessToken },
   );
 
   return parseCommitDetail(response);

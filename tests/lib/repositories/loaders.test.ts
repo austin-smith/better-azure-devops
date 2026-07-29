@@ -7,7 +7,7 @@ const {
   getCurrentAzureDevOpsIdentityIdMock,
   getAzureDevOpsAccessTokenMock,
   getRepositoryPullRequestMock,
-  getRepositoryItemContentMock,
+  getRepositoryItemTextMock,
   getRepositoryItemMock,
   getRepositoryMock,
   listPullRequestIterationChangesMock,
@@ -20,7 +20,7 @@ const {
   getCurrentAzureDevOpsIdentityIdMock: vi.fn(),
   getAzureDevOpsAccessTokenMock: vi.fn(),
   getRepositoryPullRequestMock: vi.fn(),
-  getRepositoryItemContentMock: vi.fn(),
+  getRepositoryItemTextMock: vi.fn(),
   getRepositoryItemMock: vi.fn(),
   getRepositoryMock: vi.fn(),
   listPullRequestIterationChangesMock: vi.fn(),
@@ -41,7 +41,7 @@ vi.mock("@/lib/azure-devops/current-user", () => ({
 
 vi.mock("@/lib/azure-devops/git/items", () => ({
   getRepositoryItem: getRepositoryItemMock,
-  getRepositoryItemContent: getRepositoryItemContentMock,
+  getRepositoryItemText: getRepositoryItemTextMock,
   listRepositoryItems: vi.fn(),
 }));
 
@@ -69,7 +69,7 @@ describe("repository loaders", () => {
     getCurrentAzureDevOpsIdentityIdMock.mockReset();
     getAzureDevOpsAccessTokenMock.mockReset();
     getRepositoryPullRequestMock.mockReset();
-    getRepositoryItemContentMock.mockReset();
+    getRepositoryItemTextMock.mockReset();
     getRepositoryItemMock.mockReset();
     getRepositoryMock.mockReset();
     listPullRequestIterationChangesMock.mockReset();
@@ -117,13 +117,7 @@ describe("repository loaders", () => {
   });
 
   it("does not inline text whose declared size exceeds the preview limit", async () => {
-    getRepositoryItemContentMock.mockResolvedValue(
-      new Response("not read", {
-        headers: {
-          "content-length": "1000001",
-        },
-      }),
-    );
+    getRepositoryItemTextMock.mockResolvedValue(null);
 
     await expect(
       loadRepositoryBlob(
@@ -176,7 +170,7 @@ describe("repository loaders", () => {
       },
       kind: "submodule",
     });
-    expect(getRepositoryItemContentMock).not.toHaveBeenCalled();
+    expect(getRepositoryItemTextMock).not.toHaveBeenCalled();
   });
 
   it("decodes text using Azure DevOps content metadata", async () => {
@@ -195,18 +189,7 @@ describe("repository loaders", () => {
       path: "/utf16.txt",
       size: 6,
     });
-    getRepositoryItemContentMock.mockResolvedValue(
-      new Response(
-        new Uint8Array([
-          0xff,
-          0xfe,
-          0x68,
-          0x00,
-          0x69,
-          0x00,
-        ]),
-      ),
-    );
+    getRepositoryItemTextMock.mockResolvedValue("hi");
 
     await expect(
       loadRepositoryBlob(
@@ -258,18 +241,7 @@ describe("repository loaders", () => {
       path: "/src/message.txt",
       size: 6,
     });
-    getRepositoryItemContentMock.mockResolvedValue(
-      new Response(
-        new Uint8Array([
-          0xff,
-          0xfe,
-          0x68,
-          0x00,
-          0x69,
-          0x00,
-        ]),
-      ),
-    );
+    getRepositoryItemTextMock.mockResolvedValue("hi");
 
     const data = await loadRepositoryPullRequest(
       "target-project",
@@ -289,7 +261,7 @@ describe("repository loaders", () => {
       },
       { includeContentMetadata: true },
     );
-    expect(getRepositoryItemContentMock).toHaveBeenCalledWith(
+    expect(getRepositoryItemTextMock).toHaveBeenCalledWith(
       "token",
       "fork-project",
       "fork-repository",
@@ -297,6 +269,10 @@ describe("repository loaders", () => {
       {
         type: "commit",
         value: "source-commit",
+      },
+      {
+        encoding: 1_200,
+        maxBytes: 1_000_000,
       },
     );
   });

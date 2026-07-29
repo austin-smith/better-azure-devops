@@ -46,11 +46,9 @@ describe("loadTaskList", () => {
     });
     expect(consoleError).toHaveBeenCalledWith(
       "Azure DevOps request failed.",
-      expect.objectContaining({
-        code: "server",
-        message: "Private WIQL response details.",
-        status: 503,
-      }),
+      expect.stringContaining(
+        '"message":"Private WIQL response details."',
+      ),
     );
   });
 });

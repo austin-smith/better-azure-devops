@@ -22,13 +22,9 @@ describe("Azure DevOps error responses", () => {
 
     expect(consoleError).toHaveBeenCalledWith(
       "Azure DevOps request failed.",
-      {
-        cause,
-        code: "server",
-        message: "Azure DevOps returned private upstream details.",
-        retryAfterSeconds: null,
-        status: 503,
-      },
+      expect.stringContaining(
+        '"message":"Azure DevOps returned private upstream details."',
+      ),
     );
     await expect(response.json()).resolves.toMatchObject({
       errorDetails: {

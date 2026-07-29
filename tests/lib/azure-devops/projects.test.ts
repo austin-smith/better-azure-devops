@@ -1,11 +1,11 @@
 import { listProjects } from "@/lib/azure-devops/projects";
 
-const { azureDevOpsFetchMock } = vi.hoisted(() => ({
-  azureDevOpsFetchMock: vi.fn(),
+const { readAzureDevOpsResponseMock } = vi.hoisted(() => ({
+  readAzureDevOpsResponseMock: vi.fn(),
 }));
 
 vi.mock("@/lib/azure-devops/client", () => ({
-  azureDevOpsFetch: azureDevOpsFetchMock,
+  readAzureDevOpsResponse: readAzureDevOpsResponseMock,
 }));
 
 vi.mock("@/lib/azure-devops/config", () => ({
@@ -17,39 +17,42 @@ vi.mock("@/lib/azure-devops/config", () => ({
 
 describe("listProjects", () => {
   beforeEach(() => {
-    azureDevOpsFetchMock.mockReset();
+    readAzureDevOpsResponseMock.mockReset();
   });
 
   it("requests default team image urls and normalizes the response", async () => {
-    azureDevOpsFetchMock.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          value: [
-            {
-              defaultTeamImageUrl: "https://example.com/zulu.png",
-              id: "zulu-id",
-              name: "Zulu",
-              state: "wellFormed",
-              url: "https://example.com/zulu",
-            },
-            {
-              id: "alpha-id",
-              name: "Alpha",
-              state: "wellFormed",
-              url: "https://example.com/alpha",
-            },
-            {
-              id: null,
-              name: "Invalid",
-            },
-          ],
-        }),
-      ),
+    readAzureDevOpsResponseMock.mockImplementationOnce(
+      (_path, _options, readResponse) =>
+        readResponse(
+          new Response(
+            JSON.stringify({
+              value: [
+                {
+                  defaultTeamImageUrl: "https://example.com/zulu.png",
+                  id: "zulu-id",
+                  name: "Zulu",
+                  state: "wellFormed",
+                  url: "https://example.com/zulu",
+                },
+                {
+                  id: "alpha-id",
+                  name: "Alpha",
+                  state: "wellFormed",
+                  url: "https://example.com/alpha",
+                },
+                {
+                  id: null,
+                  name: "Invalid",
+                },
+              ],
+            }),
+          ),
+        ),
     );
 
     const result = await listProjects("token");
 
-    expect(azureDevOpsFetchMock).toHaveBeenCalledWith(
+    expect(readAzureDevOpsResponseMock).toHaveBeenCalledWith(
       "/_apis/projects?%24top=1000&getDefaultTeamImageUrl=true&stateFilter=wellFormed",
       expect.objectContaining({
         accessToken: "token",
@@ -61,6 +64,7 @@ describe("listProjects", () => {
           ]),
         }),
       }),
+      expect.any(Function),
     );
     expect(result).toEqual([
       {
@@ -81,34 +85,38 @@ describe("listProjects", () => {
   });
 
   it("follows Azure DevOps continuation headers", async () => {
-    azureDevOpsFetchMock
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            value: [
-              {
-                id: "beta-id",
-                name: "Beta",
+    readAzureDevOpsResponseMock
+      .mockImplementationOnce((_path, _options, readResponse) =>
+        readResponse(
+          new Response(
+            JSON.stringify({
+              value: [
+                {
+                  id: "beta-id",
+                  name: "Beta",
+                },
+              ],
+            }),
+            {
+              headers: {
+                "x-ms-continuationtoken": "next page/token",
               },
-            ],
-          }),
-          {
-            headers: {
-              "x-ms-continuationtoken": "next page/token",
             },
-          },
+          ),
         ),
       )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            value: [
-              {
-                id: "alpha-id",
-                name: "Alpha",
-              },
-            ],
-          }),
+      .mockImplementationOnce((_path, _options, readResponse) =>
+        readResponse(
+          new Response(
+            JSON.stringify({
+              value: [
+                {
+                  id: "alpha-id",
+                  name: "Alpha",
+                },
+              ],
+            }),
+          ),
         ),
       );
 
@@ -116,13 +124,14 @@ describe("listProjects", () => {
       expect.objectContaining({ id: "alpha-id" }),
       expect.objectContaining({ id: "beta-id" }),
     ]);
-    expect(azureDevOpsFetchMock).toHaveBeenNthCalledWith(
+    expect(readAzureDevOpsResponseMock).toHaveBeenNthCalledWith(
       2,
       "/_apis/projects?%24top=1000&getDefaultTeamImageUrl=true&stateFilter=wellFormed&continuationToken=next+page%2Ftoken",
       expect.objectContaining({
         accessToken: "token",
         cache: "force-cache",
       }),
+      expect.any(Function),
     );
   });
 });

@@ -27,6 +27,7 @@ import {
 } from "@/lib/theme/constants";
 import { getAzureDevOpsAccessToken } from "@/lib/azure-devops/access-token";
 import { loadSidebarCounts } from "@/lib/tasks/load-sidebar-counts";
+import { isRepositoryAnalyticsEnabled } from "@/lib/analytics/settings";
 
 const dmSansFont = DM_Sans({
   subsets: ["latin"],
@@ -56,6 +57,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
+  const analyticsEnabled = isRepositoryAnalyticsEnabled();
   const config = hasAzureDevOpsConfig() ? getAzureDevOpsConfig() : null;
   const [sidebarCounts, currentUser, projectSelection] = config
     ? await Promise.all([
@@ -117,6 +119,7 @@ export default async function RootLayout({
           initialTheme={serverThemeMode}
         >
           <CommandCenterProvider
+            analyticsEnabled={analyticsEnabled}
             availableProjects={projectSelection?.availableProjects ?? []}
             selectedProjectIds={projectSelection?.selectedProjectIds ?? []}
           >

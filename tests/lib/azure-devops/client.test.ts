@@ -1,4 +1,7 @@
-import { azureDevOpsRequest } from "@/lib/azure-devops/client";
+import {
+  azureDevOpsRequest,
+  streamAzureDevOpsResponse,
+} from "@/lib/azure-devops/client";
 
 vi.mock("@/lib/azure-devops/config", () => ({
   getAzureDevOpsConfig: vi.fn(() => ({
@@ -8,7 +11,7 @@ vi.mock("@/lib/azure-devops/config", () => ({
   })),
 }));
 
-describe("azureDevOpsRequest", () => {
+describe("Azure DevOps client", () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
@@ -202,6 +205,182 @@ describe("azureDevOpsRequest", () => {
     ).rejects.toMatchObject({
       code: "network",
       status: null,
+    });
+  });
+
+  it("times out an Azure DevOps request that never responds", async () => {
+    fetchMock.mockImplementation(
+      (_input, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal;
+
+          if (!(signal instanceof AbortSignal)) {
+            reject(new Error("Expected a request signal."));
+            return;
+          }
+
+          signal.addEventListener(
+            "abort",
+            () => reject(signal.reason),
+            { once: true },
+          );
+        }),
+    );
+
+    await expect(
+      azureDevOpsRequest("/_apis/test", {
+        accessToken: "token",
+        timeoutMilliseconds: 10,
+      }),
+    ).rejects.toMatchObject({
+      code: "network",
+      message: "Azure DevOps did not respond within 1 seconds.",
+    });
+  });
+
+  it("times out while Azure DevOps is still sending the response body", async () => {
+    fetchMock.mockImplementation((_input, init) => {
+      const signal = init?.signal;
+
+      if (!(signal instanceof AbortSignal)) {
+        throw new Error("Expected a request signal.");
+      }
+
+      const body = new ReadableStream({
+        start(controller) {
+          signal.addEventListener(
+            "abort",
+            () => controller.error(signal.reason),
+            { once: true },
+          );
+        },
+      });
+
+      return Promise.resolve(
+        new Response(body, {
+          headers: { "content-type": "application/json" },
+          status: 200,
+        }),
+      );
+    });
+
+    await expect(
+      azureDevOpsRequest("/_apis/test", {
+        accessToken: "token",
+        timeoutMilliseconds: 10,
+      }),
+    ).rejects.toMatchObject({
+      code: "network",
+      message:
+        "Azure DevOps did not finish sending the response within 1 seconds.",
+    });
+  });
+
+  it("releases the deadline after a streaming response starts", async () => {
+    fetchMock.mockImplementation((_input, init) => {
+      const signal = init?.signal;
+
+      if (!(signal instanceof AbortSignal)) {
+        throw new Error("Expected a request signal.");
+      }
+
+      const body = new ReadableStream({
+        start(controller) {
+          signal.addEventListener(
+            "abort",
+            () => controller.error(signal.reason),
+            { once: true },
+          );
+          setTimeout(() => {
+            controller.enqueue(new TextEncoder().encode("complete"));
+            controller.close();
+          }, 25);
+        },
+      });
+
+      return Promise.resolve(new Response(body, { status: 200 }));
+    });
+
+    const response = await streamAzureDevOpsResponse("/_apis/stream", {
+      accessToken: "token",
+      timeoutMilliseconds: 10,
+    });
+
+    await expect(response.text()).resolves.toBe("complete");
+  });
+
+  it("keeps caller cancellation attached to a streaming response", async () => {
+    const requestController = new AbortController();
+
+    fetchMock.mockImplementation((_input, init) => {
+      const signal = init?.signal;
+
+      if (!(signal instanceof AbortSignal)) {
+        throw new Error("Expected a request signal.");
+      }
+
+      return Promise.resolve(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              signal.addEventListener(
+                "abort",
+                () => controller.error(signal.reason),
+                { once: true },
+              );
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+    });
+
+    const response = await streamAzureDevOpsResponse("/_apis/stream", {
+      accessToken: "token",
+      signal: requestController.signal,
+    });
+
+    requestController.abort();
+
+    await expect(response.text()).rejects.toBeDefined();
+  });
+
+  it("keeps non-success streaming response bodies within the deadline", async () => {
+    fetchMock.mockImplementation((_input, init) => {
+      const signal = init?.signal;
+
+      if (!(signal instanceof AbortSignal)) {
+        throw new Error("Expected a request signal.");
+      }
+
+      return Promise.resolve(
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              signal.addEventListener(
+                "abort",
+                () => controller.error(signal.reason),
+                { once: true },
+              );
+            },
+          }),
+          {
+            status: 503,
+            statusText: "Service Unavailable",
+          },
+        ),
+      );
+    });
+
+    await expect(
+      streamAzureDevOpsResponse("/_apis/stream", {
+        accessToken: "token",
+        timeoutMilliseconds: 10,
+      }),
+    ).rejects.toMatchObject({
+      code: "network",
+      message:
+        "Azure DevOps did not finish sending the response within 1 seconds.",
     });
   });
 });

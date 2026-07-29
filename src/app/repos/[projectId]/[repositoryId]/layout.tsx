@@ -10,6 +10,7 @@ import {
   loadActivePullRequestCount,
   loadRepositoryContext,
 } from "@/lib/repositories/loaders";
+import { isRepositoryAnalyticsEnabled } from "@/lib/analytics/settings";
 
 type RepositoryLayoutProps = {
   children: React.ReactNode;
@@ -107,6 +108,7 @@ async function RepositoryToolbarSection({
 
   return (
     <RepositoryToolbar
+      analyticsEnabled={isRepositoryAnalyticsEnabled()}
       branches={refs.branches}
       branchesTruncated={refs.branchesTruncated}
       defaultBranch={defaultBranch}

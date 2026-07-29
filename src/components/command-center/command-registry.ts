@@ -1,5 +1,6 @@
 import {
   BugIcon,
+  ChartNoAxesColumnIcon,
   CircleDotIcon,
   Clock3Icon,
   Code2Icon,
@@ -9,6 +10,7 @@ import {
   HashIcon,
   HouseIcon,
   LayoutListIcon,
+  ListChecksIcon,
   ListFilterIcon,
   PaletteIcon,
   PlusIcon,
@@ -61,6 +63,7 @@ export type CommandCenterGroup = {
 };
 
 type BuildNavigationActionsOptions = {
+  analyticsEnabled: boolean;
   currentPathname: string;
   currentSearchParams: {
     get: (name: string) => string | null;
@@ -161,16 +164,29 @@ function buildNavigationActions({
       label: "New Work Item",
       run: openNewWorkItem,
     },
+    {
+      checked: currentPathname === "/jobs",
+      description: "Monitor background work and recent job history",
+      icon: ListChecksIcon,
+      id: "jobs",
+      keywords: ["background", "history", "queue", "sync", "worker"],
+      label: "Jobs",
+      run: () => navigate("/jobs"),
+    },
   ];
 }
 
 function buildRepositoryCommandGroup({
+  analyticsEnabled,
   currentPathname,
   currentSearchParams,
   navigate,
 }: Pick<
   BuildNavigationActionsOptions,
-  "currentPathname" | "currentSearchParams" | "navigate"
+  | "analyticsEnabled"
+  | "currentPathname"
+  | "currentSearchParams"
+  | "navigate"
 >): CommandCenterGroup | null {
   const match = /^\/repos\/([^/]+)\/([^/]+)/.exec(currentPathname);
 
@@ -232,6 +248,22 @@ function buildRepositoryCommandGroup({
       label: "Repository push activity",
       shortcut: ["G", "A"],
     },
+    ...(analyticsEnabled
+      ? [
+          {
+            description: "Understand contribution and change footprint",
+            href: "/analytics",
+            icon: ChartNoAxesColumnIcon,
+            id: "repository-analytics",
+            isActive: currentPathname.startsWith(
+              `${repositoryRoot}/analytics`,
+            ),
+            keywords: ["analytics", "churn", "contributors", "metrics"],
+            label: "Repository analytics",
+            shortcut: ["G", "N"],
+          },
+        ]
+      : []),
     {
       description: "Search indexed code in this repository",
       href: "/search",

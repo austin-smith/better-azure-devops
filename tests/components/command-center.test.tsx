@@ -46,6 +46,7 @@ function stubBrowserObservers() {
 }
 
 function renderCommandCenter({
+  analyticsEnabled = true,
   availableProjects = [
     {
       defaultTeamImageUrl: null,
@@ -55,6 +56,7 @@ function renderCommandCenter({
   ],
   selectedProjectIds = ["project-one"],
 }: {
+  analyticsEnabled?: boolean;
   availableProjects?: {
     defaultTeamImageUrl: string | null;
     id: string;
@@ -65,6 +67,7 @@ function renderCommandCenter({
   return render(
     <ThemeProvider initialResolvedTheme="light" initialTheme="system">
       <CommandCenterProvider
+        analyticsEnabled={analyticsEnabled}
         availableProjects={availableProjects}
         selectedProjectIds={selectedProjectIds}
       >
@@ -144,6 +147,18 @@ describe("CommandCenter", () => {
     expect(pushMock).toHaveBeenCalledWith(
       "/repos/project-id/repository-id/activity?version=feature%2Frepository-explorer&versionType=branch",
     );
+  });
+
+  it("hides repository analytics when the feature is disabled", async () => {
+    navigationState.pathname = "/repos/project-id/repository-id";
+
+    renderCommandCenter({ analyticsEnabled: false });
+    fireEvent.click(screen.getByRole("button", { name: "Open command center" }));
+
+    await screen.findByRole("option", { name: /^Repository code\./ });
+    expect(
+      screen.queryByRole("option", { name: /^Repository analytics\./ }),
+    ).not.toBeInTheDocument();
   });
 
   it("leaves handled Cmd/Ctrl+K events with the focused control", () => {
@@ -307,7 +322,7 @@ describe("CommandCenter", () => {
     });
     const filters = screen.getByRole("option", { name: /Browse filters/ });
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       fireEvent.keyDown(search, { key: "ArrowDown" });
     }
 

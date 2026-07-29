@@ -20,7 +20,10 @@ export type AzureDevOpsRequestOptions = {
   projectName?: string | null;
   revisionConflictOnBadRequest?: boolean;
   signal?: AbortSignal;
+  timeoutMilliseconds?: number;
 };
+
+export const DEFAULT_AZURE_DEVOPS_REQUEST_TIMEOUT_MILLISECONDS = 60_000;
 
 function readAzureDevOpsErrorMessage(details: string) {
   try {
@@ -148,62 +151,142 @@ function getRequestHeaders(options: AzureDevOpsRequestOptions) {
   return headers;
 }
 
-export async function azureDevOpsFetch(
+function createRequestDeadline(options: AzureDevOpsRequestOptions) {
+  const timeoutMilliseconds =
+    options.timeoutMilliseconds ??
+    DEFAULT_AZURE_DEVOPS_REQUEST_TIMEOUT_MILLISECONDS;
+  const timeoutController = new AbortController();
+  const timeout = setTimeout(() => {
+    timeoutController.abort(
+      new DOMException(
+        "The Azure DevOps request timed out.",
+        "TimeoutError",
+      ),
+    );
+  }, timeoutMilliseconds);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, timeoutController.signal])
+    : timeoutController.signal;
+
+  return {
+    clear: () => clearTimeout(timeout),
+    signal,
+    timedOut: () =>
+      timeoutController.signal.aborted && !options.signal?.aborted,
+    timeoutMilliseconds,
+  };
+}
+
+async function performAzureDevOpsRequest<T>(
   path: string,
   options: AzureDevOpsRequestOptions,
+  readResponse: (response: Response) => T | Promise<T>,
 ) {
   const url = createAzureDevOpsUrl(path, options);
-  let response: Response;
+  const deadline = createRequestDeadline(options);
+  let receivedResponse = false;
 
   try {
-    response = await fetch(url, {
+    const response = await fetch(url, {
       method: options.method ?? "GET",
       headers: getRequestHeaders(options),
       body: options.body,
       cache: options.cache ?? "no-store",
       next: options.next,
-      signal: options.signal,
+      signal: deadline.signal,
     });
+    receivedResponse = true;
+
+    if (!response.ok) {
+      const details = (await response.text()).trim();
+
+      throw new AzureDevOpsError(
+        `Azure DevOps request failed (${response.status} ${response.statusText}): ${details || "No response body."}`,
+        {
+          code: getResponseErrorCode(
+            response.status,
+            details,
+            options.revisionConflictOnBadRequest ?? false,
+          ),
+          correlationId:
+            response.headers.get("x-vss-e2eid") ??
+            response.headers.get("x-tfs-session"),
+          retryAfterSeconds: parseRetryAfterSeconds(
+            response.headers.get("retry-after"),
+          ),
+          status: response.status,
+        },
+      );
+    }
+
+    return await readResponse(response);
   } catch (error) {
-    throw new AzureDevOpsError(
-      `Azure DevOps request could not reach ${url.origin}.`,
-      {
-        cause: error,
-        code: "network",
-      },
-    );
+    if (error instanceof AzureDevOpsError) {
+      throw error;
+    }
+
+    if (deadline.timedOut()) {
+      throw new AzureDevOpsError(
+        receivedResponse
+          ? `Azure DevOps did not finish sending the response within ${Math.ceil(deadline.timeoutMilliseconds / 1_000)} seconds.`
+          : `Azure DevOps did not respond within ${Math.ceil(deadline.timeoutMilliseconds / 1_000)} seconds.`,
+        {
+          cause: error,
+          code: "network",
+        },
+      );
+    }
+
+    if (options.signal?.aborted) {
+      throw new AzureDevOpsError(
+        "Azure DevOps request was cancelled.",
+        {
+          cause: error,
+          code: "network",
+        },
+      );
+    }
+
+    if (!receivedResponse || error instanceof TypeError) {
+      throw new AzureDevOpsError(
+        receivedResponse
+          ? "Azure DevOps stopped sending the response."
+          : `Azure DevOps request could not reach ${url.origin}.`,
+        {
+          cause: error,
+          code: "network",
+        },
+      );
+    }
+
+    throw error;
+  } finally {
+    deadline.clear();
   }
+}
 
-  if (!response.ok) {
-    const details = (await response.text()).trim();
+export function readAzureDevOpsResponse<T>(
+  path: string,
+  options: AzureDevOpsRequestOptions,
+  readResponse: (response: Response) => T | Promise<T>,
+) {
+  return performAzureDevOpsRequest(path, options, readResponse);
+}
 
-    throw new AzureDevOpsError(
-      `Azure DevOps request failed (${response.status} ${response.statusText}): ${details || "No response body."}`,
-      {
-        code: getResponseErrorCode(
-          response.status,
-          details,
-          options.revisionConflictOnBadRequest ?? false,
-        ),
-        correlationId:
-          response.headers.get("x-vss-e2eid") ??
-          response.headers.get("x-tfs-session"),
-        retryAfterSeconds: parseRetryAfterSeconds(
-          response.headers.get("retry-after"),
-        ),
-        status: response.status,
-      },
-    );
-  }
-
-  return response;
+export function streamAzureDevOpsResponse(
+  path: string,
+  options: AzureDevOpsRequestOptions,
+) {
+  return performAzureDevOpsRequest(path, options, (response) => response);
 }
 
 export async function azureDevOpsRequest<T>(
   path: string,
   options: AzureDevOpsRequestOptions,
 ) {
-  const response = await azureDevOpsFetch(path, options);
-
-  return (await response.json()) as T;
+  return readAzureDevOpsResponse(
+    path,
+    options,
+    async (response) => (await response.json()) as T,
+  );
 }
