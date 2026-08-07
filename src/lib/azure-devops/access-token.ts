@@ -16,7 +16,10 @@ const AZURE_CLI_ACCESS_TOKEN_ARGS = [
 function getAzureConfigDir() {
   const configuredPath = process.env.AZURE_CONFIG_DIR?.trim();
 
-  return configuredPath || path.join(process.cwd(), ".azure");
+  return (
+    configuredPath ||
+    path.join(/* turbopackIgnore: true */ process.cwd(), ".azure")
+  );
 }
 
 type AzureCliAccessTokenResponse = {

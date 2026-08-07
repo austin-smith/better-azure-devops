@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "moduleDetection": "force",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["tests/**/*.ts", "tests/**/*.tsx", "tests/**/*.mts"]
+}

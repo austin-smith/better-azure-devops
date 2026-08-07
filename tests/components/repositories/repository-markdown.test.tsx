@@ -1,10 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { RepositoryMarkdown } from "@/components/repositories/repository-markdown";
+import type { GitVersionDescriptor } from "@/lib/azure-devops/git/types";
 
 const VERSION = {
-  version: "main",
-  versionType: "branch",
-} as const;
+  type: "branch",
+  value: "main",
+} satisfies GitVersionDescriptor;
 
 function renderMarkdown(content: string) {
   return renderToStaticMarkup(

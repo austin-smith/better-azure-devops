@@ -29,7 +29,12 @@ function createThread({
     changeTrackingId: null,
     comments: [
       {
-        author: { displayName: "Oliver Quezon", imageUrl: null },
+        author: {
+          displayName: "Oliver Quezon",
+          id: null,
+          imageUrl: null,
+          isContainer: false,
+        },
         content,
         id: 1,
         isDeleted: false,

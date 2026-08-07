@@ -128,18 +128,20 @@ describe("TaskDetail", () => {
   });
 
   it("serializes editor-only markdown before creating work items", async () => {
-    const fetchMock = vi.fn(async () => new Response(
-      JSON.stringify({
-        item: {
-          id: 99,
-          projectId: "project-id",
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          item: {
+            id: 99,
+            projectId: "project-id",
+          },
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 201,
         },
-      }),
-      {
-        headers: { "Content-Type": "application/json" },
-        status: 201,
-      },
-    ));
+      ),
+    );
 
     vi.stubGlobal("fetch", fetchMock);
 

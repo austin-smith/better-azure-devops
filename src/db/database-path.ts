@@ -14,7 +14,10 @@ function getDefaultDataDirectory(appName: string) {
     );
   }
 
-  return path.join(os.homedir(), `.${appName}`);
+  return path.join(
+    /* turbopackIgnore: true */ os.homedir(),
+    `.${appName}`,
+  );
 }
 
 function getDefaultDatabasePath() {

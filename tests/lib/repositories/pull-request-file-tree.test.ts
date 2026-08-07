@@ -11,6 +11,7 @@ function createEntry(path: string): PullRequestFileTreeEntry {
     anchorId: `file-${path}`,
     changeType: "edit",
     deletions: 0,
+    href: null,
     path,
     threadCount: 0,
   };
