@@ -1,12 +1,24 @@
-import { execFile } from "node:child_process";
 import path from "node:path";
 
+type ExecFileMock = (
+  file: string,
+  args: readonly string[],
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+  },
+  callback: (error: Error | null, stdout: string, stderr: string) => void,
+) => void;
+
+const { execFileMock } = vi.hoisted(() => ({
+  execFileMock: vi.fn<ExecFileMock>(),
+}));
+
 vi.mock("node:child_process", () => ({
-  execFile: vi.fn(),
+  execFile: execFileMock,
 }));
 
 describe("getAzureDevOpsAccessToken", () => {
-  const execFileMock = vi.mocked(execFile);
   const originalEnv = process.env;
   const originalPlatform = process.platform;
   const azureConfigDir = path.join(process.cwd(), ".azure");
@@ -19,12 +31,9 @@ describe("getAzureDevOpsAccessToken", () => {
   }
 
   function mockExecFileSuccess(payload: object) {
-    execFileMock.mockImplementation(
-      ((file, args, options, callback) => {
-        callback?.(null, JSON.stringify(payload), "");
-        return {} as never;
-      }) as typeof execFile,
-    );
+    execFileMock.mockImplementation((_file, _args, _options, callback) => {
+      callback(null, JSON.stringify(payload), "");
+    });
   }
 
   beforeEach(() => {
@@ -139,12 +148,9 @@ describe("getAzureDevOpsAccessToken", () => {
     let completeRequest:
       | ((error: null, stdout: string, stderr: string) => void)
       | undefined;
-    execFileMock.mockImplementation(
-      ((file, args, options, callback) => {
-        completeRequest = callback as typeof completeRequest;
-        return {} as never;
-      }) as typeof execFile,
-    );
+    execFileMock.mockImplementation((_file, _args, _options, callback) => {
+      completeRequest = callback;
+    });
 
     const { getAzureDevOpsAccessToken } = await import(
       "@/lib/azure-devops/access-token"
@@ -172,12 +178,15 @@ describe("getAzureDevOpsAccessToken", () => {
   it("reports when Azure CLI is unavailable on Windows", async () => {
     setPlatform("win32");
     process.env.ComSpec = "C:\\Windows\\System32\\cmd.exe";
-    execFileMock.mockImplementation(
-      ((file, args, options, callback) => {
-        callback?.(new Error("'az' is not recognized as an internal or external command"), "", "");
-        return {} as never;
-      }) as typeof execFile,
-    );
+    execFileMock.mockImplementation((_file, _args, _options, callback) => {
+      callback(
+        new Error(
+          "'az' is not recognized as an internal or external command",
+        ),
+        "",
+        "",
+      );
+    });
 
     const { getAzureDevOpsAccessToken } = await import("@/lib/azure-devops/access-token");
 
@@ -191,12 +200,9 @@ describe("getAzureDevOpsAccessToken", () => {
 
   it("does not report malformed Azure CLI output as expired authentication", async () => {
     setPlatform("linux");
-    execFileMock.mockImplementation(
-      ((file, args, options, callback) => {
-        callback?.(null, "not json", "");
-        return {} as never;
-      }) as typeof execFile,
-    );
+    execFileMock.mockImplementation((_file, _args, _options, callback) => {
+      callback(null, "not json", "");
+    });
 
     const { getAzureDevOpsAccessToken } = await import("@/lib/azure-devops/access-token");
 

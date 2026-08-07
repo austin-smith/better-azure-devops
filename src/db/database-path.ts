@@ -9,12 +9,19 @@ function getDefaultDataDirectory(appName: string) {
   if (process.platform === "win32") {
     return path.join(
       process.env.APPDATA?.trim() ||
-        path.join(os.homedir(), "AppData", "Roaming"),
+        path.join(
+          /* turbopackIgnore: true */ os.homedir(),
+          "AppData",
+          "Roaming",
+        ),
       appName,
     );
   }
 
-  return path.join(os.homedir(), `.${appName}`);
+  return path.join(
+    /* turbopackIgnore: true */ os.homedir(),
+    `.${appName}`,
+  );
 }
 
 function getDefaultDatabasePath() {
