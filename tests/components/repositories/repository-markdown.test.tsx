@@ -36,6 +36,10 @@ describe("RepositoryMarkdown", () => {
     expect(markup).toContain('loading="lazy"');
     expect(markup).toContain('decoding="async"');
     expect(markup).toContain('title="System diagram"');
+    expect(markup).toContain('aria-haspopup="dialog"');
+    expect(markup).toContain('aria-label="Expand image: Architecture"');
+    expect(markup).toContain('role="button"');
+    expect(markup).toContain('tabindex="0"');
     expect(markup).not.toMatch(/\s(?:height|width)="\d+"/);
     expect(markup).toContain(
       "/api/repos/project-id/repository-id/content",

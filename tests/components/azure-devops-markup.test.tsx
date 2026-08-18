@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AzureDevOpsMarkupView } from "@/components/azure-devops/azure-devops-markup";
 
 function renderMarkdown(content: string) {
@@ -53,6 +53,70 @@ describe("AzureDevOpsMarkupView markdown", () => {
     renderMarkdown("![a diagram](https://example.com/a.png)");
 
     expect(screen.getByAltText("a diagram")).toBeTruthy();
+  });
+
+  it("expands markdown images in an accessible dialog", async () => {
+    renderMarkdown("![a diagram](https://example.com/a.png)");
+
+    const image = screen.getByRole("button", {
+      name: "Expand image: a diagram",
+    });
+
+    expect(image).toHaveAttribute("aria-haspopup", "dialog");
+    fireEvent.click(image);
+
+    const dialog = screen.getByRole("dialog", {
+      name: "a diagram",
+    });
+
+    expect(dialog).toHaveClass("w-fit");
+    expect(dialog).not.toHaveClass("w-full");
+    expect(dialog.className).not.toContain("100dvh-2rem");
+    expect(dialog.querySelector('[data-slot="dialog-header"]'))
+      .toHaveClass("pr-8");
+    const footer = dialog.querySelector('[data-slot="dialog-footer"]');
+
+    expect(footer).toHaveClass("p-2");
+    expect(dialog.querySelectorAll('[data-slot="dialog-close"]'))
+      .toHaveLength(2);
+    expect(screen.getAllByAltText("a diagram")).toHaveLength(2);
+
+    const closeButton = footer?.querySelector("button");
+
+    if (!closeButton) {
+      throw new Error("Expected the image dialog footer close button.");
+    }
+
+    expect(closeButton).toHaveClass("h-8");
+    fireEvent.click(closeButton);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", {
+        name: "a diagram",
+      })).not.toBeInTheDocument();
+    });
+  });
+
+  it("expands raw html images from the keyboard", () => {
+    render(
+      <AzureDevOpsMarkupView
+        markup={{
+          content: '<img src="https://example.com/shot.png" alt="shot" />',
+          format: "html",
+        }}
+      />,
+    );
+
+    const image = screen.getByRole("button", {
+      name: "Expand image: shot",
+    });
+
+    expect(image).toHaveAttribute("tabindex", "0");
+    fireEvent.keyDown(image, { key: "Enter" });
+
+    expect(
+      screen.getByRole("dialog", { name: "shot" }),
+    ).toBeInTheDocument();
   });
 
   it("still renders GitHub flavoured tables", () => {
