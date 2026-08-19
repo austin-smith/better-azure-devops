@@ -42,6 +42,19 @@ describe("RepositoryMarkdown", () => {
     );
   });
 
+  it("preserves linked repository image navigation", () => {
+    const markup = renderMarkdown(
+      "[![Architecture](../assets/diagram.png)](../docs/architecture.md)",
+    );
+
+    expect(markup).toContain(
+      '<a href="/repos/project-id/repository-id/blob/docs/architecture.md?versionType=branch&amp;version=main"><span class="contents"><img alt="Architecture"',
+    );
+    expect(markup).not.toContain('aria-haspopup="dialog"');
+    expect(markup).not.toContain('role="button"');
+    expect(markup).not.toContain('tabindex="0"');
+  });
+
   it("does not treat non-web URL schemes as repository images", () => {
     const markup = renderMarkdown("![Contact](mailto:owner@example.com)");
 

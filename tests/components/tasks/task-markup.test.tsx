@@ -112,7 +112,9 @@ describe("TaskMarkup", () => {
 
     const mention = screen.getByText("Ada Lovelace");
     const externalLink = screen.getByRole("link", { name: "External" });
-    const image = screen.getByRole("img", { name: "Diagram" });
+    const image = screen.getByRole("button", {
+      name: "Expand image: Diagram",
+    });
     const checkbox = screen.getByRole("checkbox");
 
     expect(mention.tagName).toBe("SPAN");
@@ -169,7 +171,9 @@ describe("TaskMarkup", () => {
       />,
     );
 
-    const image = screen.getByRole("img", { name: "Architecture diagram" });
+    const image = screen.getByRole("button", {
+      name: "Expand image: Architecture diagram",
+    });
 
     expect(image).toHaveAttribute("loading", "lazy");
     expect(image).toHaveAttribute("decoding", "async");

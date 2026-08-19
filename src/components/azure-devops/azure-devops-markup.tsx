@@ -13,6 +13,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { ImageLightbox } from "@/components/image-lightbox";
 import { cn } from "@/lib/utils";
 import {
   buildAzureDevOpsAssetProxyPath,
@@ -299,7 +300,7 @@ export function AzureDevOpsMarkupView({
     switch (markup.format) {
       case "html":
         return (
-          <div
+          <ImageLightbox
             className={cn(
               proseClassName,
               proseSpacingClassName,
@@ -316,7 +317,7 @@ export function AzureDevOpsMarkupView({
         );
       case "markdown":
         return (
-          <div
+          <ImageLightbox
             className={cn(
               proseClassName,
               proseSpacingClassName,
@@ -338,7 +339,7 @@ export function AzureDevOpsMarkupView({
             >
               {markup.content}
             </ReactMarkdown>
-          </div>
+          </ImageLightbox>
         );
       case "unknown":
         return (
