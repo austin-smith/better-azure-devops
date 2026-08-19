@@ -50,6 +50,10 @@ function expandableImageLabel(image: HTMLImageElement) {
   return image.alt ? `Expand image: ${image.alt}` : "Expand image";
 }
 
+function isLinkedImage(image: HTMLImageElement) {
+  return image.closest("a[href]") !== null;
+}
+
 function findImage(
   container: HTMLElement | null,
   target: EventTarget | null,
@@ -60,7 +64,9 @@ function findImage(
 
   const image = target.closest("img");
 
-  return image instanceof HTMLImageElement && container?.contains(image)
+  return image instanceof HTMLImageElement &&
+    container?.contains(image) &&
+    !isLinkedImage(image)
     ? image
     : null;
 }
@@ -81,6 +87,10 @@ export function ImageLightbox({
       ?.querySelectorAll<HTMLImageElement>("img[src]") ?? [];
 
     for (const image of images) {
+      if (isLinkedImage(image)) {
+        continue;
+      }
+
       image.classList.add(...interactiveImageClassNames);
       image.setAttribute("aria-haspopup", "dialog");
       image.setAttribute("role", "button");

@@ -233,13 +233,9 @@ function createMarkdownComponents(
         <img
           {...props}
           alt={props.alt ?? ""}
-          aria-haspopup="dialog"
-          aria-label={props.alt ? `Expand image: ${props.alt}` : "Expand image"}
           decoding={props.decoding ?? "async"}
           loading={props.loading ?? "lazy"}
-          role="button"
           src={resolvedSource}
-          tabIndex={0}
         />
       );
     },

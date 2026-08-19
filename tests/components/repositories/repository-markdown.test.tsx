@@ -36,14 +36,23 @@ describe("RepositoryMarkdown", () => {
     expect(markup).toContain('loading="lazy"');
     expect(markup).toContain('decoding="async"');
     expect(markup).toContain('title="System diagram"');
-    expect(markup).toContain('aria-haspopup="dialog"');
-    expect(markup).toContain('aria-label="Expand image: Architecture"');
-    expect(markup).toContain('role="button"');
-    expect(markup).toContain('tabindex="0"');
     expect(markup).not.toMatch(/\s(?:height|width)="\d+"/);
     expect(markup).toContain(
       "/api/repos/project-id/repository-id/content",
     );
+  });
+
+  it("preserves linked repository image navigation", () => {
+    const markup = renderMarkdown(
+      "[![Architecture](../assets/diagram.png)](../docs/architecture.md)",
+    );
+
+    expect(markup).toContain(
+      '<a href="/repos/project-id/repository-id/blob/docs/architecture.md?versionType=branch&amp;version=main"><span class="contents"><img alt="Architecture"',
+    );
+    expect(markup).not.toContain('aria-haspopup="dialog"');
+    expect(markup).not.toContain('role="button"');
+    expect(markup).not.toContain('tabindex="0"');
   });
 
   it("does not treat non-web URL schemes as repository images", () => {

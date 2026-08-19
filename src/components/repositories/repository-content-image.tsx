@@ -20,17 +20,13 @@ export function RepositoryContentImage({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         alt={alt}
-        aria-haspopup="dialog"
-        aria-label={alt ? `Expand image: ${alt}` : "Expand image"}
         className={cn(
-          "h-auto w-auto max-w-full cursor-zoom-in object-contain transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+          "h-auto w-auto max-w-full object-contain",
           className,
         )}
         decoding="async"
         loading="lazy"
-        role="button"
         src={src}
-        tabIndex={0}
         title={title}
       />
     </ImageLightbox>

@@ -119,6 +119,48 @@ describe("AzureDevOpsMarkupView markdown", () => {
     ).toBeInTheDocument();
   });
 
+  it("preserves linked markdown image navigation", () => {
+    renderMarkdown(
+      "[![linked diagram](https://example.com/diagram.png)](https://example.com/docs)",
+    );
+
+    const link = screen.getByRole("link", { name: "linked diagram" });
+    const image = screen.getByRole("img", { name: "linked diagram" });
+
+    expect(link).toHaveAttribute("href", "https://example.com/docs");
+    expect(image).not.toHaveAttribute("aria-haspopup");
+    expect(image).not.toHaveAttribute("role", "button");
+    expect(image).not.toHaveAttribute("tabindex");
+
+    expect(fireEvent.click(image)).toBe(true);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("preserves linked raw html image navigation", () => {
+    render(
+      <AzureDevOpsMarkupView
+        markup={{
+          content:
+            '<a href="https://example.com/docs"><img src="https://example.com/shot.png" alt="linked shot"></a>',
+          format: "html",
+        }}
+      />,
+    );
+
+    const link = screen.getByRole("link", { name: "linked shot" });
+    const image = screen.getByRole("img", { name: "linked shot" });
+
+    expect(link).toHaveAttribute("href", "https://example.com/docs");
+    expect(image).not.toHaveAttribute("aria-haspopup");
+    expect(image).not.toHaveAttribute("role", "button");
+    expect(image).not.toHaveAttribute("tabindex");
+
+    expect(fireEvent.click(image)).toBe(true);
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("still renders GitHub flavoured tables", () => {
     const { container } = renderMarkdown(
       "| a | b |\n| - | - |\n| 1 | 2 |",
